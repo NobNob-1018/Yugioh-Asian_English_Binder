@@ -3,7 +3,7 @@
 A collection tracker for **OCG Asian-English** Yu-Gi-Oh cards. One HTML file, no
 build step, no server, no account.
 
-**Live:** https://imyan16.github.io/Yugioh-Asian_English_Binder/
+**Live:** https://nobnob-1018.github.io/Yugioh-Asian_English_Binder/
 
 ## What it does
 
