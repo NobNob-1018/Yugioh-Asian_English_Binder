@@ -1,0 +1,6 @@
+# Keep line endings stable. Without this, Git rewrites the 826 KB index.html on
+# every checkout on Windows, which churns diffs for no reason.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

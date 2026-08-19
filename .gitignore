@@ -1,0 +1,15 @@
+# working copies made while editing the single file
+*.bak.html
+*.bak[0-9]*.html
+ygo_binder.bak*.html
+
+# exported collections and sale pages - yours, not the repo's
+ygo-binder-*.json
+cards-for-sale-*.html
+
+# OS and editor noise
+Thumbs.db
+.DS_Store
+*.swp
+.vscode/
+.idea/
