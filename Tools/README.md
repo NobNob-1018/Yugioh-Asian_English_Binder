@@ -247,3 +247,75 @@ promised to two people.
 
 The seller's name and contact come from Settings and are baked into each
 exported binder, which is what puts the "Message the seller" button on it.
+
+## 11. OCG-JP, the second region
+
+The app holds two collections that share nothing but a card pool. The switch
+sits on the wordmark: **AE** for Asian-English, **JP** for Japanese OCG.
+
+What is separate:
+
+| | Asian-English | OCG-JP |
+|---|---|---|
+| Saved under | `ygo-binder-v1` | `ygo-binder-v1-ocg` |
+| Catalogue | `AE_CAT`, 71 sets | `JP_CAT_RAW`, 223 sets |
+| Prices | TCG Corner + Players Club | Yuyu-tei |
+| Quoted in | USD / HKD, shown in pesos | yen, shown in pesos |
+| Rarities | 11 | 19 |
+
+Binder, collection, selling shelf, wishlist, deals and sales history are all
+per region. Nothing merges across: a transfer code and an exported file each
+carry the region they came from and are refused by the other side, because a
+`ROTA-JP079` means nothing in an Asian-English binder.
+
+### Scope
+
+Japanese sets released **2020 onwards** — 224 prefixes off Yugipedia's
+`Japanese release date`. Earlier sets are deliberately left out; adding them is
+the same two harvests over a longer prefix list.
+
+### Where the data comes from
+
+**Yuyu-tei** (`yuyu-tei.jp/sell/ygo/s/<lowercase-prefix>`) is a plain
+server-rendered site, not Shopify, and sends no CORS header — so prices are
+baked, exactly as the other two shops are. One request returns a whole set.
+Of the 224 sets, **130 are stocked**; the rest are promos they do not carry.
+
+A set they have never stocked still answers with a generic 40-row page rather
+than a 404, so a miss is detected by looking for the set's own `PREFIX-JP`
+codes in the response. Without that check the harvest silently fills with
+another set's cards.
+
+The same code and rarity can be listed twice — a played copy beside a clean
+one. The row kept is the one a buyer would actually get: **in stock first,
+then cheapest**. A sold-out listing keeps its last price, since it is still the
+best guide available, but its count is zero so nothing reads it as buyable.
+
+**Yugipedia** supplies the catalogue, from `Set Card Lists:… (OCG-JP)` in
+namespace 3006. Those lists carry **English** names, which is what lets both
+regions share one name table: of 6,478 Japanese names, 3,733 were already
+there and only 2,801 had to be added.
+
+### Rarities
+
+Yuyu-tei tags rarities its own way (`N SE SR UR UL QCSE PSE CR HR NR M PG
+GMR EXSE`) and Yugipedia writes them both in full and abbreviated. `RARMAP` (jp-rarity-map.pl) in
+the harvest script covers all three spellings. OCG-JP prints eight the
+Asian-English side never sees: Normal Rare, the four Parallel grades, 20th
+Secret, Millennium and Premium Gold.
+
+Rarity comes from the catalogue where the wiki lists it (67.6%), otherwise
+from whatever Yuyu-tei stocked (28.5%). The remaining 4% falls back to Common.
+
+### Scale
+
+8,447 printings across 223 sets, 14,210 priced rows, 95.7% with art already on
+YGOPRODeck. Baked, that is 106 KB of catalogue, 166 KB of prices and 68 KB of
+names — about 340 KB raw, 100 KB gzipped.
+
+### Re-harvesting
+
+`jp-sets.pl` lists the prefixes and dates, `jp-prices-yuyutei.pl` walks Yuyu-tei,
+`jp-catalogue-yugipedia.pl` walks Yugipedia, and `jp-bake.pl` writes the two tables. Sanity
+check afterwards: every priced code should be one the catalogue knows —
+orphans mean a parser drifted.
