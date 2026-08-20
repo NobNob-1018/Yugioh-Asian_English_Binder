@@ -170,3 +170,80 @@ Prices are a snapshot, dated in the footer - the page fetches nothing.
 One trap when editing the generator: the page own `<script>` is built inside a
 `String.raw` template, so a backslash written there survives verbatim. An escape
 meant for the emitted script needs a *single* backslash, not two.
+
+## 8. How the price tables are encoded
+
+Both price tables point into `AE_NAMES` rather than repeating card names.
+
+- `BAKED_PRICES` is `[code, nameIndex, [[rarity, price], ...]]`. 4,346 of 4,584
+  rows use an index; 238 keep a spelled-out name because their spelling is not
+  in the catalogue (`Retaliating C`, `Spell Card Monster Reborn`, and similar).
+  `expandBaked()` unfolds either form, so everything downstream sees a name.
+- `PC_ROWS_RAW` is `[code, rarity, priceHKD, nameIndex]`, with a fifth element
+  carrying the name where it did not match.
+
+This is worth keeping if you rebuild either table. Spelling the names out costs
+81 KB raw and, less obviously, 29 KB gzipped - a 3-4 digit index gives the
+compressor less to chew on than a repeated string does.
+
+## 9. Players Club HK, the second shop
+
+A Shopify store whose Asian-English stock is already one collection, so the
+whole catalogue comes from a single endpoint rather than a shop-wide crawl:
+
+```
+https://playersclubhk.com/en/collections/ygoae1/products.json?limit=250&page=N
+```
+
+18 pages, 4,275 products, 3,699 usable rows. Three things to know:
+
+1. **Rarity is in the title, not a field.** `25AT-AE304 (SR)Lose 1 Turn`, or
+   sometimes glued on: `DUNE-AE107(UR)`. Their abbreviations differ from ours -
+   `UTR` is Ultimate, `SER` is Secret, `PSER` is Prismatic Secret, `QCSE` is
+   Quarter Century. `NPR` and `AA` have no equivalent here and are dropped
+   rather than filed under a rarity they are not.
+2. **299 listings cover several rarities at one price** - `(UR/UTR/SER/QCSE)`.
+   Those are skipped: one figure cannot be attributed to four printings.
+3. **A title with no rarity marker is treated as the base printing.** The risk
+   is contained, because matching is keyed on rarity: a listing recorded as
+   Common can only ever price a Common copy.
+
+Prices are HKD. The rate is **not** baked - `refreshRate()` already fetches
+every currency in one call, so the HKD cross rate refreshes alongside the peso
+one. A stale file therefore cannot quietly make one shop look cheaper. With no
+rate available the shop is skipped rather than guessed at.
+
+`bestMatch()` returns whichever shop is cheaper, in pesos, naming the winner so
+a figure can be traced back to a listing.
+
+## 10. Deals: cart, order codes and reservations
+
+A buyer works through a shared binder, presses **Send an order**, and gets a
+`YGOD1.â¦` code. They send it however they already chat; the seller pastes it
+into **Deals** and it becomes a pending deal.
+
+**Reservation is a quantity, not a flag.** A copy row keeps `qty: 5` while a
+deal claims 3 of them. Nothing is moved or deleted, so postponing a deal is a
+status change rather than an attempt to restore inventory exactly.
+
+- `reservedQty(id, rarity, set)` counts only **ticked** items in **pending**
+  deals. Untick a line or postpone a deal and those copies are free at once.
+- `freeCopiesIn(id)` is deliberately separate from `copiesIn()`. The two dozen
+  places asking "what do I own" keep the same answer; only the shared binder
+  asks "what can I still offer".
+- The deal helpers read `sellCopies()`, not `copiesIn()`. `copiesIn()` answers
+  for whichever binder is open, which made reservations read as zero whenever
+  the Collection happened to be on screen.
+
+**Over-committing is never silent.** An order asking for more than is free
+shows the clash and names the deals already holding those copies, then offers
+"accept what is free" or "accept anyway". There is no server, so the app cannot
+know who asked first - it puts the facts up and the seller decides.
+
+Reserved copies still count towards Selling value and Total assets: they are
+someone else's intention, not a sale. The dashboard shows them as a separate
+"reserved" figure, and shared binders exclude them so the same card is never
+promised to two people.
+
+The seller's name and contact come from Settings and are baked into each
+exported binder, which is what puts the "Message the seller" button on it.
