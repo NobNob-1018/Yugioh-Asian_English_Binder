@@ -2,7 +2,7 @@ use strict; use warnings;
 use JSON::PP; use URI::Escape;
 binmode(STDOUT,':encoding(UTF-8)');
 my $UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36';
-my $CUT = 1577836800;   # 2020-01-01
+my $CUT = 1483228800;   # 2017-01-01
 
 my %sets; my $offset=0; my $pages=0;
 while(1){
@@ -30,8 +30,8 @@ while(1){
 my @recent = grep { $sets{$_}{ts} >= $CUT } keys %sets;
 my @older  = grep { $sets{$_}{ts} <  $CUT } keys %sets;
 printf "prefixes with a JP date : %d  (%d api pages)\n", scalar keys %sets, $pages;
-printf "  2020 onwards          : %d\n", scalar @recent;
-printf "  before 2020           : %d\n", scalar @older;
+printf "  2017 onwards          : %d\n", scalar @recent;
+printf "  before 2017           : %d\n", scalar @older;
 
 my @sorted = sort { $sets{$b}{ts} <=> $sets{$a}{ts} } @recent;
 print "\nnewest ten:\n";

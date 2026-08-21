@@ -4,7 +4,7 @@ binmode(STDOUT,':encoding(UTF-8)');
 my $UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36';
 
 my %want;
-{ open my $P,'<:encoding(UTF-8)','/tmp/jp_prefixes.txt' or die $!;
+{ open my $P,'<:encoding(UTF-8)','/tmp/jp_sets.tsv' or die $!;
   while(my $l=<$P>){ chomp $l; my ($p)=split /\t/,$l; $want{$p}=1 if $p } close $P; }
 
 my (@titles,$cont);

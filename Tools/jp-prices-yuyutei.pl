@@ -2,7 +2,7 @@ use strict; use warnings;
 binmode(STDOUT,':encoding(UTF-8)');
 my $UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36';
 
-open my $P,'<:encoding(UTF-8)','/tmp/jp_prefixes.txt' or die "prefixes: $!\n";
+open my $P,'<:encoding(UTF-8)','/tmp/jp_sets.tsv' or die "prefixes: $!\n";
 my @pre;
 while(<$P>){ chomp; my ($p,$ts)=split /\t/; push @pre,[$p,$ts] if $p }
 close $P;

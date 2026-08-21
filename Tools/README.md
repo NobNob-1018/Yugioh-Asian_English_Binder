@@ -258,7 +258,7 @@ What is separate:
 | | Asian-English | OCG-JP |
 |---|---|---|
 | Saved under | `ygo-binder-v1` | `ygo-binder-v1-ocg` |
-| Catalogue | `AE_CAT`, 71 sets | `JP_CAT_RAW`, 223 sets |
+| Catalogue | `AE_CAT`, 71 sets | `JP_CAT_RAW`, 317 sets |
 | Prices | TCG Corner + Players Club | Yuyu-tei |
 | Quoted in | USD / HKD, shown in pesos | yen, shown in pesos |
 | Rarities | 11 | 19 |
@@ -270,16 +270,16 @@ carry the region they came from and are refused by the other side, because a
 
 ### Scope
 
-Japanese sets released **2020 onwards** — 224 prefixes off Yugipedia's
-`Japanese release date`. Earlier sets are deliberately left out; adding them is
-the same two harvests over a longer prefix list.
+Japanese sets released **2017 onwards** — 318 prefixes off Yugipedia's
+`Japanese release date`. Anything earlier is the same two harvests over a longer
+prefix list: move `` in `jp-sets.pl` and re-run.
 
 ### Where the data comes from
 
 **Yuyu-tei** (`yuyu-tei.jp/sell/ygo/s/<lowercase-prefix>`) is a plain
 server-rendered site, not Shopify, and sends no CORS header — so prices are
 baked, exactly as the other two shops are. One request returns a whole set.
-Of the 224 sets, **130 are stocked**; the rest are promos they do not carry.
+Of the 318 sets, **189 are stocked**; the rest are promos they do not carry.
 
 A set they have never stocked still answers with a generic 40-row page rather
 than a 404, so a miss is detected by looking for the set's own `PREFIX-JP`
@@ -293,8 +293,8 @@ best guide available, but its count is zero so nothing reads it as buyable.
 
 **Yugipedia** supplies the catalogue, from `Set Card Lists:… (OCG-JP)` in
 namespace 3006. Those lists carry **English** names, which is what lets both
-regions share one name table: of 6,478 Japanese names, 3,733 were already
-there and only 2,801 had to be added.
+regions share one name table: of the Japanese names, well over a third were
+already there and only 4,153 had to be added.
 
 ### Rarities
 
@@ -309,7 +309,7 @@ from whatever Yuyu-tei stocked (28.5%). The remaining 4% falls back to Common.
 
 ### Scale
 
-8,473 printings across 223 sets, 14,210 priced rows, 95.7% with art already on
+11,651 printings across 317 sets, 18,049 priced rows, 95.7% with art already on
 YGOPRODeck. Baked, that is 107 KB of catalogue, 166 KB of prices and 68 KB of
 names — about 340 KB raw, 100 KB gzipped.
 
@@ -406,3 +406,29 @@ together, so its script is **compiled with `new Function` before the file is
 handed over**. If it will not parse, nothing downloads and the reason is named.
 A stray quote in a card name used to produce a file that looked fine here and
 rendered an empty grid on the buyer's machine.
+
+## 16. The wishlist holds printings, not cards
+
+One card can be worth hunting in more than one rarity — the Secret at a price
+you would pay today, the Quarter Century only if it falls a long way. So an
+entry is `{rows:[…], added}`, one row per printing, each with its own set,
+count and target. **Add another rarity** opens a new row on a rarity not
+already listed that a shop actually stocks.
+
+Card-level questions still have card-level answers: the grid badge and the
+"met" state read the **cheapest** row, since that is the one you would buy
+first. The dashboard counts both — "1 card · 3 printings".
+
+Old entries carried a single rarity; `slimWant()` turns each into a list of
+one. Transfer codes write one line per row and gather them back by card id, so
+several rows sharing a card no longer overwrite each other.
+
+### What the shops are asking
+
+`srpRange` used to read TCG Corner's rows directly. That made it disagree with
+the row underneath it — quoting ₱126 while the line below said ₱79 at Players
+Club — and return nothing at all in OCG-JP, where that shop has no rows. It now
+asks `bestMatch` once per rarity the card was printed in, which is the same
+question a single printing is asked, so the range and the lines cannot
+contradict each other. The figure is shown **before** anything is added, so the
+decision to hunt a card is made against a real number.
