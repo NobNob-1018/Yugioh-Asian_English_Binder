@@ -351,3 +351,58 @@ A give row records **which binder** the copy came from, because the same
 printing can sit in Collection and on the selling shelf, and the settlement has
 to take it out of the one that was actually picked. That is why the search
 results read `Rare · ROTA-JP002 · Selling`.
+
+## 13. Storage, and why entries are thin
+
+Binders live in **IndexedDB**, falling back to localStorage where it is not
+available. A binder saved by an older version is still read from localStorage
+on first load and written back to IndexedDB.
+
+An owned entry is `{n, copies, added}` — the name, the copies you typed in, and
+when it arrived. It used to carry a whole card beside every entry: text, art
+urls, stats, the lot. That was **842 bytes a card against 104 now**, and at 842
+about six thousand cards filled the 5 MB localStorage quota shared by both
+regions.
+
+Everything else about a card is rebuilt from the pool by id. A card the pool no
+longer carries resolves to a **name stub** — enough to list it and file copies
+against, marked `ghost` so nothing mistakes it for a real pool entry. That is
+what the name is kept for.
+
+`migrate()` reshapes old binders on the way in and drops `decks`, which the
+deck builder left behind when it was removed.
+
+### A failed save is never silent
+
+`Store.set` returns false when nothing could be written. `save()` checks it and
+raises a banner that does not go away, because the risk does not either: every
+edit since the last good write dies on the next refresh. The banner offers the
+export button directly.
+
+## 14. Undo, and the address bar
+
+`markUndo(label)` snapshots the binder before a destructive change; `toastUndo`
+offers it back for six seconds. One slot, deliberately — the mistake worth
+recovering is nearly always the one just made. Wired to clearing copies and to
+settling a trade.
+
+Where you are — region, view, drilled set or core, binder tab, search, page —
+lives in the hash, written from `renderBinder` since every navigation ends
+there. A change that is only a search keystroke replaces rather than pushes, so
+Back does not walk the search back a letter at a time. `readUrl` runs at boot
+when there is a hash, so a shared link opens where it points.
+
+## 15. Asking a shop for a price
+
+All three shops are asked the same question in the same order — this exact
+printing, then this card in this set, then this card at all — and answer it the
+same way: **stocked beats cheaper**. That order and those tie-breaks live once,
+in `pickPrinting` and `rowsForCard`. A shop supplies only its index and its
+currency. TCG Corner additionally drops played stock, which is a different
+product at a third of the price.
+
+The exported sale page is a second application built by pasting strings
+together, so its script is **compiled with `new Function` before the file is
+handed over**. If it will not parse, nothing downloads and the reason is named.
+A stray quote in a card name used to produce a file that looked fine here and
+rendered an empty grid on the buyer's machine.

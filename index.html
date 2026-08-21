@@ -796,6 +796,23 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:var(--fs-2xs);color:var(--faint)}
 .loading i{width:9px;height:9px;border:1.5px solid var(--track);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;display:block}
+/* A save that cannot land is the one failure worth interrupting for. */
+.savewarn{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:120;
+  display:flex;align-items:center;gap:var(--sp-3);max-width:min(560px,calc(100vw - 24px));
+  padding:var(--sp-3) var(--sp-4);border-radius:var(--r);background:var(--surface-3);
+  border:1px solid var(--down);box-shadow:var(--sh-3);font-size:var(--fs-sm);
+  color:var(--ink);line-height:1.45}
+.savewarn b{color:var(--down)}
+.savewarn .btn{flex:none}
+@media (max-width:560px){.savewarn{flex-direction:column;align-items:flex-start;bottom:12px}}
+/* a toast you can act on sits a little wider and stays a little longer */
+.toast-act{display:flex;align-items:center;gap:var(--sp-3)}
+.tundo{border:0;background:transparent;color:var(--accent);cursor:pointer;
+  font:inherit;font-weight:600;padding:2px 4px;border-radius:var(--r-xs)}
+.tundo:hover{text-decoration:underline}
+.tundo:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:120;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-xs);padding:8px 14px;font-size:var(--fs-sm);animation:rise .22s ease}
 @keyframes rise{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
 
@@ -1181,11 +1198,9 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
 <div id="bm-hot" aria-hidden="true"></div>
 <div id="bm-chrome"></div>
 <div id="layer"></div>
+<div id="say" aria-live="polite" class="sr-only"></div>
 
 <script>
-/* ============ storage ============ */
-const KEY='ygo-binder-v1';
-const KEY_NAMES='ygo-binder-names-v1';   /* compact id|name list, so scanning works offline */
 /* ---- region ----
    Asian-English and OCG-JP are two collections that happen to share a card
    pool. Nothing crosses between them: separate binders, separate selling
@@ -1196,22 +1211,78 @@ let REGION=(()=>{try{return localStorage.getItem(KEY_REGION)==='ocg'?'ocg':'ae';
 const ocgOn=()=>REGION==='ocg';
 const regionKey=()=>REGION==='ocg'?KEY+'-ocg':KEY;
 const regionLabel=()=>REGION==='ocg'?'OCG-JP':'Asian-English';
+/* ============ storage ============
+   IndexedDB first, localStorage as the fallback. The reason is capacity: a
+   binder used to carry a copy of the whole card - name, text, art urls, stats -
+   beside every entry you owned, which came to 842 bytes a card. Five thousand
+   cards and the 5 MB localStorage quota was gone. Worse, it went quietly:
+   setItem threw, the throw was swallowed, and the binder carried on looking
+   saved until the next refresh threw the work away.
+
+   So two changes together. Entries no longer carry the card, only its name as
+   a last-resort label, which is 68 bytes; and a failed write now says so. */
+const KEY='ygo-binder-v1';
+const KEY_NAMES='ygo-binder-names-v1';   /* compact id|name list, so scanning works offline */
+const IDB_NAME='ygo-binder',IDB_STORE='kv';
 const Store={
+  _p:null,
+  /* one connection, opened lazily; a browser that refuses simply falls back */
+  _open(){
+    if(this._p)return this._p;
+    this._p=new Promise(res=>{
+      let req;
+      try{ req=indexedDB.open(IDB_NAME,1); }catch(e){ return res(null); }
+      req.onupgradeneeded=()=>{
+        const db=req.result;
+        if(!db.objectStoreNames.contains(IDB_STORE))db.createObjectStore(IDB_STORE);
+      };
+      req.onsuccess=()=>res(req.result);
+      req.onerror=()=>res(null);
+      req.onblocked=()=>res(null);
+    });
+    return this._p;
+  },
+  async _idb(mode,fn){
+    const db=await this._open();
+    if(!db)return {ok:false};
+    return new Promise(res=>{
+      let tx;
+      try{ tx=db.transaction(IDB_STORE,mode); }catch(e){ return res({ok:false}); }
+      const st=tx.objectStore(IDB_STORE);
+      let out;
+      try{ out=fn(st); }catch(e){ return res({ok:false}); }
+      tx.oncomplete=()=>res({ok:true,value:out&&out.result});
+      tx.onerror=()=>res({ok:false});
+      tx.onabort=()=>res({ok:false});
+    });
+  },
   async get(k){
     k=k||regionKey();
-    try{ if(window.storage){const r=await window.storage.get(k);return r?JSON.parse(r.value):null;} }catch(e){}
-    try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){}
+    const r=await this._idb('readonly',st=>st.get(k));
+    if(r.ok&&r.value!=null){
+      try{ return typeof r.value==='string'?JSON.parse(r.value):r.value; }catch(e){}
+    }
+    /* nothing in IndexedDB yet - either a first run or a binder saved before
+       this version, which is still sitting in localStorage                */
+    try{ if(window.storage){const s=await window.storage.get(k);if(s)return JSON.parse(s.value);} }catch(e){}
+    try{ const v=localStorage.getItem(k); if(v)return JSON.parse(v); }catch(e){}
     return null;
   },
+  /* true only when the bytes are actually somewhere durable */
   async set(d,k){
     k=k||regionKey();
     const s=JSON.stringify(d);
+    const r=await this._idb('readwrite',st=>st.put(s,k));
+    if(r.ok)return true;
     try{ if(window.storage){await window.storage.set(k,s);return true;} }catch(e){}
-    try{ localStorage.setItem(k,s);return true;}catch(e){}
+    try{ localStorage.setItem(k,s);return true; }catch(e){}
     return false;
+  },
+  async del(k){
+    await this._idb('readwrite',st=>st.delete(k));
+    try{ localStorage.removeItem(k); }catch(e){}
   }
 };
-
 /* ============ reference data ============ */
 /* Rarities that actually exist in Asian-English printings. */
 const RARITIES_AE=[
@@ -1263,7 +1334,7 @@ const SPELL_PROPS=['Normal','Continuous','Equip','Field','Quick-Play','Ritual'];
 const TRAP_PROPS=['Normal','Continuous','Counter'];
 
 /* ============ state ============ */
-let DB={own:{},manual:{},want:{},deals2:[],decks:[],binders:BINDERS.map(b=>Object.assign({},b)),seq:0};
+let DB={own:{},manual:{},want:{},deals2:[],binders:BINDERS.map(b=>Object.assign({},b)),seq:0};
 let POOL=[],poolReady=false;
 /* the unfiltered OCG list, kept so a price sync can re-apply the Asian-English
    filter without fetching fourteen thousand cards again                    */
@@ -1822,7 +1893,6 @@ function wantTotals(){
   });
   return {target,now,quoted,met,cards:wantCount()};
 }
-const decksOf=id=>{const o=ownOf(id);return o?(o.decks||[]):[];};
 const broadType=c=>{const t=c.type||'';return /Spell/.test(t)?'Spell':/Trap/.test(t)?'Trap':'Monster';};
 
 /* ---- flipping regions ----
@@ -1845,7 +1915,7 @@ async function setRegion(r){
     AE_SETS=new Map();AE_STAMP='';AE_LEGACY=null;AE_MODERN=null;AE_ERA_STAMP='';
     SET_DATE=null;SET_DATE_STAMP='';
 
-    DB={own:{},manual:{},want:{},deals2:[],decks:[],
+    DB={own:{},manual:{},want:{},deals2:[],
         binders:BINDERS.map(b=>Object.assign({},b)),seq:0};
     const saved=await Store.get();
     if(saved)DB=migrate(saved);
@@ -1887,16 +1957,36 @@ function paintRegion(){
   });
   document.documentElement.setAttribute('data-region',REGION);
 }
-async function save(){await Store.set(DB);}
-function toast(m){document.querySelectorAll('.toast').forEach(t=>t.remove());const t=el('div','toast',esc(m));document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
+function toast(m){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=el('div','toast',esc(m));document.body.appendChild(t);
+  say(m);
+  setTimeout(()=>t.remove(),2200);
+}
+/* Every toast was silent to a screen reader; this is the one place they all
+   pass through, so it is the one place that has to speak.              */
+function say(m){const n=document.getElementById('say');if(n)n.textContent=String(m||'');}
 
 /* ============ list ============ */
+/* Bumped by every write, so anything cached against it falls the moment the
+   data behind it moves. Cheaper and harder to get wrong than tracking which
+   cache each edit invalidates.                                          */
+let DATA_V=0;
+let ALL_CACHE=null,ALL_KEY='';
 function allCards(){
+  const key=REGION+'|'+DATA_V+'|'+POOL.length+'|'+Object.keys(DB.own).length+'|'+Object.keys(DB.manual).length;
+  if(ALL_CACHE&&ALL_KEY===key)return ALL_CACHE;
   const map=new Map();
   POOL.forEach(c=>map.set(c.id,c));
-  Object.values(DB.own).forEach(o=>{if(o.card&&!map.has(o.card.id))map.set(o.card.id,o.card);});
+  /* a card you own that the pool no longer carries still has to be listed */
+  Object.keys(DB.own).forEach(id=>{
+    if(map.has(id))return;
+    const n=ownName(DB.own[id]);
+    if(n)map.set(id,nameStub(id,n));
+  });
   Object.values(DB.manual).forEach(c=>map.set(c.id,c));
-  return [...map.values()];
+  ALL_CACHE=[...map.values()];ALL_KEY=key;
+  return ALL_CACHE;
 }
 function visible(){
   /* A deck list is its own view: every card in it shows, owned or not. So is an
@@ -1939,62 +2029,128 @@ function visible(){
     ||(!copiesIn(c.id).length&&printingsOf(c).rars.includes(F.rar)));
   /* the wishlist is cards you do NOT own, so the owned switch cannot apply */
   if(F.binder&&VIEW!=='wants'&&!F.arch&&!F.set&&F.ownedOnly)list=list.filter(c=>copiesIn(c.id).length);
-  const s=F.sort,byName=(a,b)=>(a.name||'').localeCompare(b.name||'');
-  list.sort((a,b)=>{
-    if(s==='price')return unitValue(b)-unitValue(a)||byName(a,b);
-    if(s==='name')return byName(a,b);
-    if(s==='type')return broadType(a).localeCompare(broadType(b))||byName(a,b);
-    if(s==='rarity')return ((topRarity(b.id)||{w:0}).w-(topRarity(a.id)||{w:0}).w)||byName(a,b);
-    if(s==='copies')return totalCopies(b.id)-totalCopies(a.id)||byName(a,b);
-    if(s==='level')return (((b.mon||{}).level)||0)-(((a.mon||{}).level)||0)||byName(a,b);
-    const oa=ownOf(a.id),ob=ownOf(b.id);
-    if(oa&&ob)return oa.added-ob.added;
-    if(oa)return -1;
-    if(ob)return 1;
-    return byName(a,b);
+  /* A comparator asked unitValue twice per comparison, which for five thousand
+     cards is a hundred and twenty thousand price lookups to sort a list of
+     five thousand. Work the key out once per card and sort on that.     */
+  const s=F.sort;
+  const keyOf=c=>{
+    if(s==='price')return -unitValue(c);
+    if(s==='type')return broadType(c);
+    if(s==='rarity')return -((topRarity(c.id)||{w:0}).w);
+    if(s==='copies')return -totalCopies(c.id);
+    if(s==='level')return -(((c.mon||{}).level)||0);
+    if(s==='added'){const o=ownOf(c.id);return o?o.added:Infinity;}
+    return null;                                   /* name, and the default */
+  };
+  const dec=list.map((c,i)=>({c,i,k:keyOf(c),n:(c.name||'').toLowerCase()}));
+  dec.sort((a,b)=>{
+    if(a.k!==null&&b.k!==null&&a.k!==b.k)return a.k<b.k?-1:1;
+    if(a.n!==b.n)return a.n<b.n?-1:1;
+    return a.i-b.i;                                /* stable */
   });
-  return list;
+  return dec.map(d=>d.c);
 }
 
 /* ============ render ============ */
-function renderBinder(dir){
-  /* Settle the grid before measuring anything. autoLayout only sets the CSS
-     variables and PER, so this cannot recurse, and it means the sheet is right
-     even if no resize event ever reached us.                                 */
-  autoLayout(true);
-  const list=visible();
-  const pages=Math.max(1,Math.ceil(list.length/PER));
-  page=Math.min(Math.max(0,page),pages-1);
-  const grid=$('#page');
-  const bn=activeBinder(),dk=null,selling=isSelling(bn);
-  paintDash();
-  /* Cores has two levels: the list of cores, then one core's cards. The second
-     level borrows the binder grid below rather than bouncing you into Binder. */
-  /* Sets and Cores each have two levels: a board of tiles, then one of them
-     opened. An opened one draws its cards exactly like the binder does, as
-     images or as a list, whichever the display switch on the bar says.     */
-  const drilled=(VIEW==='cores'&&F.arch)||(VIEW==='sets'&&F.set);
-  const showingCards=VIEW==='binder'||VIEW==='wants'||drilled;
-  paintTools(showingCards);
-  if(!showingCards||MODE==='list'){
-    grid.className=showingCards?'rows':(MODE==='list'?'rows':'sets');
-    grid.style.height='auto';grid.style.width='100%';
-    grid.innerHTML='';
-    $('#binder-state').innerHTML='';
-    if(!showingCards&&VIEW==='sets')return renderSets(grid,dk,bn);
-    if(!showingCards&&VIEW==='cores')return renderCores(grid);
-    if(!showingCards&&VIEW==='deals')return renderDeals(grid);
-    return renderList(grid,list,dk,bn);
+/* ---- the address bar as state ----
+   Where you are is a set of filters held in memory, which meant Back did
+   nothing, a drilled set could not be linked to, and a refresh dropped you at
+   the top. All of it is small enough to live in the hash.                 */
+let URL_LAST='',URL_READING=false;
+function urlNow(){
+  const p=new URLSearchParams();
+  if(REGION!=='ae')p.set('r',REGION);
+  if(VIEW!=='binder')p.set('v',VIEW);
+  if(F.set)p.set('set',F.set);
+  if(F.arch)p.set('core',F.arch);
+  if(F.binder&&F.binder!=='b-main')p.set('b',F.binder);
+  if(F.text)p.set('q',F.text);
+  if(page)p.set('p',String(page+1));
+  return p.toString();
+}
+/* Called from the one place every navigation ends up. A change that is only a
+   search keystroke replaces rather than pushes, so Back leaves the search
+   instead of walking it back a letter at a time.                          */
+function writeUrl(){
+  if(URL_READING)return;
+  const now=urlNow();
+  if(now===URL_LAST)return;
+  const was=new URLSearchParams(URL_LAST),is=new URLSearchParams(now);
+  was.delete('q');is.delete('q');
+  const onlySearch=was.toString()===is.toString();
+  URL_LAST=now;
+  const to=location.pathname+(now?'#'+now:'');
+  try{ history[onlySearch?'replaceState':'pushState']({},'',to); }catch(e){}
+}
+async function readUrl(){
+  const raw=(location.hash||'').replace(/^#/,'');
+  const p=new URLSearchParams(raw);
+  URL_LAST=raw;
+  const want=p.get('r')==='ocg'?'ocg':'ae';
+  URL_READING=true;
+  try{
+    if(want!==REGION){ URL_READING=false; await setRegion(want); URL_READING=true; }
+    const v=p.get('v')||'binder';
+    VIEW=['binder','sets','cores','wants','deals'].includes(v)?v:'binder';
+    F.set=p.get('set')||'';
+    F.arch=p.get('core')||'';
+    F.binder=p.get('b')||'b-main';
+    F.text=p.get('q')||'';
+    page=Math.max(0,(parseInt(p.get('p'),10)||1)-1);
+    const sb=$('#f-text'); if(sb)sb.value=F.text;
+    document.querySelectorAll('#view-tabs button').forEach(b=>
+      b.classList.toggle('on',(b.dataset.v||'binder')===VIEW));
+    document.querySelectorAll('#binder-tabs button').forEach(b=>
+      b.classList.toggle('on',(b.dataset.b||'')===F.binder));
+    renderBinder();
+  } finally {
+    URL_READING=false;
+    /* a region switch on the way in resets the view and writes its own hash,
+       so the last word goes to the state that actually ended up applied  */
+    URL_LAST='';writeUrl();
   }
-  grid.style.height='';grid.style.width='';
-  const slice=list.slice(page*PER,page*PER+PER);
-  grid.className='page'+(spreadOn()?' spread':'')+(dir?' '+dir:'');
-  /* The keyframes run from dimmed-and-tilted back to rest, so a browser that
-     never composites them would leave the page mid-turn. Dropping the class
-     shortly after restores the static state, which is the correct one.   */
-  if(dir){const g=grid;setTimeout(()=>g.classList.remove('tl','tr'),420);}
-  grid.innerHTML='';
+}
+window.addEventListener('popstate',()=>{readUrl();});
 
+/* ---- one step back ----
+   Clearing copies, settling a trade and closing a deal all rewrite the binder
+   and all used to be final. One slot is enough: the mistake you want back is
+   almost always the one you just made.                                    */
+let UNDO=null;
+function markUndo(label){
+  try{ UNDO={label,json:JSON.stringify(DB),at:Date.now()}; }
+  catch(e){ UNDO=null; }
+}
+function canUndo(){ return !!UNDO; }
+async function undoLast(){
+  if(!UNDO)return;
+  const snap=UNDO; UNDO=null;
+  try{
+    DB=JSON.parse(snap.json);
+    DATA_V++;
+    await save();
+    renderBinder();
+    toast('Undone — '+snap.label);
+  }catch(e){ toast('Could not undo that'); }
+}
+/* A toast you can act on. The action lives as long as the toast does, which is
+   deliberately longer than a plain one: undo is worth reading twice.     */
+function toastUndo(msg,label){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=el('div','toast toast-act');
+  t.appendChild(el('span','',esc(msg)));
+  const b=el('button','tundo','Undo');
+  b.onclick=()=>{t.remove();undoLast();};
+  t.appendChild(b);
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),6000);
+}
+/* ---- the three things a page is made of ----
+   renderBinder decided the layout, chose the page, said what to do when
+   there was nothing to show, drew every pocket and then wired the pager,
+   all in one run of a hundred and seventy lines. It still decides; the
+   drawing is three functions that each do one of those jobs.        */
+function paintEmptyState(list,bn,dk){
   const st=$('#binder-state');st.innerHTML='';
   if(!list.length){
     if(!poolReady&&!F.ownedOnly)st.appendChild(el('div','state','<div class="spin"></div><b>Loading the OCG pool</b>Every card with an OCG release is on its way in.'));
@@ -2004,7 +2160,8 @@ function renderBinder(dir){
     else if(bn&&!F.ownedOnly)st.appendChild(el('div','state',`<b>Nothing in ${esc(bn.name)} yet</b>Open a card and use Keep / Sell on a copy to file it here.`));
     else st.appendChild(el('div','state','<b>No cards match these filters</b>Use Clear filters, or tap the \u00d7 beside the heading.'));
   }
-
+}
+function paintSlots(grid,slice,bn,selling){
   for(let i=0;i<PER;i++){
     const c=slice[i];
     if(!c){const sl=el('div','slot');sl.appendChild(el('div','pocket pocket-empty','<span>\u25c7</span><span class="sleeve"></span>'));sl.appendChild(el('div','cap-row'));grid.appendChild(sl);continue;}
@@ -2088,11 +2245,57 @@ function renderBinder(dir){
     slot.appendChild(cap);
     grid.appendChild(slot);
   }
-
+}
+function paintPager(page,pages){
   $('#jump').value=page+1;
   $('#of').textContent='/ '+pages.toLocaleString();
   $('#prev').disabled=page===0;
   $('#next').disabled=page>=pages-1;
+}
+function renderBinder(dir){
+  /* Settle the grid before measuring anything. autoLayout only sets the CSS
+     variables and PER, so this cannot recurse, and it means the sheet is right
+     even if no resize event ever reached us.                                 */
+  autoLayout(true);
+  writeUrl();
+  const list=visible();
+  const pages=Math.max(1,Math.ceil(list.length/PER));
+  page=Math.min(Math.max(0,page),pages-1);
+  const grid=$('#page');
+  const bn=activeBinder(),dk=null,selling=isSelling(bn);
+  paintDash();
+  /* Cores has two levels: the list of cores, then one core's cards. The second
+     level borrows the binder grid below rather than bouncing you into Binder. */
+  /* Sets and Cores each have two levels: a board of tiles, then one of them
+     opened. An opened one draws its cards exactly like the binder does, as
+     images or as a list, whichever the display switch on the bar says.     */
+  const drilled=(VIEW==='cores'&&F.arch)||(VIEW==='sets'&&F.set);
+  const showingCards=VIEW==='binder'||VIEW==='wants'||drilled;
+  paintTools(showingCards);
+  if(!showingCards||MODE==='list'){
+    grid.className=showingCards?'rows':(MODE==='list'?'rows':'sets');
+    grid.style.height='auto';grid.style.width='100%';
+    grid.innerHTML='';
+    $('#binder-state').innerHTML='';
+    if(!showingCards&&VIEW==='sets')return renderSets(grid,dk,bn);
+    if(!showingCards&&VIEW==='cores')return renderCores(grid);
+    if(!showingCards&&VIEW==='deals')return renderDeals(grid);
+    return renderList(grid,list,dk,bn);
+  }
+  grid.style.height='';grid.style.width='';
+  const slice=list.slice(page*PER,page*PER+PER);
+  grid.className='page'+(spreadOn()?' spread':'')+(dir?' '+dir:'');
+  /* The keyframes run from dimmed-and-tilted back to rest, so a browser that
+     never composites them would leave the page mid-turn. Dropping the class
+     shortly after restores the static state, which is the correct one.   */
+  if(dir){const g=grid;setTimeout(()=>g.classList.remove('tl','tr'),420);}
+  grid.innerHTML='';
+
+  paintEmptyState(list,bn,dk);
+
+  paintSlots(grid,slice,bn,selling);
+
+  paintPager(page,pages);
   /* One heading, not a heading plus a chip repeating it. When you are inside a
      set, core or deck the heading turns accent and grows its own way out. */
   const tag=$('#page-tag');
@@ -2824,7 +3027,8 @@ function applyTrade(S,done){
   const warn=res.length?'\n\nHeld for a buyer: '+res.join(', ')+'.':'';
   askConfirm('Trade done',
     gq+' cop'+(gq===1?'y':'ies')+' leave your binder and '+tq+' cop'+(tq===1?'y':'ies')+
-    ' arrive in Collection. This cannot be undone.'+warn,'Trade done',()=>{
+    ' arrive in Collection.'+warn,'Trade done',()=>{
+      markUndo('the trade');
       /* out first: an overdraw was ruled out above, so nothing can go negative */
       S.give.forEach(r=>{
         const o=DB.own[r.id]; if(!o)return;
@@ -2837,7 +3041,7 @@ function applyTrade(S,done){
           cp.qty-=take;left-=take;
           if(cp.qty<1)o.copies.splice(i,1);
         }
-        if(!o.copies.length&&!(o.decks||[]).length){
+        if(!o.copies.length){
           delete DB.own[r.id];
           if(DB.manual[r.id])delete DB.manual[r.id];
         }
@@ -2858,7 +3062,7 @@ function applyTrade(S,done){
         }
       });
       save();renderBinder();
-      toast('Traded — '+gq+' out, '+tq+' in');
+      toastUndo('Traded — '+gq+' out, '+tq+' in','the trade');
       if(done)done();
     });
 }
@@ -3128,7 +3332,7 @@ function closeDeal(id){
     if(want>0){const c=cardById(it.id);short.push((c?c.name:it.id)+' '+(it.rar||'')+' short by '+want);}
     /* a copy row that has run out stops being a row */
     if(o){o.copies=(o.copies||[]).filter(cp=>(+cp.qty||0)>0);
-      if(!o.copies.length&&!(o.decks||[]).length)delete DB.own[it.id];}
+      if(!o.copies.length)delete DB.own[it.id];}
   });
   d.status='done'; d.closed=Date.now(); d.sold=sold;
   save();
@@ -3854,10 +4058,36 @@ ri.addEventListener('change',view);
 view();
 `+'<\/script></body></html>';
 }
+/* ---- the page is checked before it goes ----
+   The shared page is a second application built by pasting strings together,
+   which means a stray quote in a card name produces a file that looks fine
+   here and renders an empty grid on the buyer's machine. It has happened.
+   So the script it carries is compiled before the file is handed over: if it
+   will not parse, nothing is downloaded and the reason is named.       */
+function saleScriptOf(html){
+  const open=html.indexOf('<script>');
+  if(open<0)return null;
+  const close=html.indexOf('<\/script>',open);
+  const end=close<0?html.indexOf('</'+'script>',open):close;
+  if(end<0)return null;
+  return html.slice(open+8,end);
+}
+function saleParses(html){
+  const js=saleScriptOf(html);
+  if(js==null)return 'the page carries no script';
+  try{ new Function(js); return ''; }
+  catch(e){ return String(e&&e.message||e); }
+}
 function doSaleList(){
   const data=saleCards();
   if(!data.length){toast('Nothing is on the selling shelf yet');return;}
-  const blob=new Blob([salePageHTML()],{type:'text/html'});
+  const html=salePageHTML();
+  const bad=saleParses(html);
+  if(bad){
+    toast('Sale page not written 2014 it would not open: '+bad);
+    return;
+  }
+  const blob=new Blob([html],{type:'text/html'});
   const a=el('a');a.href=URL.createObjectURL(blob);
   a.download='cards-for-sale-'+(ocgOn()?'ocg-':'')+new Date().toISOString().slice(0,10)+'.html';
   a.click();URL.revokeObjectURL(a.href);
@@ -3904,11 +4134,71 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ============ detail ============ */
-const cardById=id=>DB.manual[id]||POOL.find(c=>c.id===id)||(DB.own[id]&&DB.own[id].card)||NAME_CACHE.find(c=>c.id===id);
+/* ---- what an owned entry holds ----
+   The id is the card. Everything else about it - art, text, stats - is in the
+   pool and rebuilt on arrival, so the entry keeps only what the pool cannot
+   give back: the copies you typed in, and the name as a label of last resort
+   for a card the pool no longer carries.                                  */
+const ownName=o=>(o&&(o.n||(o.card&&o.card.name)))||'';
+/* A card that exists only as a name. Enough to list and to file copies
+   against; no art, no text, and marked so nothing mistakes it for a real
+   pool entry.                                                            */
+const nameStub=(id,name)=>({id:String(id),name:name||String(id),type:'',desc:'',
+  archetype:'',img:'',imgFull:'',usd:0,ocg:'',stub:true,ghost:true,mon:{}});
+/* POOL.find over five thousand cards ran on every row of every render. */
+let POOL_BY_ID=null;
+const poolIndex=()=>{
+  if(POOL_BY_ID)return POOL_BY_ID;
+  POOL_BY_ID=new Map();
+  POOL.forEach(c=>POOL_BY_ID.set(c.id,c));
+  return POOL_BY_ID;
+};
+const cardById=id=>{
+  if(id==null)return undefined;
+  const k=String(id);
+  return DB.manual[k]||poolIndex().get(k)||NAME_CACHE.find(c=>c.id===k)||
+    (DB.own[k]?nameStub(k,ownName(DB.own[k])):undefined);
+};
 function ensureOwn(id){
-  if(!DB.own[id])DB.own[id]={card:cardById(id),copies:[],decks:[],added:Date.now()};
+  if(!DB.own[id]){
+    const c=cardById(id);
+    DB.own[id]={n:(c&&c.name)||'',copies:[],added:Date.now()};
+  }
   return DB.own[id];
 }
+/* ---- saving, and saying so when it fails ----
+   A write that cannot land is the one failure the binder must never hide:
+   everything typed since the last good save is gone on the next refresh. */
+let SAVE_FAILED=false;
+async function save(){
+  DATA_V++;
+  const ok=await Store.set(DB);
+  if(!ok&&!SAVE_FAILED){
+    SAVE_FAILED=true;
+    toast('Could not save — your device is out of storage. Export a copy before closing.');
+    paintSaveState();
+  }else if(ok&&SAVE_FAILED){
+    SAVE_FAILED=false;
+    paintSaveState();
+    toast('Saving again');
+  }
+  return ok;
+}
+/* A toast disappears; this does not, because the risk does not either. */
+function paintSaveState(){
+  let bar=document.getElementById('save-warn');
+  if(!SAVE_FAILED){ if(bar)bar.remove(); return; }
+  if(bar)return;
+  bar=el('div','savewarn');
+  bar.id='save-warn';
+  bar.innerHTML='<b>Not saving.</b> This device is out of storage, so nothing '+
+    'typed since the last save will survive a refresh. Save a copy from Transfer.';
+  const btn=el('button','btn btn-sm','Save a copy');
+  btn.onclick=doExport;
+  bar.appendChild(btn);
+  document.body.appendChild(bar);
+}
+
 /* Filling in a whole set or core one card at a time is the slowest thing in the
    app. This lists everything on screen at once: type a quantity, pick a rarity
    if there is a choice, flip a row to Selling and give it a price. Rows left at
@@ -4034,13 +4324,19 @@ function openDetail(id){
 
   /* A want is a rarity, a count and the most you will pay. The live quote sits
      beside it so the target is set against something real, not from memory. */
-  const drawWant=()=>{
+  detailCopies(id,c);detailWant(id,c);
+}
+/* The wishlist row and the copies list were two closures inside openDetail,
+   which is what made that function two hundred and sixty lines. Neither
+   ever needed the closure: both find their own host by id and use nothing
+   from the enclosing scope but the card, so both are plain functions.  */
+function detailWant(id,c){
     const box=document.getElementById('want'); if(!box)return;
     box.innerHTML='';
     const w=wantOf(id);
     if(!w){
       const add=el('button','btn btn-sm','Add to wishlist');
-      add.onclick=()=>{setWant(id,{qty:1,rarity:'',set:'',target:null});drawWant();renderBinder();};
+      add.onclick=()=>{setWant(id,{qty:1,rarity:'',set:'',target:null});detailWant(id,c);renderBinder();};
       box.appendChild(add);
       const note=el('p','note');note.style.marginTop='7px';
       note.textContent='Track a card you are hunting and watch both shops for it.';
@@ -4070,17 +4366,17 @@ function openDetail(id){
     linkSetRarity(wSet,wRar,c,{anySet:'Any set',anyRar:'Any rarity',
       set:w.set||'',rar:w.rarity||'',onChange:()=>{
       setWant(id,{rarity:wRar.value,set:(wSet.value||'').trim().toUpperCase()});
-      drawWant();renderBinder();
+      detailWant(id,c);renderBinder();
     }});
     row.querySelector('#w-target').onchange=e=>{
       const v=e.target.value.trim();
-      setWant(id,{target:v===''?null:Math.max(0,+v||0)});drawWant();renderBinder();};
+      setWant(id,{target:v===''?null:Math.max(0,+v||0)});detailWant(id,c);renderBinder();};
     const st=row.querySelector('#w-step');
-    st.children[0].onclick=()=>{const n=Math.max(1,(w.qty||1)-1);setWant(id,{qty:n});drawWant();renderBinder();};
-    st.children[2].onclick=()=>{setWant(id,{qty:(w.qty||1)+1});drawWant();renderBinder();};
-    row.querySelector('#w-drop').onclick=()=>{dropWant(id);drawWant();renderBinder();};
-  };
-  const drawCopies=()=>{
+    st.children[0].onclick=()=>{const n=Math.max(1,(w.qty||1)-1);setWant(id,{qty:n});detailWant(id,c);renderBinder();};
+    st.children[2].onclick=()=>{setWant(id,{qty:(w.qty||1)+1});detailWant(id,c);renderBinder();};
+    row.querySelector('#w-drop').onclick=()=>{dropWant(id);detailWant(id,c);renderBinder();};
+}
+function detailCopies(id,c){
     const box=document.getElementById('copies');box.innerHTML='';
     const o=DB.own[id];
     const all=o?(o.copies||[]):[];
@@ -4133,10 +4429,10 @@ function openDetail(id){
       st.innerHTML='<button aria-label="One fewer">\u2212</button><span>'+cp.qty+'</span><button aria-label="One more">+</button>';
       st.children[0].onclick=()=>{
         cp.qty--;if(cp.qty<1)o.copies.splice(i,1);
-        if(!o.copies.length&&!o.decks.length)delete DB.own[id];
-        save();drawCopies();renderBinder();
+        if(!o.copies.length)delete DB.own[id];
+        save();detailCopies(id,c);renderBinder();
       };
-      st.children[2].onclick=()=>{cp.qty++;save();drawCopies();renderBinder();};
+      st.children[2].onclick=()=>{cp.qty++;save();detailCopies(id,c);renderBinder();};
       row.appendChild(st);
       /* clearing lives beside the count it clears, rather than in a separate
          button at the foot of the panel that did the same job for every row */
@@ -4144,12 +4440,13 @@ function openDetail(id){
       clr.title='Remove all '+cp.qty+' of this printing';
       clr.onclick=()=>askConfirm('Clear copies',
         `Remove all ${cp.qty} × ${r.n}${cp.set?' ('+cp.set+')':''} of ${c.name}?`,'Clear',()=>{
+          markUndo('cleared copies of '+r.n);
           o.copies.splice(i,1);
-          if(!o.copies.length&&!o.decks.length)delete DB.own[id];
+          if(!o.copies.length)delete DB.own[id];
           if(DB.manual[id]&&!DB.own[id])delete DB.manual[id];
           save();renderBinder();
-          if(DB.own[id])drawCopies();else closeModal();
-          toast('Cleared');
+          if(DB.own[id])detailCopies(id,c);else closeModal();
+          toastUndo('Cleared','cleared copies');
         });
       row.appendChild(clr);grp.appendChild(row);
 
@@ -4167,7 +4464,7 @@ function openDetail(id){
       pre.innerHTML='<option value="">Any set</option>'
         +opts2.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
       pre.value=cur;
-      pre.onchange=()=>{cp.set=(pre.value||'').trim().toUpperCase();save();drawCopies();renderBinder();};
+      pre.onchange=()=>{cp.set=(pre.value||'').trim().toUpperCase();save();detailCopies(id,c);renderBinder();};
       const setname=el('span');
       setname.className='c-setname';
       const inf=setInfo(setPrefix(pre.value)||pre.value);
@@ -4181,7 +4478,7 @@ function openDetail(id){
         /* it has just left the binder you are looking at, so its row goes too */
         const to=(DB.binders.find(b=>b.id===cp.b)||{}).name||'the other binder';
         if(F.binder&&cp.b!==F.binder)toast('Moved to '+to);
-        drawCopies();renderBinder();});
+        detailCopies(id,c);renderBinder();});
       line2.appendChild(tog);
       /* An asking price is a selling concern, so the box only appears for copies
          in the Sell binder. One exception: if a price was set earlier and the
@@ -4257,11 +4554,9 @@ function openDetail(id){
       const set=(add.querySelector('#new-pre').value||'').trim().toUpperCase();
       const hit=own.copies.find(x=>x.rarity===k&&(x.set||'')===set&&x.b===b);
       if(hit)hit.qty++;else own.copies.push({rarity:k,set,qty:1,b});
-      save();drawCopies();renderBinder();
+      save();detailCopies(id,c);renderBinder();
       toast((hit?'Another ':'')+rarBy(k).n+' filed under '+(b==='b-sell'?'Selling':'Collection'));
     };
-  };
-  drawCopies();drawWant();
 }
 
 /* ============ TCG Corner price feed ============
@@ -8136,6 +8431,7 @@ function ourRar(t,name){
   return null;
 }
 function indexPrices(rows){
+  PX_BY_CODE=null;
   PX={};PX_NAME={};PX_META={};PX_ROWS=[];PX_KEY={};
   rows.forEach(([code,price,name,rar,cond,av])=>{
     const c=cond||'';
@@ -8317,39 +8613,70 @@ function priceHelp(){
 /* value order: your price, then TCG Corner, then the card database */
 /* One AE code can hold eight printings — RC04-AE009 runs from Ultra to
    Quarter Century Secret — so rarity is part of the key, never an afterthought. */
+/* ---- asking a shop for a price ----
+   All three shops are asked the same question in the same order: this exact
+   printing; failing that this card in this set; failing that this card at all.
+   And all three answer it the same way - what is on the shelf beats what is
+   cheaper, because a price you cannot buy is a memory of one, not an offer.
+
+   What differs is only the index each keeps and the currency it answers in, so
+   that is all a shop supplies. The order and the tie-breaks live here once. */
+function narrowByRarity(rows,rar){
+  return (rows||[]).filter(r=>r.rar===rar);
+}
+/* Cheapest of what is stocked; only when nothing is stocked does the cheapest
+   unavailable listing stand in, and it says so.                            */
+function pickPrinting(rows,cost){
+  if(!rows||!rows.length)return null;
+  const here=rows.filter(r=>r.av);
+  const from=here.length?here:rows;
+  let best=from[0];
+  for(let i=1;i<from.length;i++)if(cost(from[i])<cost(best))best=from[i];
+  return {row:best,stocked:here.length>0};
+}
+/* The set the copy names, if it named one, and whether it named a whole code. */
+function askedFor(cp,codeRe){
+  const asked=cp&&cp.set?String(cp.set).toUpperCase():'';
+  return {asked,full:codeRe.test(asked),pre:asked?asked.split('-')[0]:''};
+}
+/* Rows for a card, narrowed to a set when one was named. Returns null - not an
+   empty list - when the named set has no such printing, because that is a
+   different answer from "this card is unknown".                          */
+function rowsForCard(byName,card,rar,pre){
+  const rows=narrowByRarity(card&&card.name?byName(nameKey(card.name)):null,rar);
+  if(!rows.length)return null;
+  if(!pre)return rows;
+  const inSet=rows.filter(r=>r.pre===pre);
+  return inSet.length?inSet:null;
+}
+const howFound=(full,pre)=>full?'code + rarity':(pre?'set + rarity':'rarity');
+/* A code lookup used to scan every row in the feed. */
+let PX_BY_CODE=null;
+function pxCodeIndex(){
+  if(PX_BY_CODE)return PX_BY_CODE;
+  PX_BY_CODE=new Map();
+  PX_ROWS.forEach(r=>{
+    if(!PX_BY_CODE.has(r.code))PX_BY_CODE.set(r.code,[]);
+    PX_BY_CODE.get(r.code).push(r);
+  });
+  return PX_BY_CODE;
+}
 function tcgcMatch(cp,card){
   const want=cp&&cp.rarity?cp.rarity:null;
   if(!want)return null;                       /* without a rarity there is no single price */
-  const asked=cp&&cp.set?cp.set.toUpperCase():'';
-  const full=/-AE[SC]?\d/i.test(asked);
-  const pre=asked?asked.split('-')[0]:'';
-  let pool;
-  if(full){
-    pool=PX_ROWS.filter(r=>r.code===asked&&r.rar===want);
-    if(!pool.length)pool=null;
+  const {asked,full,pre}=askedFor(cp,/-AE[SC]?\d/i);
+  let pool=full?narrowByRarity(pxCodeIndex().get(asked),want):null;
+  if(!pool||!pool.length){
+    pool=rowsForCard(k=>PX_NAME[k],card,want,pre);
+    if(!pool)return null;
   }
-  if(!pool){
-    const rows=card&&card.name?PX_NAME[nameKey(card.name)]:null;
-    if(!rows||!rows.length)return null;
-    pool=rows.filter(r=>r.rar===want);
-    if(pre){
-      const inSet=pool.filter(r=>r.pre===pre);
-      if(inSet.length)pool=inSet;
-      else return null;                       /* that set has no such printing */
-    }
-  }
-  if(!pool.length)return null;
   /* Played stock (Status A/B/C) is a different product at a third of the price.
      Only clean copies count — no price at all beats quoting a damaged one.    */
   const use=pool.filter(r=>!r.cond);
-  if(!use.length)return null;
-  /* Cheapest of what is on the shelf; only if nothing is stocked does the
-     cheapest unavailable listing stand in, flagged as such.            */
-  const here=use.filter(r=>r.av);
-  const from=here.length?here:use;
-  const best=from.reduce((a,b)=>b.price<a.price?b:a);
-  return {price:best.price,code:best.code,cond:'',av:!!here.length,
-          how:full?'code + rarity':(pre?'set + rarity':'rarity')};
+  const p=pickPrinting(use,r=>r.price);
+  if(!p)return null;
+  return {price:p.row.price,code:p.row.code,cond:'',av:p.stocked,
+          how:howFound(full,pre)};
 }
 /* ---- Players Club HK ----
    The second shop. Their prices are HKD, ours are PHP, so nothing can be
@@ -8385,31 +8712,20 @@ function pcMatch(cp,card){
   pcIndex();
   const want=cp&&cp.rarity?cp.rarity:null;
   if(!want)return null;
-  const asked=cp&&cp.set?cp.set.toUpperCase():'';
-  const full=/-AE[SC]?\d/i.test(asked);
-  const pre=asked?asked.split('-')[0]:'';
-  let best=null;
-  if(full){
-    best=PC_BY_CODE.get(asked+'|'+want)||null;
-  }
+  const {asked,full,pre}=askedFor(cp,/-AE[SC]?\d/i);
+  let best=full?(PC_BY_CODE.get(asked+'|'+want)||null):null;
   if(!best){
-    const rows=(card&&card.name)?PC_BY_NAME.get(nameKey(card.name)):null;
-    if(!rows||!rows.length)return null;
-    let pool=rows.filter(r=>r.rar===want);
-    if(pre){
-      const inSet=pool.filter(r=>r.pre===pre);
-      if(inSet.length)pool=inSet; else return null;
-    }
-    if(!pool.length)return null;
-    const here=pool.filter(r=>r.av);
-    const from=here.length?here:pool;
-    best=from.reduce((a,b)=>b.price<a.price?b:a);
+    const pool=rowsForCard(k=>PC_BY_NAME.get(k),card,want,pre);
+    if(!pool)return null;
+    const p=pickPrinting(pool,r=>r.price);
+    if(!p)return null;
+    best=p.row;
   }
   if(!best)return null;
   const peso=hkdToPeso(best.price);
   if(peso==null)return null;
   return {price:best.price,peso,code:best.code,shop:'Players Club',av:!!best.av,
-          how:full?'code + rarity':(pre?'set + rarity':'rarity')};
+          how:howFound(full,pre)};
 }
 /* What the card actually costs: the cheaper of the two shops, in pesos, with
    the winner named so the figure can be traced back to a listing.          */
@@ -9031,29 +9347,20 @@ function ytMatch(cp,card){
   jpPriceIndex();
   const want=cp&&cp.rarity?cp.rarity:null;
   if(!want)return null;
-  const asked=cp&&cp.set?cp.set.toUpperCase():'';
-  const full=/-JP[0-9A-Z]{3}$/i.test(asked);
-  const pre=asked?asked.split('-')[0]:'';
-  let best=null;
-  if(full)best=JP_BY_CODE.get(asked+'|'+want)||null;
+  const {asked,full,pre}=askedFor(cp,/-JP[0-9A-Z]{3}$/i);
+  let best=full?(JP_BY_CODE.get(asked+'|'+want)||null):null;
   if(!best){
-    const rows=(card&&card.name)?JP_BY_NAME.get(nameKey(card.name)):null;
-    if(!rows||!rows.length)return null;
-    let pool=rows.filter(r=>r.rar===want);
-    if(pre){
-      const inSet=pool.filter(r=>r.pre===pre);
-      if(inSet.length)pool=inSet; else return null;
-    }
-    if(!pool.length)return null;
-    const here=pool.filter(r=>r.av);
-    const from=here.length?here:pool;
-    best=from.reduce((a,b)=>b.yen<a.yen?b:a);
+    const pool=rowsForCard(k=>JP_BY_NAME.get(k),card,want,pre);
+    if(!pool)return null;
+    const p=pickPrinting(pool,r=>r.yen);
+    if(!p)return null;
+    best=p.row;
   }
   if(!best)return null;
   const peso=yenToPeso(best.yen);
   if(peso==null)return null;
   return {price:best.yen,peso,code:best.code,shop:'Yuyu-tei',av:!!best.av,qty:best.qty,
-          how:full?'code + rarity':(pre?'set + rarity':'rarity')};
+          how:howFound(full,pre)};
 }
 /* ============ pool ============ */
 const API='https://db.ygoprodeck.com/api/v7/cardinfo.php';
@@ -9186,6 +9493,7 @@ function refilterPool(){
              atk:x[6]===''?null:+x[6],def:x[7]===''?null:+x[7]}:{}});
   });
   POOL.sort((a,b)=>a.name.localeCompare(b.name));
+  POOL_BY_ID=null;DATA_V++;     /* the index and the caches fall with the pool */
 }
 async function loadPool(){
   const slot=$('#load-slot');
@@ -9265,7 +9573,7 @@ function openManual(){
     if(!name){toast('Give the card a name first');return;}
     const id='manual-'+(++DB.seq),img=box.querySelector('#m-img').value.trim();
     DB.manual[id]={id,name,type:box.querySelector('#m-type').value,desc:box.querySelector('#m-desc').value.trim(),img,imgFull:img,mon:{},archetype:''};
-    DB.own[id]={card:DB.manual[id],copies:[{rarity:box.querySelector('#m-rar').value,set:'',qty:Math.max(1,+box.querySelector('#m-qty').value||1),b:F.binder||DB.binders[0].id}],decks:[],added:Date.now()};
+    DB.own[id]={n:(DB.manual[id]&&DB.manual[id].name)||'',copies:[{rarity:box.querySelector('#m-rar').value,set:'',qty:Math.max(1,+box.querySelector('#m-qty').value||1),b:F.binder||DB.binders[0].id}],added:Date.now()};
     save();closeModal();renderBinder();toast(name+' added');
   };
 }
@@ -9299,9 +9607,8 @@ function transferCode(){
   Object.entries(DB.own).forEach(([id,o])=>{
     const cps=(o.copies||[]).map(c=>[+c.qty||0,c.set||'',c.rarity||'',
       c.b==='b-sell'?1:0,c.price==null?'':+c.price,c.cond||'']);
-    const dks=(o.decks||[]).map(d=>[d.id,+d.qty||1]);
-    if(!cps.length&&!dks.length)return;
-    own.push([id,(o.card&&o.card.name)||'',cps,dks]);
+    if(!cps.length)return;
+    own.push([id,ownName(o),cps]);
   });
   /* the wishlist is typed-in data too, so it rides along */
   const want=Object.entries(DB.want||{}).map(([id,w])=>
@@ -9312,7 +9619,6 @@ function transferCode(){
   /* Stamped with the region so a Japanese binder cannot be merged into an
      Asian-English one: the set codes would be nonsense on the other side. */
   const pay={v:1,r:REGION,t:new Date().toISOString().slice(0,10),own,want,deals,
-    decks:(DB.decks||[]).map(d=>[d.id,d.name]),
     manual:Object.values(DB.manual||{})};
   return TCODE+b64enc(JSON.stringify(pay));
 }
@@ -9330,8 +9636,7 @@ function readCode(code){
     e.region=from;
     throw e;
   }
-  const out={own:{},manual:{},want:{},decks:(pay.decks||[]).map(d=>({id:d[0],name:d[1]})),
-    binders:[],seq:0};
+  const out={own:{},manual:{},want:{},binders:[],seq:0};
   out.deals2=(pay.deals||[]).map(d=>({id:d[0],who:d[1],contact:d[2],status:d[3],
     created:d[4],note:d[5],offer:d[6]===''?null:+d[6],
     items:(d[7]||[]).map(i=>({id:String(i[0]),rar:i[1],set:i[2],qty:+i[3],
@@ -9342,14 +9647,13 @@ function readCode(code){
   });
   (pay.manual||[]).forEach(c=>{if(c&&c.id)out.manual[c.id]=c;});
   pay.own.forEach(row=>{
-    const id=row[0],name=row[1],cps=row[2]||[],dks=row[3]||[];
-    out.own[id]={card:cardById(id)||out.manual[id]||{id,name},
+    const id=row[0],name=row[1],cps=row[2]||[];
+    out.own[id]={n:name||'',
       copies:cps.map(c=>{
         const cp={qty:+c[0]||0,set:c[1]||'',rarity:c[2]||'',b:c[3]?'b-sell':'b-main'};
         if(c[4]!==''&&c[4]!=null)cp.price=+c[4];
         if(c[5])cp.cond=c[5];
         return cp;}),
-      decks:dks.map(d=>({id:d[0],qty:+d[1]||1})),
       added:Date.now()};
   });
   return out;
@@ -9410,13 +9714,31 @@ function withBinders(d){
   }));
   return d;
 }
+/* Older binders carried a whole card beside every entry, and a deck list that
+   nothing reads any more. Both are dropped here rather than left to bloat
+   every future save; the name is kept as the label of last resort.      */
+function slimOwn(own){
+  Object.keys(own||{}).forEach(id=>{
+    const o=own[id];
+    if(!o||typeof o!=='object')return;
+    if(o.card){ if(!o.n)o.n=o.card.name||''; delete o.card; }
+    if(o.decks)delete o.decks;
+    if(!o.copies)o.copies=[];
+  });
+  return own;
+}
 function migrate(saved){
-  if(saved.own)return withBinders(Object.assign({own:{},manual:{},want:{},deals2:[],decks:[],binders:[],seq:0,layout:{c:6,r:2}},saved));
-  const out={own:{},manual:{},decks:saved.decks||[],seq:saved.seq||0};
+  if(saved.own){
+    const d=withBinders(Object.assign({own:{},manual:{},want:{},deals2:[],binders:[],seq:0,layout:{c:6,r:2}},saved));
+    delete d.decks;
+    slimOwn(d.own);
+    return d;
+  }
+  const out={own:{},manual:{},seq:saved.seq||0};
   Object.values(saved.cards||{}).forEach(c=>{
     const {copies,decks,added,...card}=c;
     if(String(c.id).startsWith('manual-'))out.manual[c.id]=card;
-    out.own[c.id]={card,copies:copies||[],decks:decks||[],added:added||Date.now()};
+    out.own[c.id]={n:card.name||'',copies:copies||[],added:added||Date.now()};
   });
   return withBinders(out);
 }
@@ -9424,7 +9746,7 @@ function migrate(saved){
    that already holds cards must not lose either side. A copy is the same copy
    when its card, rarity, set and binder all agree.                         */
 function mergeIn(inc){
-  (inc.decks||[]).forEach(d=>{if(!DB.decks.some(x=>x.id===d.id))DB.decks.push(d);});
+  slimOwn(inc.own);
   (inc.binders||[]).forEach(b=>{if(!DB.binders.some(x=>x.id===b.id))DB.binders.push(b);});
   Object.assign(DB.manual,inc.manual||{});
   /* a deal already recorded is left alone; an unseen one is taken on */
@@ -9449,7 +9771,6 @@ function mergeIn(inc){
       const hit=cur.copies.find(x=>x.rarity===cp.rarity&&(x.set||'')===(cp.set||'')&&x.b===cp.b);
       if(hit)hit.qty=Math.max(hit.qty,cp.qty);else cur.copies.push(cp);
     });
-    (o.decks||[]).forEach(d=>{if(!cur.decks.some(x=>x.id===d.id))cur.decks.push(d);});
   });
   DB.seq=Math.max(DB.seq||0,inc.seq||0);
   save();renderBinder();
@@ -9669,7 +9990,9 @@ syncCategory();
   DB.fxJpy=DB.fxJpy||0.39;      /* pesos per yen, likewise */
   await loadCachedNames();
   await loadCachedPrices();
-  renderBinder();
+  /* the address bar wins over the default view, so a shared link opens where
+     it points rather than at the binder                                  */
+  if((location.hash||'').length>1)await readUrl(); else renderBinder();
   loadPool();
   if(PX_SRC==='synced'&&PX_DATE!==new Date().toISOString().slice(0,10))setTimeout(()=>refreshPrices(null),1500);
   refreshRate(false);        /* quietly tops up the exchange rate; no-op offline */
