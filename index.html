@@ -313,7 +313,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .cgrp .crow-2{border-bottom:none;padding:0}
 .crow-2{display:flex;gap:5px;padding:0 0 7px 0;border-bottom:1px solid var(--line-soft);align-items:center;flex-wrap:wrap}
 .crow-2 .inp{padding:4px 6px;font-size:var(--fs-xs)}
-.crow-2 .c-set{width:104px;flex:none}
+.crow-2 .c-set{width:124px;flex:none}
 .crow-2 .c-price{width:110px;flex:none}
 .crow-2 .c-cond{width:80px;flex:none}
 .c-setname{font-size:var(--fs-2xs);color:var(--faint);flex:1;min-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -974,7 +974,7 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
   .crow{flex-wrap:wrap;gap:6px}
   .crow .setc{flex:1 1 100%;order:3;white-space:normal}
   .crow-2{gap:6px}
-  .crow-2 .c-set{width:82px}
+  .crow-2 .c-set{width:104px}
   .crow-2 .c-price{flex:1 1 84px;width:auto;min-width:0}
   .crow-2 .c-cond{width:72px}
   /* icons carry the meaning on a phone; the words would not fit anyway */
@@ -3929,11 +3929,8 @@ function openDetail(id){
     const q=wantQuote(id),met=wantMet(id);
     const row=el('div','wrow');
     const rars=printingsOf(c).rars;
-    row.innerHTML='<select class="inp c-set" id="w-rar"><option value="">Any rarity</option>'+
-      RARITIES.filter(r=>!rars.length||rars.includes(r.k))
-        .map(r=>'<option value="'+r.k+'"'+(w.rarity===r.k?' selected':'')+'>'+esc(r.n)+'</option>').join('')+
-      '</select>'+
-      '<input class="inp c-set" id="w-set" list="setlist" placeholder="Set" value="'+esc(w.set||'')+'">'+
+    row.innerHTML='<select class="inp c-set" id="w-rar"></select>'+
+      '<select class="inp c-set" id="w-set"></select>'+
       '<input class="inp c-price" id="w-target" inputmode="decimal" placeholder="Target \u20b1" value="'+
         (w.target==null?'':w.target)+'">'+
       '<div class="step" id="w-step"><button aria-label="One fewer">\u2212</button>'+
@@ -3946,8 +3943,14 @@ function openDetail(id){
         (w.target!=null?(met?' \u00b7 <b>at or under your target</b>':' \u00b7 '+esc(peso(q.peso-w.target))+' above target'):'')
       : 'Neither shop lists this printing right now.';
     box.appendChild(line);
-    row.querySelector('#w-rar').onchange=e=>{setWant(id,{rarity:e.target.value});drawWant();renderBinder();};
-    row.querySelector('#w-set').onchange=e=>{setWant(id,{set:(e.target.value||'').trim().toUpperCase()});drawWant();renderBinder();};
+    /* Same two-way narrowing as the copy row: a rarity you are hunting rules
+       out the sets that never printed it, and a set rules out the rest.  */
+    const wSet=row.querySelector('#w-set'),wRar=row.querySelector('#w-rar');
+    wSet.value=w.set||'';wRar.value=w.rarity||'';
+    linkSetRarity(wSet,wRar,c,{anySet:'Any set',anyRar:'Any rarity',onChange:()=>{
+      setWant(id,{rarity:wRar.value,set:(wSet.value||'').trim().toUpperCase()});
+      drawWant();renderBinder();
+    }});
     row.querySelector('#w-target').onchange=e=>{
       const v=e.target.value.trim();
       setWant(id,{target:v===''?null:Math.max(0,+v||0)});drawWant();renderBinder();};
@@ -4031,14 +4034,22 @@ function openDetail(id){
 
       /* second line: which binder this copy lives in, plus sale fields */
       const line2=el('div','crow-2');
-      /* set picker: choose the AE set, then the card number inside it */
-      const pre=el('input','inp');pre.setAttribute('list','setlist');
-      pre.placeholder=aeSets().size?'Set':'Load prices';pre.classList.add('c-set');
-      pre.value=setPrefix(cp.set)||'';
+      /* Set picker: only the sets this card was printed in at this rarity.
+         The rarity is fixed once a copy exists, so it is the one narrowing
+         the other here rather than the two narrowing each other.         */
+      const pre=el('select','inp');pre.classList.add('c-set');
+      const opts2=printSets(c,cp.rarity);
+      const cur=ocgOn()?(cp.set||''):(setPrefix(cp.set)||'');
+      /* a set saved before, that this rarity no longer offers, is kept so the
+         copy does not silently change which printing it claims to be  */
+      if(cur&&!opts2.includes(cur))opts2.unshift(cur);
+      pre.innerHTML='<option value="">Any set</option>'
+        +opts2.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
+      pre.value=cur;
       pre.onchange=()=>{cp.set=(pre.value||'').trim().toUpperCase();save();drawCopies();renderBinder();};
       const setname=el('span');
       setname.className='c-setname';
-      const inf=setInfo(pre.value);
+      const inf=setInfo(setPrefix(pre.value)||pre.value);
       setname.textContent=inf?inf.name:(pre.value?'unlisted set':'');
       line2.appendChild(pre);line2.appendChild(setname);
       const tog=el('div','tabs');tog.style.cssText='flex:none';
@@ -4087,17 +4098,15 @@ function openDetail(id){
        is settled the whole code goes in - which is what prices it exactly. */
     const preSet=openSet?(jpCodeFor(c,openSet)||openSet)
                         :(pr.oneCode||pr.oneSet||setPrefix(heldSet)||'');
-    const opt=r=>`<option value="${r.k}"${r.k===pr.oneRar?' selected':''}>${esc(r.n)}</option>`;
-    const known=RARITIES.filter(r=>has.has(r.k));
-    /* Only the rarities this card was actually printed in. Offering the other
-       nine is clutter, and every one of them would price as nothing anyway.
-       The full list is the fallback for cards the feed has never listed.     */
-    const rarHtml=(known.length?known:RARITIES).map(opt).join('');
+    /* Both pickers are menus of printings that exist, and each narrows the
+       other. The set list used to be a free text box against every set in
+       the region, which let you file a copy under a set the card was never
+       in - and that priced as nothing.                                    */
     /* Which binder the copy lands in is decided here rather than inherited from
        whichever tab you happen to be on, so a Sell listing can be created
        alongside a Keep one instead of just bumping its quantity.            */
-    add.innerHTML=`<select class="inp" id="new-rar" style="flex:1;min-width:150px">${rarHtml}</select>
-      <input class="inp" id="new-pre" list="setlist" placeholder="Set" value="${esc(preSet)}" style="width:110px">
+    add.innerHTML=`<select class="inp" id="new-rar" style="flex:1;min-width:150px"></select>
+      <select class="inp" id="new-pre" style="width:150px"></select>
       <div class="tabs" id="new-bin" style="flex:none">
         <button data-b="b-main" class="on">Keep</button><button data-b="b-sell">Sell</button>
       </div>
@@ -4111,6 +4120,9 @@ function openDetail(id){
       note.style.cssText='margin-top:6px';
       box.appendChild(note);
     }
+    const newSet=add.querySelector('#new-pre'),newRar=add.querySelector('#new-rar');
+    newSet.value=preSet;newRar.value=pr.oneRar||'';
+    linkSetRarity(newSet,newRar,c,{anySet:'Any set'});
     const binSeg=add.querySelector('#new-bin');
     binSeg.querySelectorAll('button').forEach(t=>t.onclick=()=>{
       binSeg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===t));
@@ -4121,8 +4133,8 @@ function openDetail(id){
     add.querySelector('#new-add').onclick=()=>{
       const own=ensureOwn(id),k=add.querySelector('#new-rar').value;
       const b=(binSeg.querySelector('button.on')||{dataset:{b:'b-main'}}).dataset.b;
-      /* a blank box still resolves when the card only ever had the one set */
-      const set=((add.querySelector('#new-pre').value||'').trim()||preSet).toUpperCase();
+      /* blank means you did not want to pin it to a set, so leave it blank */
+      const set=(add.querySelector('#new-pre').value||'').trim().toUpperCase();
       const hit=own.copies.find(x=>x.rarity===k&&(x.set||'')===set&&x.b===b);
       if(hit)hit.qty++;else own.copies.push({rarity:k,set,qty:1,b});
       save();drawCopies();renderBinder();
@@ -8332,6 +8344,96 @@ function printingsOf(card){
   const rars=[...new Set(live.map(r=>r.rar).filter(Boolean))];
   return {sets,rars,oneSet:sets.length===1?sets[0]:'',
           oneRar:rars.length===1?rars[0]:'',oneCode:''};
+}
+/* ---- which printings actually exist ----
+   A card's set and its rarity are not independent: Ash Blossom is Secret in one
+   set and Common in another, and offering all eleven rarities against all six
+   sets invites a combination that was never printed and therefore never prices.
+
+   Two sources, and they know different amounts. The price feed knows set and
+   rarity together. The catalogue knows only that the card is in the set - so a
+   set only the catalogue has heard of accepts any rarity rather than none,
+   which matters: 877 Asian-English cards have no priced printing at all, and
+   restricting those to an empty list would make them impossible to record. */
+let PAIR_CACHE=new Map(),PAIR_REGION='';
+function printingPairs(card){
+  if(!card||!card.name)return new Map();
+  if(PAIR_REGION!==REGION){PAIR_CACHE=new Map();PAIR_REGION=REGION;}
+  const k=nameKey(card.name);
+  const hit=PAIR_CACHE.get(k);
+  if(hit)return hit;
+  const by=new Map();                 /* set -> rarities; empty set means unknown */
+  const put=(s,r)=>{
+    if(!s)return;
+    if(!by.has(s))by.set(s,new Set());
+    if(r)by.get(s).add(r);
+  };
+  if(ocgOn()){
+    jpCat();
+    /* the Japanese catalogue carries the card number, so the set is the whole
+       code - which is also what prices it exactly rather than by name */
+    (JP_PRINT_BY_NAME.get(k)||[]).forEach(r=>{
+      if(r.rars.length)r.rars.forEach(x=>put(r.code,x));
+      else put(r.code,'');
+    });
+  }else{
+    (PX_NAME[k]||[]).filter(r=>!r.cond).forEach(r=>put(r.pre,r.rar));
+    aeIndex();
+    AE_BY_SET.forEach((names,pre)=>{if(names.has(k))put(pre,'');});
+  }
+  PAIR_CACHE.set(k,by);
+  return by;
+}
+/* The sets this card was printed in, narrowed to one rarity if you name one.
+   A set whose rarities are unknown is always offered: we cannot rule it out. */
+function printSets(card,rar){
+  const by=printingPairs(card),out=[];
+  by.forEach((rs,s)=>{if(!rar||!rs.size||rs.has(rar))out.push(s);});
+  return out.sort();
+}
+/* The rarities this card was printed in, narrowed to one set if you name one. */
+function printRars(card,set){
+  const by=printingPairs(card);
+  const all=()=>RARITIES.map(r=>r.k);
+  if(set){
+    const rs=by.get(set);
+    if(!rs)return all();
+    return rs.size?[...rs]:all();       /* known set, unknown rarities */
+  }
+  const out=new Set();let unknown=false;
+  by.forEach(rs=>{rs.size?rs.forEach(x=>out.add(x)):unknown=true;});
+  if(unknown||!out.size)return all();
+  return [...out];
+}
+/* How a set reads in a menu: its code, and its name where we have one. */
+function setLabel(s){
+  const inf=setInfo(setPrefix(s)||s);
+  return inf&&inf.name?s+' — '+inf.name:s;
+}
+/* ---- keep the two pickers honest about each other ----
+   Choosing a rarity narrows the sets, choosing a set narrows the rarities, and
+   a choice that the other side has just ruled out is moved to one that still
+   exists rather than left pointing at a printing that does not.          */
+function linkSetRarity(setSel,rarSel,card,o){
+  o=o||{};
+  const anySet=o.anySet||'', anyRar=o.anyRar||'';
+  const paint=()=>{
+    const wantSet=setSel.value, wantRar=rarSel.value;
+    const sets=printSets(card,wantRar);
+    const rars=printRars(card,wantSet);
+    setSel.innerHTML=(anySet?'<option value="">'+esc(anySet)+'</option>':'')
+      +sets.map(s=>'<option value="'+esc(s)+'">'+esc(setLabel(s))+'</option>').join('');
+    rarSel.innerHTML=(anyRar?'<option value="">'+esc(anyRar)+'</option>':'')
+      +RARITIES.filter(r=>rars.includes(r.k))
+        .map(r=>'<option value="'+esc(r.k)+'">'+esc(r.n)+'</option>').join('');
+    /* put the choices back, falling to the first still-valid one */
+    setSel.value = sets.includes(wantSet) ? wantSet : (anySet?'':(sets[0]||''));
+    rarSel.value = rars.includes(wantRar) ? wantRar : (anyRar?'':(rars[0]||''));
+  };
+  setSel.addEventListener('change',()=>{paint();if(o.onChange)o.onChange();});
+  rarSel.addEventListener('change',()=>{paint();if(o.onChange)o.onChange();});
+  paint();
+  return paint;
 }
 /* The card's number inside one Japanese set, so opening a set and adding a
    copy fills the code rather than just the prefix. Empty outside OCG-JP. */
