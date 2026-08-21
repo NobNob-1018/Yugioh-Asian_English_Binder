@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="96" fill="#0f1115"/>
+  <!-- three cards fanned, which is what a binder page looks like at a glance -->
+  <g transform="translate(256 268)">
+    <rect x="-150" y="-140" width="150" height="212" rx="14" fill="#2b3346"
+          transform="rotate(-14 -75 -34)"/>
+    <rect x="0" y="-140" width="150" height="212" rx="14" fill="#2b3346"
+          transform="rotate(14 75 -34)"/>
+    <rect x="-75" y="-156" width="150" height="212" rx="14" fill="#c9a227"/>
+    <rect x="-59" y="-140" width="118" height="118" rx="8" fill="#0f1115" opacity=".55"/>
+    <rect x="-59" y="-8" width="118" height="12" rx="6" fill="#0f1115" opacity=".35"/>
+    <rect x="-59" y="14" width="86" height="12" rx="6" fill="#0f1115" opacity=".35"/>
+  </g>
+</svg>

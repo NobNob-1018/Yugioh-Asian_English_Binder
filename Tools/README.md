@@ -258,7 +258,7 @@ What is separate:
 | | Asian-English | OCG-JP |
 |---|---|---|
 | Saved under | `ygo-binder-v1` | `ygo-binder-v1-ocg` |
-| Catalogue | `AE_CAT`, 71 sets | `JP_CAT_RAW`, 317 sets |
+| Catalogue | `AE_CAT`, 71 sets | `JP_CAT_RAW`, 454 sets |
 | Prices | TCG Corner + Players Club | Yuyu-tei |
 | Quoted in | USD / HKD, shown in pesos | yen, shown in pesos |
 | Rarities | 11 | 19 |
@@ -270,7 +270,7 @@ carry the region they came from and are refused by the other side, because a
 
 ### Scope
 
-Japanese sets released **2017 onwards** — 318 prefixes off Yugipedia's
+Japanese sets released **2013 onwards** — 455 prefixes off Yugipedia's
 `Japanese release date`. Anything earlier is the same two harvests over a longer
 prefix list: move `` in `jp-sets.pl` and re-run.
 
@@ -279,7 +279,7 @@ prefix list: move `` in `jp-sets.pl` and re-run.
 **Yuyu-tei** (`yuyu-tei.jp/sell/ygo/s/<lowercase-prefix>`) is a plain
 server-rendered site, not Shopify, and sends no CORS header — so prices are
 baked, exactly as the other two shops are. One request returns a whole set.
-Of the 318 sets, **189 are stocked**; the rest are promos they do not carry.
+Of the 455 sets, **259 are stocked**; the rest are promos they do not carry.
 
 A set they have never stocked still answers with a generic 40-row page rather
 than a 404, so a miss is detected by looking for the set's own `PREFIX-JP`
@@ -309,7 +309,7 @@ from whatever Yuyu-tei stocked (28.5%). The remaining 4% falls back to Common.
 
 ### Scale
 
-11,651 printings across 317 sets, 18,049 priced rows, 95.7% with art already on
+15,530 printings across 454 sets, 22,164 priced rows, 95.7% with art already on
 YGOPRODeck. Baked, that is 107 KB of catalogue, 166 KB of prices and 68 KB of
 names — about 340 KB raw, 100 KB gzipped.
 
@@ -432,3 +432,51 @@ asks `bestMatch` once per rarity the card was printed in, which is the same
 question a single printing is asked, so the range and the lines cannot
 contradict each other. The figure is shown **before** anything is added, so the
 decision to hunt a card is made against a real number.
+
+## 17. Working without a signal
+
+`sw.js` is a service worker; `manifest.webmanifest` and `icon.svg` make the
+binder installable. Together they mean that after **one** visit the app opens
+with no network at all — which matters, because the place you most want it open
+is a card shop with no bars.
+
+Three caches, each with a different rule:
+
+| Cache | Holds | Rule |
+|---|---|---|
+| `-shell` | index.html, manifest, icon | stale-while-revalidate |
+| `-img` | card art from YGOPRODeck and Yuyu-tei | cache-first, capped at 600 |
+| `-data` | the card pool and the exchange rate | network-first, cache as fallback |
+
+**The shell is served from cache first.** That is what makes a 1.6 MB file open
+instantly, and it is why an update lands silently on the *next* open rather
+than making you wait for it on this one. A fresh copy is fetched in the
+background every time.
+
+The pool response is about 24 MB and is cached whole. That sounds like a lot
+until you look at the quota: measured at 26.6 MB against 6.1 GB, or 0.4%. It is
+what lets the app start up with no connection at all rather than starting up
+empty.
+
+`VERSION` at the top of `sw.js` names all three caches. Bump it and the old
+ones are deleted on activate. There is no build step and nothing to configure —
+it is registered with a relative path, so it scopes itself correctly whether it
+is served from the root or from a project subpath on Pages.
+
+It cannot run from `file://`, where there is no origin to scope to. The app
+notices and carries on without it.
+
+**Verified** by stopping the web server outright and reloading: the app booted,
+the pool was there, prices resolved, and both regions worked.
+
+### Nothing in OCG-JP is legacy
+
+Asian-English runs back to 2004 and the shops stock almost none of it, so
+anything before `AE_MODERN_FROM` (2018) sits behind the legacy switch. OCG-JP
+has no such tail — the catalogue was deliberately cut at 2013, so everything in
+it was chosen to be there. `modernFrom()` returns an unreachable date in OCG,
+which puts nothing in the legacy bucket.
+
+Without that, extending the catalogue back to 2013 would have added 168 sets
+and shown none of them: the pool stayed at 7,740 instead of 10,393, and a card
+from 2013 was invisible unless you found the legacy toggle.
