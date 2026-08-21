@@ -4083,7 +4083,10 @@ function openDetail(id){
     /* opened from inside a set, that is the set: the card is on screen because
        it belongs to it, so there is nothing left to ask                     */
     const openSet=(F.set&&F.set!=='\u2014')?F.set:'';
-    const preSet=openSet||pr.oneSet||setPrefix(heldSet)||'';
+    /* Japanese printings carry their number in the catalogue, so when the set
+       is settled the whole code goes in - which is what prices it exactly. */
+    const preSet=openSet?(jpCodeFor(c,openSet)||openSet)
+                        :(pr.oneCode||pr.oneSet||setPrefix(heldSet)||'');
     const opt=r=>`<option value="${r.k}"${r.k===pr.oneRar?' selected':''}>${esc(r.n)}</option>`;
     const known=RARITIES.filter(r=>has.has(r.k));
     /* Only the rarities this card was actually printed in. Offering the other
@@ -7928,19 +7931,17 @@ const TCGC_LINK='https://tcg-corner.com/search?q=';
 /* Yuyu-tei has no useful search in English - their catalogue is Japanese - but
    every set has a page at a predictable address, so link the sets the card is
    actually printed in. Three is enough; past that it is a wall of links.   */
-const YT_LINK='https://yuyu-tei.jp/sell/ygo/s/';
+const YT_TOP='https://yuyu-tei.jp/top/ygo';
 function shopLinks(c){
   const a=(href,text)=>'<a href="'+href+'" target="_blank" rel="noopener">'+esc(text)+' '+'\u2197'+'</a>';
   if(!ocgOn()){
     return a(TCGC_LINK+encodeURIComponent(c.name),'TCG Corner')
          + a(PC_LINK+encodeURIComponent(c.name),'Players Club');
   }
-  jpCat();
-  const k=nameKey(c.name),sets=[];
-  JP_BY_SET.forEach((v,pre)=>{ if(v.names.has(k))sets.push(pre); });
-  if(!sets.length)return '<span class="faint">Not in the OCG-JP catalogue</span>';
-  return sets.slice(0,3).map(pre=>a(YT_LINK+pre.toLowerCase(),'Yuyu-tei '+pre)).join('')
-       + (sets.length>3?'<span class="faint"> +'+(sets.length-3)+' more</span>':'');
+  /* One link, not one per set. Yuyu-tei has no English search worth linking
+     into, so a card printed in six sets used to spray six near-identical
+     links across the panel. Better to say plainly that the lookup is manual. */
+  return a(YT_TOP,'Check manually at Yuyu-tei');
 }
 
 const KEY_PRICES='ygo-binder-tcgc-v1';
@@ -8309,11 +8310,38 @@ function bestMatch(cp,card){
    one rarity there is nothing to choose, so the form fills it in itself.
    Clean stock only, to match how tcgcMatch prices things.                     */
 function printingsOf(card){
+  /* In OCG-JP the catalogue is the authority, not a shop's stock list: it
+     knows every printing whether or not Yuyu-tei happens to carry it, and
+     the Asian-English feed would otherwise offer sets that do not exist in
+     Japanese at all.                                                     */
+  if(ocgOn()){
+    jpCat();
+    const rows=(card&&card.name?JP_PRINT_BY_NAME.get(nameKey(card.name)):null)||[];
+    const sets=[...new Set(rows.map(r=>r.pre))].sort();
+    const rars=[];
+    rows.forEach(r=>r.rars.forEach(k=>{if(!rars.includes(k))rars.push(k);}));
+    /* one set means one card number, so the full code is known outright */
+    const codes=[...new Set(rows.map(r=>r.code))];
+    return {sets,rars,oneSet:sets.length===1?sets[0]:'',
+            oneRar:rars.length===1?rars[0]:'',
+            oneCode:codes.length===1?codes[0]:''};
+  }
   const rows=(card&&card.name?PX_NAME[nameKey(card.name)]:null)||[];
   const live=rows.filter(r=>!r.cond);
   const sets=[...new Set(live.map(r=>r.pre).filter(Boolean))].sort();
   const rars=[...new Set(live.map(r=>r.rar).filter(Boolean))];
-  return {sets,rars,oneSet:sets.length===1?sets[0]:'',oneRar:rars.length===1?rars[0]:''};
+  return {sets,rars,oneSet:sets.length===1?sets[0]:'',
+          oneRar:rars.length===1?rars[0]:'',oneCode:''};
+}
+/* The card's number inside one Japanese set, so opening a set and adding a
+   copy fills the code rather than just the prefix. Empty outside OCG-JP. */
+function jpCodeFor(card,pre){
+  if(!ocgOn()||!card||!card.name||!pre)return '';
+  jpCat();
+  const p=String(pre).split('-')[0].toUpperCase();
+  const rows=JP_PRINT_BY_NAME.get(nameKey(card.name))||[];
+  const hit=rows.find(r=>r.pre===p);
+  return hit?hit.code:'';
 }
 /* Change since the previous pull. This used to look up PX by cp.set, but cp.set
    holds a set prefix ("RC04") while PX is keyed by full code ("RC04-AE009"), so
@@ -8695,10 +8723,14 @@ WPP7|001,12,3980,6;001,6,1780,0;001,9,1980,7;002,0,50,0;003,2,80,0;004,0,50,0;00
    card printed in both only costs its name once.                            */
 const JP_RKEYS=['C','NR','R','NPR','SR','SPR','UR','UPR','UtR','ScR','ScPR','ExSR','PScR','QCSR','20ScR','CR','MR','PGR','HGR'];
 let JP_BY_SET=null,JP_SET_NAME=null,JP_SET_DATE=null,JP_NAME_BY_CODE=null,JP_ALL=null,JP_SIZE=null,JP_NAME_BY_KEY=null;
+/* nameKey -> every Japanese printing of that card, so a card can say which
+   sets it is in without going anywhere near the Asian-English price feed */
+let JP_PRINT_BY_NAME=null;
 function jpCat(){
   if(JP_BY_SET)return JP_BY_SET;
   JP_BY_SET=new Map();JP_SET_NAME=new Map();JP_SET_DATE=new Map();
   JP_NAME_BY_CODE=new Map();JP_ALL=new Set();JP_SIZE=new Map();JP_NAME_BY_KEY=new Map();
+  JP_PRINT_BY_NAME=new Map();
   JP_CAT_RAW.split('\n').forEach(line=>{
     if(!line)return;
     const f=line.split('|');
@@ -8715,6 +8747,8 @@ function jpCat(){
         names.add(k);JP_ALL.add(k);
         if(!JP_NAME_BY_KEY.has(k))JP_NAME_BY_KEY.set(k,nm);
         JP_NAME_BY_CODE.set(pre+'-JP'+p[0],nm);
+        if(!JP_PRINT_BY_NAME.has(k))JP_PRINT_BY_NAME.set(k,[]);
+        JP_PRINT_BY_NAME.get(k).push({pre,num:p[0],code:pre+'-JP'+p[0],rars});
       }
       return {num:p[0],name:nm,rars};
     });
