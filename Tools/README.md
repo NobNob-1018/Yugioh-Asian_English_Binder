@@ -499,3 +499,30 @@ and whether the browser has agreed to keep it.
 Chrome grants persistence on its own once the app is **installed** or visited
 often; asking on a first visit is usually declined, which is why the Settings
 row offers a **Keep offline** button rather than pretending it is settled.
+
+## 18. Three piles, not four views
+
+Collection, Selling and Wishlist are three answers to the same question — where
+does this card sit for me — so they are one control. The wishlist used to sit in
+the view strip beside Binder, Sets and Cores, which are not piles at all but
+ways of looking at one, and it read as a peer of things it had nothing in
+common with.
+
+Internally the wishlist still rides on `VIEW==='wants'` rather than on
+`F.binder`, because nothing in it is owned and a binder filter would be wrong.
+`pickPile()` maps the third segment onto the view; `paintBinders()` lights the
+segment from whichever of the two is in play, and `paintViewTabs()` falls back
+to Binder while the wishlist is open. Both reset points — switching region and
+restoring from the address bar — go through those two painters, so the strips
+cannot drift apart.
+
+## 19. Getting the newest version on a phone
+
+The saved copy is what makes the app open instantly and work with no signal,
+but it also means a new version arrives one open late. On a phone there is no
+obvious way to force it, so **Settings → App version → Get the newest** deletes
+the caches, unregisters the worker and reloads.
+
+It does **not** touch your binder. The collection lives in IndexedDB under its
+own name; only the caches the service worker owns are cleared. The confirmation
+says so, and it is verified: a marked card with 7 copies came back untouched.

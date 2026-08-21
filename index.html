@@ -1120,9 +1120,14 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
         </label>
         <button class="rail-tog" id="rail-tog" aria-expanded="true" title="Hide the sidebar">&laquo;</button>
       </div>
+      <!-- Collection, Selling and Wishlist are three answers to the same
+           question - where does this card sit for me - so they are one
+           control. Wishlist used to sit beside Binder and Sets, which are
+           not piles at all but ways of looking at one.               -->
       <div class="tabs" id="binder-tabs" style="margin-top:9px">
         <button data-b="b-main" class="on">Collection</button>
         <button data-b="b-sell">Selling</button>
+        <button data-b="b-want">Wishlist</button>
       </div>
       <label class="switch" id="legacy-row" style="margin-top:9px">
         <input type="checkbox" id="legacy-sets">
@@ -1184,7 +1189,6 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
         <div class="tabs" id="view-tabs">
           <button data-v="binder" class="on" title="Binder"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.2"/><rect x="4.2" y="2" width="1.5" height="12" fill="#141008"/></svg><span class="tl">Binder</span></button>
           <button data-v="sets" title="Sets"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1.6" width="10" height="10" rx="2" opacity=".45"/><rect x="5" y="4.4" width="10" height="10" rx="2"/></svg><span class="tl">Sets</span></button>
-          <button data-v="wants" title="Wishlist"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.6 3.1 8.9a3 3 0 1 1 4.9-3.3 3 3 0 1 1 4.9 3.3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><span class="tl">Wishlist</span></button>
           <button data-v="cores" title="Cores"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.1" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2.5"/></svg><span class="tl">Cores</span></button>
         </div>
         <div class="toolset">
@@ -2022,10 +2026,7 @@ async function setRegion(r){
     paintRarityKey();
     $('#t-rar').innerHTML=opts(RARITIES.map(r2=>r2.n),'Any rarity');
     const sb=$('#search'); if(sb)sb.value='';
-    document.querySelectorAll('#view-tabs button').forEach(b=>
-      b.classList.toggle('on',(b.dataset.v||'binder')==='binder'));
-    document.querySelectorAll('#binder-tabs button').forEach(b=>
-      b.classList.toggle('on',(b.dataset.b||'')==='b-main'));
+    paintViewTabs();paintBinders();
     applyTheme();applyDensity();
     renderBinder();
     paintSetList();
@@ -2193,10 +2194,7 @@ async function readUrl(){
     F.text=p.get('q')||'';
     page=Math.max(0,(parseInt(p.get('p'),10)||1)-1);
     const sb=$('#f-text'); if(sb)sb.value=F.text;
-    document.querySelectorAll('#view-tabs button').forEach(b=>
-      b.classList.toggle('on',(b.dataset.v||'binder')===VIEW));
-    document.querySelectorAll('#binder-tabs button').forEach(b=>
-      b.classList.toggle('on',(b.dataset.b||'')===F.binder));
+    paintViewTabs();paintBinders();
     renderBinder();
   } finally {
     URL_READING=false;
@@ -3600,7 +3598,32 @@ function openSettings(){
     '<div class="set-hint" id="set-store">checking…</div></div>'+
     '<button class="btn btn-sm" id="set-keep">Keep offline</button>';
   box.appendChild(store);
+  /* The saved copy is what makes the app open instantly and work with no
+     signal, but it also means a new version arrives one open late. On a
+     phone there is no obvious way to force it, so there is one here.   */
+  const upd=el('div','set-row');
+  upd.innerHTML='<div><div class="set-lbl">App version</div>'+
+    '<div class="set-hint">Throws away the saved copy and fetches the newest one. '+
+    'Your binder, wishlist and deals are not touched.</div></div>'+
+    '<button class="btn btn-sm" id="set-upd">Get the newest</button>';
+  box.appendChild(upd);
   const body=modal('Settings',box);
+  const ub=body.querySelector('#set-upd');
+  if(ub)ub.onclick=()=>askConfirm('Get the newest',
+    'This clears the copy saved on this device and reloads. Nothing you have '+
+    'typed in is affected — your cards, wishlist and deals are stored '+
+    'separately and stay exactly as they are.','Clear and reload',async()=>{
+      try{
+        /* the binder itself lives in IndexedDB under its own name, which is
+           not touched here: only the caches the service worker owns    */
+        for(const n of await caches.keys())await caches.delete(n);
+        if(navigator.serviceWorker){
+          const regs=await navigator.serviceWorker.getRegistrations();
+          for(const r of regs)await r.unregister();
+        }
+      }catch(e){}
+      location.reload();
+    });
   (async()=>{
     const line=body.querySelector('#set-store');
     const btn=body.querySelector('#set-keep');
@@ -3694,8 +3717,16 @@ function paintDealsBtn(){
 }
 function paintBinders(){
   paintDealsBtn();
-  document.querySelectorAll('#binder-tabs button').forEach(b=>b.classList.toggle('on',(b.dataset.b||'')===F.binder));
+  const on=VIEW==='wants'?'b-want':F.binder;
+  document.querySelectorAll('#binder-tabs button').forEach(b=>b.classList.toggle('on',(b.dataset.b||'')===on));
   slideAllTabs();
+}
+/* Binder, Sets and Cores are ways of looking; the wishlist is not one of
+   them, so leaving it selects Binder rather than nothing.             */
+function paintViewTabs(){
+  const v=VIEW==='wants'?'binder':VIEW;
+  document.querySelectorAll('#view-tabs button').forEach(b=>
+    b.classList.toggle('on',(b.dataset.v||'binder')===v));
 }
 /* Built from RARITIES itself, so the key cannot drift from the chips. */
 function paintRarityKey(){
@@ -10480,6 +10511,7 @@ document.querySelectorAll('#view-tabs button').forEach(b=>{
   b.onclick=()=>{
     VIEW=b.dataset.v;page=0;
     F.arch='';F.set='';              /* always land on the board, not inside one */
+    paintBinders();                  /* leaving the wishlist unlights its segment */
     document.querySelectorAll('#view-tabs button').forEach(x=>x.classList.toggle('on',x===b));
     slideAllTabs();
     renderBinder();
@@ -10529,8 +10561,18 @@ $('#bm-hot').addEventListener('click',()=>bmPeek(2600));
 $('#bm-hot').addEventListener('touchstart',()=>bmPeek(2600),{passive:true});
 $('#jump').onchange=e=>{const n=parseInt(e.target.value,10);if(n>0)page=n-1;renderBinder();};
 $('#open-manual').onclick=openManual;
+/* Picking a pile. The wishlist is not a binder - nothing in it is owned - so
+   it rides on VIEW rather than on F.binder, and the segment stands in for
+   the view the same way the other two stand in for the binder.        */
+function pickPile(v){
+  if(v==='b-want'){ VIEW='wants'; }
+  else { if(VIEW==='wants')VIEW='binder'; F.binder=v||''; }
+  F.set='';F.arch='';page=0;
+  paintViewTabs();
+  renderBinder();
+}
 document.querySelectorAll('#binder-tabs button').forEach(b=>{
-  b.onclick=()=>{F.binder=b.dataset.b||'';page=0;renderBinder();};
+  b.onclick=()=>pickPile(b.dataset.b||'');
 });
 document.querySelectorAll('#regsw button').forEach(b=>{
   b.onclick=()=>setRegion(b.dataset.r);
