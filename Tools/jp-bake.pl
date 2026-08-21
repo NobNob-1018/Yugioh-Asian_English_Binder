@@ -14,7 +14,7 @@ my %idx; my $i=0; for(@$ae){ $idx{nk($_)}=$i++ }
 my @names=@$ae; my $base=scalar @names;
 
 # ---- catalogue ----
-my $cat; { local $/; open my $C,'<:encoding(UTF-8)','/tmp/jp_cat3.json' or die $!; $cat=JSON::PP->new->decode(<$C>); }
+my $cat; { local $/; open my $C,'<:encoding(UTF-8)','/tmp/jp_cat.json' or die $!; $cat=JSON::PP->new->decode(<$C>); }
 my (%sn,%sd);
 { open my $S,'<:encoding(UTF-8)','/tmp/jp_sets.tsv' or die $!;
   while(my $l=<$S>){ chomp $l; my ($p,$ts,$n)=split /\t/,$l; next unless $p;

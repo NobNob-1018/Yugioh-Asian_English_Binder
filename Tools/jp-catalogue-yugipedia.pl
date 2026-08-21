@@ -29,7 +29,7 @@ sub clean {
   $s =~ s/\s+/ /g; $s =~ s/^\s+|\s+$//g;
   $s;
 }
-my (%rows,%seen,$dupe);
+my (%rows,%at,$merged);
 for(my $i=0;$i<@titles;$i+=40){
   my @batch=@titles[$i..($i+39>$#titles?$#titles:$i+39)];
   my $u='https://yugipedia.com/api.php?action=query&prop=revisions&rvprop=content&format=json&titles='
@@ -44,13 +44,30 @@ for(my $i=0;$i<@titles;$i+=40){
       my @f = split /\s*;\s*/, $line;
       my $name = clean($f[1]//''); next unless length $name;
       my $rars = clean($f[2]//'');
-      if($seen{"$pre$num"}++){ $dupe++; next }
-      push @{$rows{$pre}}, [$num,$name,$rars];
+      # The same code appears on several set-list pages - a set and its bonus
+      # pack, a reprint listing - and each names only the rarities it covers.
+      # Keeping the first and dropping the rest threw real rarities away:
+      # INFO-JP006 kept the bonus pack's two and lost the main set's Ultimate
+      # and Secret. Merge them instead.
+      my $key="$pre$num";
+      if(exists $at{$key}){
+        my $row=$at{$key}; $merged++;
+        my %have = map { $_ => 1 } grep { length } split /\s*,\s*/, $row->[2];
+        for my $r (grep { length } split /\s*,\s*/, $rars){
+          next if $have{$r}++;
+          $row->[2] = length($row->[2]) ? $row->[2].', '.$r : $r;
+        }
+        next;
+      }
+      my $row=[$num,$name,$rars];
+      $at{$key}=$row;
+      push @{$rows{$pre}}, $row;
     }
   }
 }
 my $n=0; $n += scalar @{$rows{$_}} for keys %rows;
-printf "sets %d   printings %d   (skipped %d repeat listings)\n",scalar keys %rows,$n,$dupe//0;
-open my $O,'>:encoding(UTF-8)','/tmp/jp_cat3.json' or die $!;
+printf "sets %d   printings %d   (merged %d repeat listings)
+",scalar keys %rows,$n,$merged//0;
+open my $O,'>:encoding(UTF-8)','/tmp/jp_cat.json' or die $!;
 print $O JSON::PP->new->utf8(0)->canonical->encode(\%rows); close $O;
-printf "wrote /tmp/jp_cat3.json (%.1f KB)\n",(-s '/tmp/jp_cat3.json')/1024;
+printf "wrote /tmp/jp_cat.json (%.1f KB)\n",(-s '/tmp/jp_cat.json')/1024;

@@ -309,8 +309,8 @@ from whatever Yuyu-tei stocked (28.5%). The remaining 4% falls back to Common.
 
 ### Scale
 
-8,447 printings across 223 sets, 14,210 priced rows, 95.7% with art already on
-YGOPRODeck. Baked, that is 106 KB of catalogue, 166 KB of prices and 68 KB of
+8,473 printings across 223 sets, 14,210 priced rows, 95.7% with art already on
+YGOPRODeck. Baked, that is 107 KB of catalogue, 166 KB of prices and 68 KB of
 names — about 340 KB raw, 100 KB gzipped.
 
 ### Re-harvesting
@@ -319,3 +319,35 @@ names — about 340 KB raw, 100 KB gzipped.
 `jp-catalogue-yugipedia.pl` walks Yugipedia, and `jp-bake.pl` writes the two tables. Sanity
 check afterwards: every priced code should be one the catalogue knows —
 orphans mean a parser drifted.
+
+### One code, several set-list pages
+
+A code appears on more than one Yugipedia page — a set and its `+1 Bonus Pack`,
+a reprint listing — and **each page names only the rarities it covers**. The
+first harvest kept whichever page it met first and dropped the others, which
+silently threw real rarities away: `INFO-JP006` kept the bonus pack's Ultra and
+Quarter Century and lost the main set's Ultimate and Secret.
+
+The rarities are now merged across every page a code appears on. That is 819
+printings affected, and the number of printings known in more than one rarity
+went from 2,970 to 3,055.
+
+Belt and braces on top of that: at runtime, any rarity Yuyu-tei actually has on
+the shelf for a code is treated as existing whatever the wiki page says. A
+listing you can buy is not a rarity that needs arguing about.
+
+## 12. Settling a trade
+
+The trade calculator weighs two piles against each other; **Trade done** applies
+the result. What you gave leaves the binder, what you got arrives in Collection,
+and anything you received that was on the wishlist has its wanted count reduced.
+
+It refuses rather than improvises. If a row asks for more copies than you hold,
+the whole trade stops — a half-applied trade is worse than none, because you
+would have to work out yourself what had already moved. Copies promised to a
+buyer in a pending deal do not block the trade but are named in the confirmation.
+
+A give row records **which binder** the copy came from, because the same
+printing can sit in Collection and on the selling shelf, and the settlement has
+to take it out of the one that was actually picked. That is why the search
+results read `Rare · ROTA-JP002 · Selling`.
