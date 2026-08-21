@@ -480,3 +480,22 @@ which puts nothing in the legacy bucket.
 Without that, extending the catalogue back to 2013 would have added 168 sets
 and shown none of them: the pool stayed at 7,740 instead of 10,393, and a card
 from 2013 was invisible unless you found the legacy toggle.
+
+### The pre-2018 switch is Asian-English only
+
+Since nothing in OCG-JP is legacy, the switch would toggle nothing there and
+only invites a pointless click. `paintLegacySwitch()` hides the whole row when
+the Japanese binder is open. `[hidden]` needed a rule of its own, because a
+`.switch` is `display:flex` and would otherwise ignore the attribute.
+
+### Keeping the binder on the device
+
+Browsers clear "best effort" storage when a device runs low, and a binder is
+exactly what would go quietly: it is only ever written by you and can never be
+fetched back. `askPersist()` asks for persistent storage at boot, and Settings
+shows the honest answer — how much is used, whether the app works offline yet,
+and whether the browser has agreed to keep it.
+
+Chrome grants persistence on its own once the app is **installed** or visited
+often; asking on a first visit is usually declined, which is why the Settings
+row offers a **Keep offline** button rather than pretending it is settled.

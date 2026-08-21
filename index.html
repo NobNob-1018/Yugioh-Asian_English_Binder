@@ -276,6 +276,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .sub-filters{margin-top:7px;padding-top:8px;border-top:1px solid var(--line-soft)}
 .sub-filters[hidden]{display:none}
 
+[hidden]{display:none!important}
 .switch{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none}
 .switch input{position:absolute;opacity:0;width:0;height:0}
 /* the knob eases across and swells very slightly, so the switch feels thrown
@@ -1123,7 +1124,7 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
         <button data-b="b-main" class="on">Collection</button>
         <button data-b="b-sell">Selling</button>
       </div>
-      <label class="switch" style="margin-top:9px">
+      <label class="switch" id="legacy-row" style="margin-top:9px">
         <input type="checkbox" id="legacy-sets">
         <span class="track"></span>
         <span class="lbl">Include pre-2018 sets</span>
@@ -2032,7 +2033,15 @@ async function setRegion(r){
   } finally { REGION_BUSY=false; }
 }
 /* The wordmark carries the switch, so the title always says where you are. */
+/* The pre-2018 switch exists because Asian-English runs back to 2004 and the
+   shops stock almost none of it. OCG-JP was cut at 2013 on purpose, so there
+   is nothing behind the switch there and it only invites a pointless click. */
+function paintLegacySwitch(){
+  const row=document.getElementById('legacy-row');
+  if(row)row.hidden=ocgOn();
+}
 function paintRegion(){
+  paintLegacySwitch();
   document.title=ocgOn()?'OCG-JP Binder \u2014 Japanese Collection'
                        :'Asian-English Binder \u2014 OCG Collection';
   const t=$('#mark-title'); if(t)t.textContent=ocgOn()?'OCG-JP Binder':'Asian-English Binder';
@@ -3583,7 +3592,41 @@ function openSettings(){
     '<div class="set-foot">'+
     '<button class="btn btn-sm" id="set-binder">View as a binder</button>'+
     '<span class="set-hint" id="set-binder-note"></span></div>';
+  /* Where the binder actually lives, and whether the browser has agreed to
+     keep it. Worth showing: it is the difference between a collection that
+     survives a low-disk moment and one that does not.                   */
+  const store=el('div','set-row');
+  store.innerHTML='<div><div class="set-lbl">Saved on this device</div>'+
+    '<div class="set-hint" id="set-store">checking…</div></div>'+
+    '<button class="btn btn-sm" id="set-keep">Keep offline</button>';
+  box.appendChild(store);
   const body=modal('Settings',box);
+  (async()=>{
+    const line=body.querySelector('#set-store');
+    const btn=body.querySelector('#set-keep');
+    if(!line)return;
+    let used='',kept=null;
+    try{
+      if(navigator.storage&&navigator.storage.estimate){
+        const e=await navigator.storage.estimate();
+        used=(e.usage/1048576).toFixed(1)+' MB used of '+Math.round(e.quota/1048576)+' MB';
+      }
+      if(navigator.storage&&navigator.storage.persisted)kept=await navigator.storage.persisted();
+    }catch(e){}
+    const sw=!!(navigator.serviceWorker&&navigator.serviceWorker.controller);
+    line.textContent=[used,
+      sw?'works offline':'not saved for offline yet',
+      kept===true?'protected from clearing':(kept===false?'may be cleared if the device runs low':'')]
+      .filter(Boolean).join(' · ');
+    if(btn){
+      if(kept===true){btn.disabled=true;btn.textContent='Kept';}
+      else btn.onclick=async()=>{
+        const ok=await askPersist();
+        toast(ok?'This device will keep your binder':'The browser decided not to — it may still keep it');
+        closeModal();
+      };
+    }
+  })();
   const pick=(id,fn)=>{
     const g=body.querySelector('#'+id);
     g.querySelectorAll('button').forEach(b=>b.onclick=()=>{
@@ -10504,9 +10547,24 @@ $('#file-in').onchange=e=>{if(e.target.files[0]){doImport(e.target.files[0]);clo
 
    It cannot run from file://, where there is no origin to scope it to; the
    app simply carries on without it.                                    */
+/* Browsers clear "best effort" storage when a device runs low, and a binder
+   is exactly the kind of thing that would go quietly: it is only ever written
+   by you and can never be fetched back. Asking for persistence marks it as
+   yours to keep. Chrome grants it silently once the app is installed or
+   visited often, and the answer is remembered.                        */
+let STORAGE_PERSISTED=null;
+async function askPersist(){
+  try{
+    if(!navigator.storage||!navigator.storage.persist)return null;
+    STORAGE_PERSISTED=await navigator.storage.persisted();
+    if(!STORAGE_PERSISTED)STORAGE_PERSISTED=await navigator.storage.persist();
+    return STORAGE_PERSISTED;
+  }catch(e){ return null; }
+}
 if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    askPersist();
   });
 }
 /* Offline is not an error here - everything needed is already saved - but it
