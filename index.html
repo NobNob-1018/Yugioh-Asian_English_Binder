@@ -172,6 +172,17 @@ button{cursor:pointer;background:none;border:none}
    sidebar being folded away                                              */
 /* Everything on the bar keeps its slot between views: things that do not
    apply go invisible rather than absent, so nothing slides sideways.     */
+/* The pile switch and the owned switch, when the rail is not beside us. */
+.pilebar{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+  width:100%;order:0;margin-top:2px}
+.pilebar[hidden]{display:none}
+.pilebar #binder-tabs{margin-top:0!important;flex:1 1 auto;min-width:0}
+.pilebar .switch{flex:0 0 auto;gap:7px}
+.pilebar .switch .lbl{font-size:var(--fs-2xs)}
+@media (max-width:420px){
+  .pilebar{gap:var(--sp-2)}
+  .pilebar #binder-tabs button{padding:0 9px}
+}
 .toolset{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:28px}
 .toolset .gone{visibility:hidden;pointer-events:none}
 /* The left group is a fixed column so the view tabs start at the same place
@@ -1191,6 +1202,9 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
           <button data-v="sets" title="Sets"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1.6" width="10" height="10" rx="2" opacity=".45"/><rect x="5" y="4.4" width="10" height="10" rx="2"/></svg><span class="tl">Sets</span></button>
           <button data-v="cores" title="Cores"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.1" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2.5"/></svg><span class="tl">Cores</span></button>
         </div>
+        <!-- Below 920px the rail drops underneath the card grid, which strands
+             the two controls reached for most. They move in here instead. -->
+        <div class="pilebar" id="pilebar" hidden></div>
         <div class="toolset">
           <select class="mini" id="t-sort" aria-label="Order by"></select>
           <select class="mini" id="t-rar" aria-label="Rarity"></select>
@@ -2350,6 +2364,7 @@ function renderBinder(dir){
      variables and PER, so this cannot recurse, and it means the sheet is right
      even if no resize event ever reached us.                                 */
   autoLayout(true);
+  placePiles();
   writeUrl();
   const list=visible();
   const pages=Math.max(1,Math.ceil(list.length/PER));
@@ -10520,11 +10535,47 @@ document.querySelectorAll('#view-tabs button').forEach(b=>{
     if(g&&!REDUCED){g.classList.remove('vfade');void g.offsetWidth;g.classList.add('vfade');}
   };
 });
+/* ---- where the pile switch and the owned switch live ----
+   On a wide screen both sit in the rail, which is where they belong: they
+   scope everything below them. Under 920px the rail stacks beneath the card
+   grid, and a control you must scroll past a hundred cards to reach is no
+   control at all - so both move up beside the filters and go back when there
+   is room again. Moved rather than duplicated, so there is still one of
+   each and nothing can fall out of step.                              */
+let RAIL_HOME=null;
+const RAIL_STACKED=matchMedia('(max-width:920px)');
+if(RAIL_STACKED.addEventListener)RAIL_STACKED.addEventListener('change',()=>placePiles());
+else if(RAIL_STACKED.addListener)RAIL_STACKED.addListener(()=>placePiles());
+function placePiles(){
+  const slot=document.getElementById('pilebar');
+  const tabs=document.getElementById('binder-tabs');
+  /* by the checkbox, not by where it is sitting: a positional selector stops
+     matching the moment the switch moves, and then it can never move back */
+  const box=document.getElementById('owned-only');
+  const owned=box?box.closest('.switch'):null;
+  if(!slot||!tabs||!owned)return;
+  if(!RAIL_HOME)RAIL_HOME={tabs:tabs.parentNode,owned:owned.parentNode};
+  /* the same query the stylesheet uses to stack the rail, so the two can
+     never disagree - and unlike innerWidth it is never reported as zero */
+  const narrow=RAIL_STACKED.matches;
+  const moved=tabs.parentNode===slot;
+  if(narrow===moved)return;                 /* already where it should be */
+  if(narrow){
+    slot.appendChild(owned);
+    slot.appendChild(tabs);
+    slot.hidden=false;
+  }else{
+    RAIL_HOME.owned.insertBefore(owned,RAIL_HOME.owned.firstChild);
+    RAIL_HOME.tabs.insertBefore(tabs,document.getElementById('legacy-row'));
+    slot.hidden=true;
+  }
+  slideAllTabs();
+}
 /* Re-flow whenever the window changes shape, keeping your place in the binder.
    A plain resize listener misses some cases (mobile chrome collapsing, split
    screen, devtools emulation), so a ResizeObserver watches the root as well. */
 let rzT;
-function reflow(){clearTimeout(rzT);rzT=setTimeout(()=>{slideAllTabs();if(autoLayout(true))renderBinder();},140);}
+function reflow(){clearTimeout(rzT);rzT=setTimeout(()=>{placePiles();slideAllTabs();if(autoLayout(true))renderBinder();},140);}
 addEventListener('resize',reflow);
 addEventListener('orientationchange',reflow);
 if(window.ResizeObserver)new ResizeObserver(reflow).observe(document.documentElement);
@@ -10631,6 +10682,7 @@ syncCategory();
   RARITIES = ocgOn()?RARITIES_JP:RARITIES_AE;
   $('#t-rar').innerHTML=opts(RARITIES.map(r=>r.n),'Any rarity');
   paintRegion();
+  placePiles();
   paintOnline();
   const lg=$('#legacy-sets'); if(lg)lg.checked=!!DB.legacy;
   applyTheme();

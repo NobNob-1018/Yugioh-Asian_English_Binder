@@ -526,3 +526,35 @@ the caches, unregisters the worker and reloads.
 It does **not** touch your binder. The collection lives in IndexedDB under its
 own name; only the caches the service worker owns are cleared. The confirmation
 says so, and it is verified: a marked card with 7 copies came back untouched.
+
+## 20. On a phone, the scoping controls move up
+
+Below 920px the rail stacks underneath the card grid. That left the two
+controls you reach for most — which pile you are in, and whether to show only
+what you own — roughly **1,500px down the page**, past everything they scope.
+A control you scroll past a hundred cards to reach is not a control.
+
+`placePiles()` moves both into `#pilebar` in the toolbar when the rail has
+stacked, and back to the rail when there is room. **Moved, not duplicated**, so
+there is still one of each and nothing can fall out of step.
+
+The order that leaves reads outward-in: what you are looking at (Binder / Sets
+/ Cores), then which pile, then how to sort it, then paging. Everything lands
+above the first card at 375×812.
+
+| | Before | After |
+|---|---|---|
+| Show owned | 1,479px | **465px** |
+| Collection / Selling / Wishlist | 1,518px | **451px** |
+
+Two things this got wrong first, both worth remembering:
+
+- The switch was looked up as `.switch-row .switch`, a **positional** selector.
+  It stopped matching the moment the switch moved, so the guard bailed and it
+  could never move back. It is found by its checkbox id now, which is true
+  wherever it sits.
+- The breakpoint was read from `window.innerWidth`, which some shells report as
+  `0`. It asks `matchMedia('(max-width:920px)')` instead — the same query the
+  stylesheet uses, so the two cannot disagree. `placePiles()` also runs on every
+  render, because not every shell delivers resize or mediaquery events; the call
+  returns immediately when nothing needs moving.
