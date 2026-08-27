@@ -31,12 +31,30 @@ sub parse_title {
   $cond = 'D' if !$cond && $raw =~ /damaged|\bDMG\b|played/i;
 
   # rarity is the bracketed tag that is NOT the status one
+  #
+  # This used to cap the tag at five letters, which silently dropped every
+  # rarity with a longer name. "Overframe" is nine, so a title like
+  #   ROTA-AE001 Witness of the Ancient (Overframe)
+  # lost its rarity AND kept "(Overframe)" glued to the card name, so the
+  # name never matched the catalogue and the card vanished from the binder
+  # entirely rather than merely arriving unrarified. Any bracketed word up
+  # to twenty letters now counts, and the same pattern strips it from the
+  # name, so the two can never disagree again.
+  # The rarity tag is the LAST bracket on the line, so it is matched by
+  # position rather than by length. Guessing a length is what broke this:
+  # five letters lost "Overframe", twenty would still lose "Quarter Century
+  # Secret Rare", and "Collector's Rare" carries an apostrophe. Anchoring to
+  # the end takes whatever the shop wrote, however long, and leaves any
+  # bracket earlier in the line - which belongs to the card name - alone.
   my $norar = $rest;
-  $norar =~ s/\(\s*Status[^)]*\)//gi;
+  $norar =~ s/\(\s*Status[^)]*\)\s*//gi;
+  $norar =~ s/\s+$//;
   my $rar = '';
-  $rar = uc($1) if $norar =~ /\(([A-Za-z]{1,5})\)/;
+  $rar = uc($1) if $norar =~ /\(\s*([A-Za-z][A-Za-z'’.\- ]*?)\s*\)\s*$/;
 
-  $rest =~ s/\((?:Status[^)]*|[A-Za-z]{1,5})\)//gi;
+  $rest =~ s/\(\s*Status[^)]*\)//gi;
+  $rest =~ s/\(\s*[A-Za-z][A-Za-z'’.\- ]*?\s*\)\s*$//;
+  $rest =~ s/\s+/ /g;
   $rest =~ s/^\s+|\s+$//g;
   return { code => $code, name => $rest, rar => $rar, cond => $cond };
 }

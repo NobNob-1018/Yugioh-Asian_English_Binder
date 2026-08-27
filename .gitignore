@@ -22,3 +22,6 @@ graphify-out/
 
 # raw price harvest - 386 kB intermediate, rebuilt by Tools/ae-prices-tcgcorner.pl
 tcgc-prices.json
+
+# impeccable scratch - decision-page payloads, regenerated per run
+.impeccable/

@@ -9,60 +9,85 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <meta name="color-scheme" content="dark">
 <style>
+/* ============================================================
+   SCORE PAPER - the default rendition of this world.
+   A score is read on paper, and this app is read under a shop's
+   fluorescent overheads with glare on the glass. Paper matches that
+   light; the negative below serves the desk at night.
+   One ink. Weight is carried by FILL, never by hue, which leaves the
+   colour channel free for the only thing here that is genuinely
+   colour-coded: rarity foil.
+   ============================================================ */
 :root{
-  --bg:#0A0B0E;
-  --surface:#16181D;
-  --surface-2:#1F232B;
+  --bg:#F1F1EE;
+  --surface:#FFFFFF;
+  --surface-2:#FAFAF8;
   /* third tier for anything floating above the page */
-  --surface-3:#242832;
-  --sh-1:0 1px 2px rgba(0,0,0,.32);
-  --sh-2:0 10px 30px rgba(0,0,0,.45);
-  --sh-3:0 24px 60px rgba(0,0,0,.60);
-  --ring:0 0 0 3px rgba(240,194,74,.32);
+  --surface-3:#FFFFFF;
+  /* No shadows in this world. The tokens survive because 600 rules call
+     them; they now draw the hairline that replaced the blur.          */
+  --sh-1:none;
+  --sh-2:0 0 0 1px var(--line);
+  --sh-3:0 0 0 1px var(--text);
+  --ring:0 0 0 3px rgba(17,17,17,.18);
   /* Everything below had been written as a literal somewhere; a second
      palette needs them named.                                          */
-  --line-hover:#3C3C42;
-  --track:#2A2A2F;
-  --meter-bg:#2A2E37;
-  --pocket-bg:#0C0C10;
-  --shimmer-a:#101015; --shimmer-b:#181820;
-  --scroll:#2C2C31;
-  --on-accent:#141008;
-  --veil:rgba(8,8,9,.78);
-  --hi:rgba(255,255,255,.05);
-  --hi-strong:rgba(255,255,255,.2);
-  --sleeve:rgba(255,255,255,.055); --sleeve-2:rgba(255,255,255,.03);
-  --top-a:rgba(22,24,29,.96); --top-b:rgba(10,11,14,.94);
-  --leaf-a:rgba(24,26,33,.99); --leaf-b:rgba(13,14,19,.95);
-  --scrim:rgba(6,6,9,.55);
-  --glass:rgba(16,18,23,.98);
-  --line:#2E333D;
-  --line-soft:#2C2C35;
-  --text:#F5F3EF;
-  --muted:#A3A3AE;
-  --faint:#8A8A99;          /* 5.22:1 on --surface; was #767683 at 3.97 */
-  --accent:#F0C24A;
-  --accent-soft:rgba(240,194,74,.18);
-  --danger:#E0736A;
-  --r-xs:4px;
-  --r-sm:6px;
-  --r:10px;
-  --r-pill:100px;
-  /* Type ramp. Seventeen ad-hoc sizes collapsed to nine steps; every rule
-     below picks one of these rather than inventing a number.            */
+  --line-hover:#111111;
+  --track:#E6E6E6;
+  --meter-bg:#EDEDEA;
+  --pocket-bg:#F6F6F3;
+  --shimmer-a:#F1F1EE; --shimmer-b:#FAFAF8;
+  --scroll:#C8C8C2;
+  --on-accent:#FFFFFF;
+  --veil:rgba(255,255,255,.86);
+  --hi:rgba(17,17,17,.04);
+  --hi-strong:rgba(17,17,17,.14);
+  --sleeve:rgba(17,17,17,.05); --sleeve-2:rgba(17,17,17,.025);
+  --top-a:rgba(255,255,255,.98); --top-b:rgba(255,255,255,.94);
+  --leaf-a:rgba(255,255,255,.99); --leaf-b:rgba(250,250,248,.96);
+  --scrim:rgba(241,241,238,.72);
+  --glass:rgba(255,255,255,.98);
+  --line:#D6D6D2;
+  --line-soft:#E8E8E4;
+  --text:#111111;
+  --muted:#55555A;          /* 7.4:1 on paper */
+  --faint:#666669;          /* 5.06:1 on the page ground, 4.59:1 on the beat band */
+  /* The accent IS the ink. Emphasis in a score is inversion, not hue. */
+  --accent:#111111;
+  --accent-soft:rgba(17,17,17,.07);
+  --danger:#111111;
+  /* THE BEAT BAND - the pale band that crosses the full width at the
+     active row. The one moving element in the whole interface.        */
+  --band:#E6E6E6;
+  /* LEVEL FILLS. Laban encodes level by fill, not colour. These carry
+     rarity tier, condition and state without spending a single hue.   */
+  --fill-1:repeating-linear-gradient(45deg,var(--text) 0 1px,transparent 1px 5px);
+  --fill-2:radial-gradient(circle at 50% 50%,var(--text) .8px,transparent .9px) 0 0/5px 5px;
+  --fill-3:repeating-linear-gradient(45deg,var(--text) 0 1.4px,transparent 1.4px 3.4px);
+  --fill-4:radial-gradient(circle at 50% 50%,var(--text) .9px,transparent 1px) 0 0/2.6px 2.6px;
+  /* A score is square. Nothing here is a pill. */
+  --r-xs:0px;
+  --r-sm:0px;
+  --r:0px;
+  --r-pill:0px;
+  /* Type ramp. TALL FORMS, FEW WORDS - so the top of the ramp is allowed
+     to be genuinely large. The dense bottom is untouched: 11px is still
+     the floor for anything a person has to read and act on.           */
   --fs-3xs:11px;  --fs-2xs:11.5px; --fs-xs:12px;
   --fs-sm:13px;   --fs-md:14px;   --fs-lg:15px;
-  --fs-xl:17px;   --fs-2xl:20px;  --fs-3xl:28px;
+  --fs-xl:19px;   --fs-2xl:26px;  --fs-3xl:40px;
   /* Spacing rhythm, used for the containers where it reads: panels, boards,
      modals, the sidebar. Small controls keep their own tuned padding.    */
   --sp-1:4px;  --sp-2:8px;  --sp-3:12px;
   --sp-4:16px; --sp-5:24px; --sp-6:32px;
-  /* Gold means value. This means information: counts, set codes, the things
-     that were competing with prices for the same emphasis.             */
-  --info:#7FA8D8;
-  --info-soft:rgba(127,168,216,.16);
-  --up:#4FBF8B;
-  --down:#E0736A;
+  /* Information used to be blue and direction used to be green and red.
+     In a notation, direction is SHAPE - the arrow glyph carries it - so
+     these resolve to ink and stop competing with rarity for the eye.
+     It also means a colour-blind reader loses nothing.                 */
+  --info:#55555A;
+  --info-soft:rgba(17,17,17,.06);
+  --up:#111111;
+  --down:#111111;
   --gap:12px;
   --cap:22px;
   /* binder inset; the toolbar pulls itself out by exactly this much */
@@ -72,11 +97,24 @@
   --cols:6;
   --rows:2;
   --page-h:calc(100dvh - 176px);
-  /* One family everywhere. Tabular figures stand in for the old mono face, so
-     prices and set codes still line up in a straight column. */
-  --display:"Nunito",system-ui,-apple-system,sans-serif;
-  --body:"Nunito",system-ui,-apple-system,sans-serif;
-  --mono:"Nunito",system-ui,-apple-system,sans-serif;
+  /* Nunito was named here but never loaded - no web fonts are allowed in a
+     one-file offline app - so it only ever rendered on a machine that
+     happened to have it installed. Everyone else silently got the system
+     face. These are real stacks, so every device gets what was designed.
+
+     The one concession this world forces: its display voice is a tall
+     condensed face nobody has installed and no CDN may serve. Rather than
+     fake it with Impact, the display register here is TRACKED CAPS at
+     scale, and the identity is carried by the staff, the fills and the
+     beat band - which is what this notation says it is: the staff is the
+     structure, not the lettering.
+
+     Numerals get their own voice. Prices, set codes and counts are
+     measurement, so they are set in mono with tabular figures and hold a
+     straight column that never reflows while it is being read.        */
+  --display:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --body:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Menlo,Consolas,"Liberation Mono",monospace;
 }
 *{box-sizing:border-box}
 html{scrollbar-gutter:stable}
@@ -226,12 +264,14 @@ button{cursor:pointer;background:none;border:none}
      hidden ones away buys back the room; wrap is the safety net so the bar
      can never push the page sideways again.                            */
   .toolset{flex-wrap:nowrap;min-width:0;flex:0 0 auto}
-  /* Bulk add and Clear filters only appear once you drill into a set or core,
-     which is a deliberate move, so they may take their space back.       */
+  /* Reserving a slot for every hidden control cost 412px of the 1020px
+     bar - forty percent of it holding nothing - and pushed the pager onto
+     a third row. The stability that bought is now provided by anchoring
+     instead: the tabs are pinned to the left edge and the pager to the
+     right, so neither can be moved by anything between them. Only the
+     rarity menu still holds its slot, because it vanishes just by
+     changing view, which is not something you asked for.              */
   .toolset .gone{display:none}
-  /* The rarity menu toggles just by moving between Binder, Sets, Cores and
-     Wishlist. Letting it vanish dragged every control after it sideways, so
-     it keeps its slot and merely stops being visible.                   */
   .toolset #t-rar.gone{display:block;visibility:hidden;pointer-events:none}
   /* Everything from the tabs rightwards is one block pinned to the right
      edge, so a longer or shorter heading can no longer push it around.  */
@@ -305,11 +345,14 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
   transition:background .22s cubic-bezier(.4,0,.2,1);border:1px solid transparent}
 .track::after{content:"";position:absolute;top:2.5px;left:2.5px;width:13px;height:13px;border-radius:50%;
   background:var(--muted);
-  transition:transform .26s cubic-bezier(.34,1.4,.5,1),background .22s ease,box-shadow .22s ease}
+  transition:transform .26s var(--ease),background .22s ease,box-shadow .22s ease}
 .switch:hover .track::after{box-shadow:0 0 0 4px var(--hi)}
-.switch input:checked + .track{background:rgba(240,194,74,.4);border-color:rgba(240,194,74,.5)}
-.switch input:checked + .track::after{transform:translateX(15px);background:var(--accent);
-  box-shadow:0 0 8px rgba(240,194,74,.45)}
+/* Left over from the gold palette: a hardcoded amber glow that survived the
+   world change because nothing named it. A switch is on or off, and this
+   world says on by inverting, not by lighting up. */
+.switch input:checked + .track{background:var(--text);border-color:var(--text)}
+.switch input:checked + .track::after{transform:translateX(15px);background:var(--on-accent);
+  box-shadow:none}
 .switch:active .track::after{width:16px}
 .switch input:focus-visible + .track{outline:1.5px solid var(--accent);outline-offset:2px}
 .switch .lbl{font-size:var(--fs-sm)}
@@ -326,7 +369,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 /* A copy is two lines of controls. Loose in a list they read as two separate
    items, which stops making sense the moment you hold three rarities of the
    same card. Each copy gets its own block, edged in its rarity.        */
-.cgrp{border:1px solid var(--line-soft);border-left:3px solid var(--rar);
+.cgrp{border:1px solid var(--line-soft);border-left:1px solid var(--rar);
   border-radius:var(--r-sm);background:var(--surface-2);
   padding:9px 11px;margin-bottom:9px;transition:border-color .15s}
 .cgrp:hover{border-color:var(--line);border-left-color:var(--rar)}
@@ -415,9 +458,9 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
   width:var(--tw,0);height:var(--th,0);
   transform:translate(var(--tx,0),var(--ty,0));
   background:var(--accent);border-radius:var(--r-xs);opacity:var(--to,0);
-  transition:transform .34s cubic-bezier(.34,1.12,.5,1),
-             width .34s cubic-bezier(.34,1.12,.5,1),
-             height .34s cubic-bezier(.34,1.12,.5,1),
+  transition:transform .34s var(--ease),
+             width .34s var(--ease),
+             height .34s var(--ease),
              opacity .2s ease}
 .tabs button{padding:4px 12px;font-size:var(--fs-sm);color:var(--muted);border-radius:var(--r-xs);
   position:relative;z-index:1;transition:color .22s ease}
@@ -441,12 +484,14 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 
 /* --- sets view --- */
 .sets{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
-.setcard{border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2);
-  padding:var(--sp-3) var(--sp-4);text-align:left;width:100%;
+/* One rule each, not three. This was six declarations across six lines, each
+   adding a single property to the same selector; position:relative in
+   particular was easy to delete by accident even though .set-edit anchors
+   to it. The Score Notation layer restyles both further down. */
+.setcard{position:relative;border:1px solid var(--line);border-radius:var(--r-sm);
+  background:var(--surface-2);padding:var(--sp-3) var(--sp-4);text-align:left;width:100%;
   transition:border-color .15s ease,background .15s ease,transform .15s ease}
-.setcard:hover{border-color:var(--line-hover);background:var(--surface-3);transform:translateY(-1px)}
-.setcard{position:relative}
-.setcard:hover{border-color:var(--accent)}
+.setcard:hover{border-color:var(--line-hover);background:var(--surface-3)}
 .set-edit{position:absolute;right:8px;top:8px;font-size:var(--fs-2xs);color:var(--faint);
   border:1px solid var(--line);border-radius:var(--r-xs);padding:2px 7px;background:var(--surface)}
 .set-edit:hover{color:var(--accent);border-color:var(--accent)}
@@ -566,7 +611,7 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 .tdiff{margin-left:auto;text-align:right}
 .tdiff.up b{color:var(--up)}.tdiff.down b{color:var(--down)}.tdiff.flat b{color:var(--muted)}
 /* deals */
-.deal{border:1px solid var(--line-soft);border-left:3px solid var(--line);
+.deal{border:1px solid var(--line-soft);border-left:1px solid var(--line);
   border-radius:var(--r-sm);background:var(--surface-2);padding:var(--sp-3);
   margin-bottom:var(--sp-3)}
 .deal.pending{border-left-color:var(--accent)}
@@ -731,8 +776,11 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 .pocket.unowned img{filter:grayscale(1) brightness(.34) contrast(1.1)}
 .pocket.unowned:hover img{filter:grayscale(.1) brightness(.95)}
 .pocket{transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease}
-.pocket.filled:hover{border-color:var(--accent);transform:translateY(-2px);
-  box-shadow:inset 0 1px 6px rgba(0,0,0,.6), 0 0 0 1px rgba(240,194,74,.25), var(--sh-2)}
+/* The last of the gold: a hover ring in the old accent, hardcoded so the
+   world change could not reach it. A hovered pocket now gains an ink edge,
+   which is the same emphasis every other control uses. */
+.pocket.filled:hover{border-color:var(--text);transform:translateY(-2px);
+  box-shadow:0 0 0 1px var(--text), var(--sh-2)}
 /* The qty and deck pips sit on whatever the art happens to be; this keeps a
    consistent floor under them without dimming the picture.              */
 .pocket.filled::after{content:'';position:absolute;left:0;right:0;bottom:0;height:38%;
@@ -761,7 +809,16 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 .f-exsecret{background:linear-gradient(115deg,#B98CFF,#FFFFFF,#7ED8FF,#E79BFF,#B98CFF);background-size:300% 300%}
 .f-qcsr{background:linear-gradient(115deg,#FFE07A,#FFFFFF,#8FD8FF,#FFA8DC,#FFE07A);background-size:300% 300%}
 .f-collector{background:linear-gradient(115deg,#5FE0C8,#FFFFFF,#FFD86B,#7FB4FF,#5FE0C8);background-size:300% 300%}
+/* The detector flags this glow, correctly, as the look it exists to catch.
+   It stays: Holographic Rare IS a glow in the hand, this is the one channel
+   in the app where colour and sheen carry meaning rather than decoration,
+   and the project rule is that foil classes are information. Every other
+   glow in this file has been removed; this one is earned. */
 .f-holo{background:linear-gradient(115deg,#C9F5FF,#FFFFFF,#9FD4FF,#FFFFFF,#C9F5FF);background-size:300% 300%;box-shadow:0 0 7px rgba(180,230,255,.55)}
+/* Overframe: the whole card is framed in foil, so the chip reads as an edge
+   rather than a wash - a bright border with a dark core, which is what the
+   treatment actually looks like in the hand. */
+.f-overframe{background:linear-gradient(135deg,#E8D9A0,#FFF6D6,#C9A94E,#FFF6D6,#E8D9A0);background-size:300% 300%;box-shadow:inset 0 0 0 1.5px #6B5A22,0 0 7px rgba(232,217,160,.5);color:#2A2410}
 @keyframes foil{to{background-position:340% 0}}
 
 /* ---------- modal ---------- */
@@ -989,7 +1046,7 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
   background-size:140px 140px;
   background-blend-mode:soft-light;
 }
-:root[data-theme="light"] .binder{background-blend-mode:multiply}
+:root:not([data-theme="dark"]) .binder{background-blend-mode:multiply}
 
 @media (max-width:920px){
   :root{--page-h:calc(100dvh - 250px);--gap:7px;--bpad-x:8px;--bpad-t:8px;--bpad-b:10px}   /* cols/rows come from autoLayout() */
@@ -1066,48 +1123,660 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
 /* ---- light ----
    Only the tokens change. Rarity chips keep their own fills in both themes:
    they are pale colours carrying dark text, which reads either way.     */
-:root[data-theme="light"]{
-  --bg:#EEF0F4;
-  --surface:#FFFFFF;
-  --surface-2:#F4F6F9;
-  --surface-3:#E9ECF2;
-  --line:#D3D8E0;
-  --line-soft:#E2E6EC;
-  --text:#14161B;
-  --muted:#565C68;
-  --faint:#6E7482;          /* 4.68:1 on white; was #7B8290 at 3.86 */
-  --accent:#8A6508;
-  --accent-soft:rgba(240,194,74,.26);
-  --info:#3C6595;
-  --info-soft:rgba(60,101,149,.14);
-  --up:#1C7A4F;
-  --down:#B23B32;
-  --danger:#B23B32;
-  --line-hover:#A9B0BC;
-  --track:#C6CBD4;
-  --meter-bg:#DCE0E7;
-  --pocket-bg:#DEE2E9;
-  --shimmer-a:#E4E7ED; --shimmer-b:#F1F3F7;
-  --scroll:#C2C7D0;
-  --on-accent:#FFFFFF;
-  --veil:rgba(30,33,40,.42);
-  --hi:rgba(255,255,255,.65);
-  --hi-strong:rgba(255,255,255,.55);
-  --sleeve:rgba(255,255,255,.55); --sleeve-2:rgba(120,130,150,.10);
-  --top-a:rgba(255,255,255,.97); --top-b:rgba(243,245,248,.94);
-  --leaf-a:rgba(252,253,255,.99); --leaf-b:rgba(232,235,241,.96);
-  --scrim:rgba(24,26,32,.42);
-  --glass:rgba(255,255,255,.98);
-  --ring:0 0 0 3px rgba(138,101,8,.28);
-  --sh-1:0 1px 2px rgba(24,28,38,.10);
-  --sh-2:0 10px 30px rgba(24,28,38,.13);
-  --sh-3:0 24px 60px rgba(24,28,38,.20);
+/* ============================================================
+   THE NEGATIVE - the same score, printed in reverse.
+   Not a recolour: every relationship above is preserved and only the
+   polarity flips, which is exactly what this world does to mark an
+   active state. Ink becomes paper, paper becomes ink, and the fills
+   invert with them because they are drawn from var(--text).
+   ============================================================ */
+:root[data-theme="dark"]{
+  --bg:#0B0B0B;
+  --surface:#141414;
+  --surface-2:#191919;
+  --surface-3:#141414;
+  --line:#333330;
+  --line-soft:#242422;
+  --text:#F2F2EE;
+  --muted:#A8A8A2;          /* 8.1:1 on the negative's surface */
+  --faint:#94948D;          /* 6.04:1 on surface, 4.71:1 on the negative's band */
+  --accent:#F2F2EE;
+  --accent-soft:rgba(242,242,238,.08);
+  --info:#A8A8A2;
+  --info-soft:rgba(242,242,238,.06);
+  --up:#F2F2EE;
+  --down:#F2F2EE;
+  --danger:#F2F2EE;
+  --band:#2A2A28;
+  --line-hover:#F2F2EE;
+  --track:#2A2A28;
+  --meter-bg:#242422;
+  --pocket-bg:#0E0E0E;
+  --shimmer-a:#141414; --shimmer-b:#1C1C1C;
+  --scroll:#3A3A36;
+  --on-accent:#0B0B0B;
+  --veil:rgba(11,11,11,.86);
+  --hi:rgba(242,242,238,.05);
+  --hi-strong:rgba(242,242,238,.16);
+  --sleeve:rgba(242,242,238,.05); --sleeve-2:rgba(242,242,238,.025);
+  --top-a:rgba(20,20,20,.98); --top-b:rgba(11,11,11,.94);
+  --leaf-a:rgba(20,20,20,.99); --leaf-b:rgba(14,14,14,.96);
+  --scrim:rgba(11,11,11,.72);
+  --glass:rgba(20,20,20,.98);
+  --ring:0 0 0 3px rgba(242,242,238,.22);
+  --sh-1:none;
+  --sh-2:0 0 0 1px var(--line);
+  --sh-3:0 0 0 1px var(--text);
 }
-/* an unowned card is dimmed, not blackened, when the page is white */
-:root[data-theme="light"] .pocket.unowned img{filter:grayscale(1) brightness(1.04) contrast(.92) opacity(.55)}
-:root[data-theme="light"] .pocket.unowned:hover img{filter:grayscale(.1) brightness(1) opacity(.95)}
-:root[data-theme="light"] .binder{box-shadow:0 1px 0 rgba(255,255,255,.9) inset, var(--sh-2)}
-@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+/* an unowned card is dimmed, not blackened, on paper */
+:root:not([data-theme="dark"]) .pocket.unowned img{filter:grayscale(1) brightness(1.04) contrast(.92) opacity(.5)}
+:root:not([data-theme="dark"]) .pocket.unowned:hover img{filter:grayscale(.1) brightness(1) opacity(.95)}
+/* ============================================================
+   SCORE NOTATION - the component layer.
+
+   Four rules from the world, applied to this product:
+     LEVEL IS SHOWN BY FILL     - state is hatch and stipple, never hue
+     TIME IS SHOWN BY LENGTH    - price is a bar you read before a number
+     SYMMETRY GUIDES THE EYE    - holding left of the line, market right
+     THE STAFF IS THE STRUCTURE - a hairline rules every column
+
+   Everything below is achromatic on purpose. The rarity foil classes are
+   untouched, which makes them the only colour anywhere in the interface.
+   That is the whole idea: when nothing else is coloured, colour means
+   rarity and cannot mean anything else.
+   ============================================================ */
+
+/* ---- no blur, anywhere. thirty-six literal shadows resolve to a rule ---- */
+.setcard,.grp,.mini,.btn,.inp,.tabs,.deal,.ditem,.dash,.shell,.page,
+.pocket,.fxbox,.sg,.step,.seg2,.switch,.regsw,.tag,.prow,.trow{box-shadow:none}
+.setcard:hover{transform:none;border-color:var(--text)}
+
+/* ---- THE DISPLAY REGISTER ----
+   This world's display voice is a tall condensed face that cannot be
+   loaded here, so the register is carried by tracking and case instead.
+   Few words, wide letterspacing, always caps.                        */
+h1,#mark-title{font-family:var(--display);font-size:var(--fs-md);font-weight:600;
+  letter-spacing:.2em;text-transform:uppercase;line-height:1.1}
+/* A fixed slot, sized for the wider of the two region strings. The text
+   inside it changes; the switch that follows it does not move. */
+#mark-title{min-width:14.5em;flex:0 0 auto}
+@media (max-width:560px){#mark-title{min-width:0}}
+.grp h2,.rkey-row b,.dstat .lbl{letter-spacing:.16em}
+
+/* ---- NUMERALS ARE THEIR OWN VOICE ----
+   Prices, codes, counts and dates are measurement, so they are set in
+   mono with tabular figures and hold a column that never reflows while
+   it is being read.                                                  */
+body{font-variant-numeric:tabular-nums}
+.setcard .code,.setcard .foot,.setcard .est,.crow .setc,.crow .tagr,
+.pxpill,.ttot,.dsum,.dstat b,.trow,.prow{font-family:var(--mono);
+  font-variant-numeric:tabular-nums}
+.setcard .code{color:var(--text);letter-spacing:.02em}
+.setcard .est .own{color:var(--text)}
+
+/* ---- ACTIVE IS INVERSION ----
+   The one emphasis this world has. A pressed control is a solid ink
+   block with paper lettering; it reads with the colour removed, which
+   is what keeps rarity's channel clear.                              */
+.tabs::before{background:var(--text)!important;border-radius:0!important;box-shadow:none!important}
+.tabs button.on,#view-tabs button.on,.mini.on,.btn.on,.seg2 button.on,
+.regsw button[aria-pressed="true"]{background:var(--text);color:var(--on-accent);
+  border-color:var(--text)}
+.btn:hover,.mini:hover,.inp:focus{border-color:var(--text)}
+
+/* ---- THE BEAT BAND ----
+   The pale band that crosses the active row edge to edge. It is the only
+   thing in this interface that moves, and it moves because the eye needs
+   to be told where it is, not because motion is nice.                */
+.crow,.trow,.ditem,.rkey-row{position:relative;z-index:0}
+/* The band used to bleed 16px past each edge to read as edge-to-edge. In a
+   modal, whose content box is narrower than the row's parent, that bleed
+   showed as a grey strip hanging outside the list - so it covers exactly
+   its own row now and earns its width from the row's padding instead. */
+.crow::before,.trow::before,.ditem::before{content:'';position:absolute;
+  inset:0;background:var(--band);opacity:0;z-index:-1;pointer-events:none;
+  transform-origin:left center;transform:scaleX(.985);
+  transition:opacity var(--fast) var(--ease),transform var(--fast) var(--ease)}
+.crow,.trow,.ditem{padding-left:6px;padding-right:6px;margin-left:-6px;margin-right:-6px}
+/* One rule, both properties. The band's rest state and its motion were
+   declared in two separate sections, so changing how it behaves meant
+   finding both. */
+.crow:hover::before,.crow:focus-within::before,
+.trow:hover::before,.ditem:hover::before{opacity:1;transform:scaleX(1)}
+
+/* ---- TIME IS SHOWN BY LENGTH ----
+   A price bar under each row, its width proportional to the printing's
+   price against the dearest on screen. You read the set's shape first
+   and the number second. --len is written by the renderer; with no
+   price the bar is absent rather than zero, because an absent price and
+   a free card are not the same statement.                            */
+.crow[style*="--len"]::after{content:'';position:absolute;left:0;bottom:-1px;
+  height:2px;width:var(--len,0);background:var(--text);opacity:.75}
+
+/* ---- LEVEL IS SHOWN BY FILL ----
+   Condition grades and the unowned state carry a fill, not a colour, so
+   they survive a greyscale print, a colour-blind reader and a phone in
+   direct sun.                                                        */
+.cond-a,.cond-b,.cond-c{position:relative;border:1px solid var(--text)}
+.cond-a{background:transparent}
+.cond-b{background-image:var(--fill-1)}
+.cond-c{background-image:var(--fill-3)}
+.pocket.unowned{background-image:var(--fill-2);background-color:var(--pocket-bg)}
+
+/* ---- THE STAFF ----
+   Panels stop being cards with corners and become columns ruled by a
+   line. One hairline does the work six borders and a radius were doing. */
+.grp{border-radius:0;border-left:none;border-right:none;border-top:none}
+.grp:first-child{border-radius:0}
+.grp:last-child{border-radius:0}
+.setcard{border-radius:0;border-left-width:2px;border-left-color:var(--text)}
+.rail{gap:0}
+
+/* ---- browser surfaces ----
+   The parts not drawn here still carry the design.                   */
+::selection{background:var(--text);color:var(--on-accent)}
+::-webkit-scrollbar-thumb{border-radius:0;background:var(--scroll);border:2px solid var(--bg)}
+:focus-visible{outline:2px solid var(--text);outline-offset:2px;border-radius:0}
+
+/* ---- one navigation block on a phone ----
+   The controls were spread down the page: view tabs in one place, pile tabs
+   in another, sort and display in a third, the pager in a fourth. Grouped,
+   they read as one thing you scan once - where am I, which pile, how is it
+   sorted - and the page below it is just results.                       */
+@media (max-width:919px){
+  .binder>.bar{gap:8px;padding:10px var(--bpad-x)}
+  /* row 1: where am I */
+  .bar>#view-tabs{flex:1 1 100%;width:100%;order:0;display:flex}
+  .bar>#view-tabs button{flex:1 1 0;justify-content:center}
+  /* row 2: which pile */
+  .bar>#pilebar{flex:1 1 100%;order:1;margin:0}
+  /* row 3: how it is sorted and shown */
+  .bar>.toolset{flex:1 1 100%;order:2;gap:6px}
+  .toolset .mini{flex:1 1 0;max-width:none}
+  .toolset #mode-tog,.toolset #t-select{flex:0 0 auto}
+  /* row 4: the count and the pager share a line rather than taking two.
+     The pile tabs directly above already name the pile, so the caption
+     drops the word and keeps the number. */
+  .bar>.bar-left{flex:0 1 auto;order:3;max-width:98px;min-width:0;width:auto}
+  .bar .tag{display:none}
+  .bar .count{font-size:var(--fs-2xs);white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis;border:none;padding:0}
+  .bar>.nav{flex:0 0 auto;order:4;margin:0 0 0 auto;gap:6px}
+  .bar>.nav .btn{padding:0 10px}
+  .bar .jump{width:44px}
+}
+/* Controls that cannot do anything useful on a phone are removed, not
+   disabled - a dead control is one you can still tap by mistake. */
+@media (max-width:759px){
+  #t-per,.more-row{display:none}
+  .toolset #core-mult{display:none}
+}
+
+/* ---- filters as a sheet on a phone ----
+   Below 920px the rail drops beneath the card grid, which buried every
+   filter under everything you own. Search was the worst of it and moved to
+   the header; the rest move into a sheet that slides up over the grid from
+   one thumb-reachable button, so narrowing a search never costs a scroll
+   past the whole collection.                                            */
+@media (max-width:919px){
+  .filt-fab{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));
+    z-index:55;display:inline-flex;align-items:center;gap:7px;
+    min-height:48px;padding:0 18px;background:var(--text);color:var(--on-accent);
+    border:none;font-size:var(--fs-sm);font-weight:500;letter-spacing:.04em;
+    box-shadow:0 2px 12px rgba(0,0,0,.22)}
+  .filt-fab .badge{background:var(--on-accent);color:var(--text);margin-left:2px}
+  :root[data-theme="dark"] .filt-fab{box-shadow:0 2px 12px rgba(0,0,0,.6)}
+
+  .shell>.rail{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:70;
+    max-height:82dvh;margin:0;background:var(--surface);
+    border-top:2px solid var(--text);border-radius:0;
+    padding:0 var(--sp-4) calc(var(--sp-5) + env(safe-area-inset-bottom,0px));
+    overflow:auto;transform:translateY(101%);
+    /* Transform carries the motion, visibility carries the truth. A sheet
+       that is only moved off-screen still takes taps and still reads to a
+       screen reader, so the closed state says so outright and the slide is
+       the part that is merely pleasant.                                 */
+    visibility:hidden;pointer-events:none;
+    transition:transform var(--slow) var(--ease),visibility 0s linear var(--slow);
+    box-shadow:0 -8px 32px rgba(0,0,0,.24)}
+  :root[data-sheet="open"] .shell>.rail{transform:translateY(0);
+    visibility:visible;pointer-events:auto;
+    transition:transform var(--slow) var(--ease),visibility 0s}
+  /* a grab bar, and a heading that names what the sheet is */
+  .shell>.rail::before{content:'Filters';position:sticky;top:0;z-index:2;
+    display:block;padding:var(--sp-4) 0 var(--sp-3);background:var(--surface);
+    border-bottom:1px solid var(--line-soft);margin-bottom:var(--sp-3);
+    font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .sheet-veil{position:fixed;inset:0;z-index:65;background:var(--scrim);
+    opacity:0;pointer-events:none;transition:opacity var(--fast) var(--ease)}
+  :root[data-sheet="open"] .sheet-veil{opacity:1;pointer-events:auto}
+  :root[data-sheet="open"]{overflow:hidden}
+  .sheet-done{position:sticky;bottom:0;width:100%;min-height:48px;margin-top:var(--sp-4);
+    background:var(--text);color:var(--on-accent);border:none;font-size:var(--fs-md);font-weight:500}
+}
+@media (min-width:920px){.filt-fab,.sheet-veil,.sheet-done{display:none}}
+@media (prefers-reduced-motion:reduce){.shell>.rail{transition:none}}
+
+/* ---- the legend ----
+   The one component this world ships that answers its own honest risk: a
+   notation nobody can read is decoration. Each swatch is drawn with the
+   same rule the interface uses, so the key cannot drift from the thing. */
+.legend{display:flex;flex-direction:column;gap:7px;margin:2px 0 var(--sp-3)}
+.lg-row{display:flex;align-items:flex-start;gap:var(--sp-2);
+  font-size:var(--fs-xs);color:var(--muted);line-height:1.45}
+.lg-row b{color:var(--text);font-weight:600}
+.lg-s{flex:0 0 auto;width:18px;height:18px;border:1px solid var(--text);margin-top:1px}
+.lg-colour{background:linear-gradient(115deg,#C9F5FF,#FFFFFF,#9FD4FF)}
+.lg-fill{background-image:var(--fill-1)}
+.lg-inv{background:var(--text)}
+.lg-band{background:var(--band);border-color:var(--line)}
+.lg-h{font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);margin:var(--sp-3) 0 4px;display:flex;align-items:center;gap:8px}
+.lg-h::after{content:'';flex:1;height:1px;background:var(--line-soft)}
+
+/* ---- select mode ----
+   A picked card is marked by inversion, the same emphasis this world uses
+   everywhere else, so the state reads with colour removed and leaves the
+   rarity ring saying only what it always says.                          */
+body.selmode .pocket{cursor:copy}
+.pocket.picked{outline:3px solid var(--text);outline-offset:-3px}
+.pocket.picked::after{content:'✓';position:absolute;top:6px;left:6px;z-index:3;
+  width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  background:var(--text);color:var(--on-accent);font-size:var(--fs-xs);line-height:1}
+.bulkbar{position:fixed;left:0;right:0;bottom:0;z-index:60;
+  display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+  padding:var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom,0px));
+  background:var(--surface);border-top:2px solid var(--text)}
+.bulkbar[hidden]{display:none}
+.bb-n{font-size:var(--fs-sm);font-weight:500;color:var(--text);
+  font-variant-numeric:tabular-nums;flex:0 0 auto}
+.bb-acts{display:flex;gap:var(--sp-2);flex-wrap:wrap;margin-left:auto}
+.bulkbar .btn{min-height:40px}
+.bulkbar .btn:disabled{opacity:.4;pointer-events:none}
+@media (max-width:560px){
+  .bb-acts{margin-left:0;width:100%}
+  .bulkbar .btn{flex:1 1 auto;min-height:44px}
+}
+/* the filter button would sit on top of the bulk bar */
+body.selmode .filt-fab{display:none}
+
+/* ---- a count you do not have to read ---- */
+.badge{display:inline-flex;align-items:center;justify-content:center;
+  min-width:18px;height:18px;padding:0 5px;margin-left:auto;
+  font-family:var(--mono);font-size:var(--fs-3xs);font-variant-numeric:tabular-nums;
+  background:var(--text);color:var(--on-accent);line-height:1}
+.btn.has-badge{display:flex;align-items:center;gap:var(--sp-2)}
+
+/* ---- recent searches ----
+   In a shop the same few cards get checked over and over. The last handful
+   of queries sit under the box so the second lookup is one tap, not one
+   retype - and they are the app's only history, so they are labelled as
+   such rather than pretending to be suggestions.                       */
+.rec{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:60;
+  background:var(--surface);border:1px solid var(--text);padding:var(--sp-2);
+  display:flex;flex-direction:column;gap:1px}
+.rec[hidden]{display:none}
+.rec-h{font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);padding:2px 6px 5px;display:flex;align-items:center;gap:var(--sp-2)}
+.rec-h button{margin-left:auto;color:var(--faint);font-size:var(--fs-3xs);
+  letter-spacing:.06em;text-transform:none;text-decoration:underline}
+.rec-h button:hover{color:var(--text)}
+.rec-i{display:flex;align-items:center;gap:var(--sp-2);min-height:34px;
+  padding:4px 6px;text-align:left;font-size:var(--fs-sm);color:var(--text);
+  position:relative;z-index:0}
+.rec-i::before{content:'';position:absolute;inset:0;background:var(--band);
+  opacity:0;z-index:-1;transition:opacity var(--fast) var(--ease)}
+.rec-i:hover::before,.rec-i:focus-visible::before{opacity:1}
+.rec-i .q{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-family:var(--mono)}
+@media (max-width:820px){.rec-i{min-height:44px}}
+
+/* ---- the dashboard is one headline and a list of movements ----
+   Two columns, not four tiles: the value you came for, and what changed
+   since you last looked. The movement rows are pressable, because the next
+   thing you want after seeing a card moved is that card.               */
+/* One strip, not a panel. The dashboard was 154px tall and pushed the binder
+   below the fold to report, most of the time, that nothing had happened.
+   It now reads as a single line: the value, what it did, and what moved -
+   and it only grows when there is something to grow for.              */
+.dash{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-3) var(--sp-5);
+  padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-3)}
+.dash-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3);
+  flex:0 0 auto;position:relative}
+.dash .big{font-size:var(--fs-2xl);line-height:1.05}
+.dash .cap{font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+.dash-head .cap{flex:0 0 100%;margin-bottom:-2px}
+.dash-head .delta{font-family:var(--mono);font-size:var(--fs-xs)}
+.dash-head .sub2{font-family:var(--mono);font-size:var(--fs-3xs);color:var(--faint)}
+.dash-moves{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3);
+  flex:1 1 320px;min-width:0;border-left:1px solid var(--line-soft);padding-left:var(--sp-5)}
+.dash-moves .cap{flex:0 0 auto}
+/* the movers run along the strip as chips rather than down a column */
+.mv-list{display:flex;flex-wrap:wrap;gap:6px;min-width:0;flex:1 1 auto}
+/* a mover is a chip on the strip: name, then how far it went */
+.mv-row{display:inline-flex;align-items:center;gap:7px;max-width:230px;
+  padding:3px 8px;border:1px solid var(--line);text-align:left;
+  font-size:var(--fs-xs);color:var(--text);position:relative;z-index:0}
+.mv-row::before{content:'';position:absolute;inset:0;background:var(--band);
+  opacity:0;z-index:-1;transition:opacity var(--fast) var(--ease)}
+/* ---- the search panel ----
+   Opens over the page rather than filtering it underneath, so nothing you
+   were reading moves while you type. It is the only place finding happens,
+   which is why the refinements sit inside it.                          */
+/* The scrim does two jobs: it says the page behind is not live, and it is
+   the click target that closes. It was too faint on the dark rendition to
+   read as either, and a dismiss you cannot see is a dismiss nobody tries.
+   The cursor confirms it: the whole backdrop is a button. */
+/* The page goes quiet: desaturated and pushed back, so the panel is the only
+   thing with colour or contrast left on screen. Card art is the loudest
+   thing in this app, and greying it is what makes the panel read as the
+   single live object rather than a box floating over a busy grid. */
+.sp-veil{position:fixed;inset:0;z-index:80;cursor:pointer;
+  background:rgba(20,20,20,.62);backdrop-filter:saturate(.25) blur(2px)}
+:root[data-theme="dark"] .sp-veil{background:rgba(0,0,0,.66)}
+.sp-veil[hidden]{display:none}
+.sp-veil::after{content:'Click anywhere to close';position:absolute;
+  left:50%;bottom:28px;transform:translateX(-50%);
+  font-size:var(--fs-3xs);letter-spacing:.18em;text-transform:uppercase;
+  color:#FFFFFF;opacity:.45;pointer-events:none;
+  transition:opacity var(--slow) var(--ease)}
+.sp-veil:hover::after{opacity:.8}
+.sp-x{display:inline-flex;align-items:center;gap:7px;flex:0 0 auto;height:36px;
+  border-color:transparent;color:var(--faint);font-size:var(--fs-xs)}
+.sp-x:hover{border-color:var(--line);color:var(--text)}
+.sp-x kbd{font-family:var(--mono);font-size:var(--fs-3xs);color:var(--faint);
+  border:1px solid var(--line);padding:1px 5px}
+/* Sits a little further down the page than a dropdown would, so it reads as
+   its own surface rather than an extension of the header. The border is a
+   hairline, not a 2px slab: the scrim is already doing the separating, and
+   two heavy edges fighting each other is what made it feel bolted on. */
+.sp{position:fixed;z-index:85;left:50%;top:76px;transform:translateX(-50%);
+  width:min(660px,calc(100vw - 40px));max-height:min(620px,calc(100dvh - 132px));
+  display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--text);
+  box-shadow:0 24px 64px rgba(0,0,0,.32),0 2px 8px rgba(0,0,0,.18)}
+:root[data-theme="dark"] .sp{box-shadow:0 24px 64px rgba(0,0,0,.6)}
+.sp[hidden]{display:none}
+html.sp-on{overflow:hidden}
+/* the query line carries no box of its own - the panel edge is the box */
+.sp-top{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-4) var(--sp-4) var(--sp-3);
+  position:relative}
+.sp-top .mag{position:absolute;left:var(--sp-4);width:17px;height:17px;
+  color:var(--muted);pointer-events:none}
+.sp-top .inp{flex:1 1 auto;min-width:0;height:40px;padding:0 0 0 28px;
+  font-size:var(--fs-xl);font-weight:500;letter-spacing:-.01em;
+  background:transparent;border:none;border-radius:0}
+.sp-top .inp:focus{outline:none}
+.sp-top .inp::placeholder{color:var(--faint);font-weight:400;letter-spacing:0}
+/* refinements read as a quiet strip, not a second toolbar */
+.sp-ref{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;
+  padding:0 var(--sp-4) var(--sp-3);border-bottom:1px solid var(--line)}
+.sp-ref .inp{flex:0 1 138px;min-width:0;height:32px;font-size:var(--fs-xs);
+  background:transparent;border:1px solid var(--line-soft);color:var(--muted)}
+.sp-ref .inp:hover,.sp-ref .inp:focus{border-color:var(--text);color:var(--text)}
+.sp-chk{display:inline-flex;align-items:center;gap:7px;font-size:var(--fs-xs);
+  color:var(--muted);min-height:32px;cursor:pointer}
+.sp-chk:hover{color:var(--text)}
+.sp-ref .btn{margin-left:auto;border-color:transparent;color:var(--faint)}
+.sp-ref .btn:hover{border-color:var(--line);color:var(--text)}
+.sp-body{overflow:auto;padding:0 var(--sp-3) var(--sp-3);min-height:140px;
+  scrollbar-gutter:stable}
+.sp-h{font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);padding:var(--sp-3) 0 5px;display:flex;align-items:center;gap:8px}
+.sp-h::after{content:'';flex:1;height:1px;background:var(--line-soft)}
+.sp-n{font-family:var(--mono);letter-spacing:0}
+.sp-row{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:40px;
+  padding:6px 6px;text-align:left;font-size:var(--fs-sm);color:var(--text);
+  position:relative;z-index:0}
+.sp-row::before{content:'';position:absolute;inset:0;background:var(--band);
+  opacity:0;z-index:-1;transition:opacity var(--fast) var(--ease)}
+.sp-row:hover::before,.sp-row:focus-visible::before{opacity:1}
+.sp-code{flex:0 0 74px;font-family:var(--mono);font-size:var(--fs-3xs);
+  color:var(--faint);text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-meta{flex:0 0 auto;font-family:var(--mono);font-size:var(--fs-3xs);color:var(--muted)}
+.sp-empty{margin:var(--sp-4) 0;font-size:var(--fs-sm);color:var(--faint);text-align:center}
+@media (max-width:640px){
+  .sp{top:0;left:0;transform:none;width:100vw;max-height:100dvh;height:100dvh;border:none}
+  .sp-row{min-height:48px}
+  .sp-code{flex:0 0 62px}
+  .sp-ref .btn{margin-left:0}
+}
+
+/* ---- a card with no art says so ----
+   Tokens are not in the art feed. A broken image icon reads as a fault in
+   the app; a plain panel reads as a fact about the card.               */
+.art.noart{display:flex;align-items:center;justify-content:center;
+  min-height:220px;border:1px solid var(--line);background-image:var(--fill-2);
+  background-color:var(--surface-2);cursor:default}
+.art.noart img{display:none}
+.art.noart span{font-size:var(--fs-3xs);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);background:var(--surface);padding:4px 8px;text-align:center}
+
+/* ---- the caption says only what nothing else is saying ----
+   "SETS · Collection" repeated the lit tab and the lit pile tab, then got
+   clipped to a sliver by the 180px slot, leaving half a word floating in
+   the background. The lit tab names the view and the pile tabs name the
+   pile, so the caption keeps only the count - and the breadcrumb, which is
+   the one case where it is carrying something no other control shows. */
+.bar .tag:not(.drill){display:none}
+.bar-left .count{border-left:none;padding-left:0}
+.mv-row:hover::before,.mv-row:focus-visible::before{opacity:1}
+.mv-row:hover{border-color:var(--text)}
+.mv-n{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mv-d{flex:0 0 auto;font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:var(--fs-3xs);color:var(--muted)}
+.mv-more{font-family:var(--mono);color:var(--faint);letter-spacing:0;text-transform:none}
+.mv-empty{margin:0;font-size:var(--fs-xs);color:var(--faint)}
+.mv-foot{font-size:var(--fs-3xs);color:var(--muted);font-family:var(--mono);
+  flex:0 0 auto;margin-left:auto;white-space:nowrap}
+/* On a phone the dashboard is one line and nothing else. The mover chips and
+   the SRP footnote are a desk-sized nicety; here they cost 90px of a screen
+   that has to show cards, so the count carries the whole story and the
+   movers are one tap away in the list itself. */
+@media (max-width:759px){
+  .dash{padding:var(--sp-2) var(--sp-3);gap:var(--sp-1) var(--sp-3)}
+  .dash .big{font-size:var(--fs-xl)}
+  .dash-head{flex:1 1 100%;align-items:baseline}
+  .dash-head .cap{flex:0 0 auto;margin-bottom:0}
+  .dash-head .sub2{flex:1 1 100%}
+  .dash-moves{border-left:none;padding-left:0;flex:1 1 100%;gap:6px}
+  .dash-moves .mv-list,.dash-moves .mv-foot{display:none}
+  .mv-empty{font-size:var(--fs-3xs)}
+}
+
+/* ---- search in the header ----
+   Sticky, so it is reachable at any scroll position, and it takes the room
+   left over between the wordmark and the actions rather than a fixed slot,
+   because it is the one control that benefits from every spare pixel.  */
+/* A ruled line, not a box. The staff is this world's structural device and a
+   bordered pill in the header was the one component still shaped like a
+   generic search field. The line darkens to ink on hover and focus, so the
+   control announces itself by weight rather than by chrome.
+
+   It is also not a text field any more: it opens the panel, so it reads as
+   a button and cannot take a caret it would only lose a moment later. */
+.hdr-search{position:relative;display:flex;align-items:center;
+  flex:1 1 300px;max-width:460px;min-width:0;margin:0 var(--sp-4);cursor:text}
+.hdr-search .mag{position:absolute;left:2px;width:14px;height:14px;
+  color:var(--faint);pointer-events:none;transition:color var(--fast) var(--ease)}
+.hdr-search:hover .mag{color:var(--text)}
+.hdr-search .inp{padding:0 52px 0 24px;height:36px;cursor:text;
+  background:transparent;border:none;border-bottom:1px solid var(--line);
+  border-radius:0;font-size:var(--fs-md);color:var(--text);
+  transition:border-color var(--fast) var(--ease)}
+.hdr-search:hover .inp{border-bottom-color:var(--muted)}
+.hdr-search .inp:focus{outline:none;border-bottom-color:var(--text);border-bottom-width:2px;
+  margin-bottom:-1px}
+.hdr-search .inp::placeholder{color:var(--faint);letter-spacing:.01em}
+.hdr-search .x-btn{display:none}
+.hdr-kbd{position:absolute;right:2px;font-family:var(--mono);font-size:var(--fs-3xs);
+  color:var(--faint);border:1px solid var(--line);padding:1px 6px;pointer-events:none;
+  transition:border-color var(--fast) var(--ease),color var(--fast) var(--ease)}
+.hdr-search:hover .hdr-kbd{color:var(--text);border-color:var(--muted)}
+@media (max-width:820px){
+  /* its own full-width row rather than a squeezed sliver */
+  .top-in{flex-wrap:wrap;height:auto;padding-top:8px;padding-bottom:8px}
+  .hdr-search{order:3;flex:1 1 100%;max-width:none;margin:6px 0 0}
+  .hdr-kbd{display:none}
+  .hdr-search .inp{padding-right:34px;height:40px}
+  .hdr-search .x-btn{right:8px}
+}
+
+/* ---- breadcrumb ----
+   Names the parent instead of offering an unlabelled dismiss. The parent is
+   the control; the current location is plain text and not clickable, because
+   pressing where you already are should do nothing.                     */
+.tag.drill{color:var(--muted)}
+.tag.drill .crumb{font:inherit;letter-spacing:inherit;text-transform:inherit;
+  color:var(--muted);padding:2px 0;border-bottom:1px solid var(--line);
+  transition:color var(--fast) var(--ease),border-color var(--fast) var(--ease)}
+.tag.drill .crumb:hover{color:var(--text);border-bottom-color:var(--text)}
+.tag.drill .sep{color:var(--faint);margin:0 7px}
+.tag.drill .here{color:var(--text);font-weight:600}
+
+/* ---- sidebar: primary and secondary stop looking alike ----
+   A drawer holds secondary navigation. What sat here was four identical
+   buttons for two different jobs, so nothing said which to reach for.  */
+.acts-grp{display:flex;flex-direction:column;gap:6px;margin-top:var(--sp-3)}
+.acts-grp h3{font-size:var(--fs-3xs);font-weight:500;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--faint);margin:0 0 2px;
+  display:flex;align-items:center;gap:8px}
+.acts-grp h3::after{content:'';flex:1;height:1px;background:var(--line-soft)}
+.acts-grp .btn{width:100%;justify-content:flex-start;text-align:left}
+/* what you press mid-deal */
+.act-primary{border-color:var(--text);color:var(--text);font-weight:500}
+.act-primary:hover{background:var(--text);color:var(--on-accent)}
+/* what you press once a month */
+.act-quiet{border-color:var(--line-soft);color:var(--muted)}
+.act-quiet:hover{border-color:var(--text);color:var(--text)}
+
+/* ---- the bar does not move ----
+   Three things were sliding around and all three came from the same
+   mistake: letting content decide where a control sits.
+
+   1. The caption changes width with the view - "COLLECTION 0 cards" then
+      "ASIAN-ENGLISH SETS 9 sets" - and the tabs sat after it, so the tabs
+      moved every time you changed view.
+   2. The toolset changed width as controls appeared, and the tabs were
+      pinned to its left edge, so they moved again.
+   3. The wordmark was rewritten per region, so the AE/JP switch moved.
+
+   Reading order is now fixed: where am I, what am I looking at, what can I
+   do, where am I in it. Navigation owns the left edge and never leaves it. */
+/* ---- the overflow menu ---- */
+/* The pager and the overflow button are one right-hand group: the auto
+   margin belongs to whichever of them comes first, or the second gets
+   pushed onto its own row. */
+.more{position:relative;flex:0 0 auto}
+.more-btn{min-width:36px;letter-spacing:.12em;line-height:1}
+.more-menu{position:absolute;right:0;top:calc(100% + 4px);z-index:70;min-width:210px;
+  background:var(--surface);border:1px solid var(--text);padding:var(--sp-2);
+  display:flex;flex-direction:column;gap:2px;box-shadow:var(--sh-2)}
+.more-menu[hidden]{display:none}
+.more-row{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);
+  font-size:var(--fs-sm);color:var(--muted);padding:4px 6px;min-height:36px}
+.more-row .mini{flex:0 0 88px}
+.more-sep{height:1px;background:var(--line-soft);margin:4px 0}
+.more-item{text-align:left;padding:8px 6px;min-height:36px;font-size:var(--fs-sm);
+  color:var(--text);position:relative;z-index:0}
+.more-item[hidden]{display:none}
+.more-item::before{content:'';position:absolute;inset:0;background:var(--band);
+  opacity:0;z-index:-1;transition:opacity var(--fast) var(--ease)}
+.more-item:hover::before,.more-item:focus-visible::before{opacity:1}
+
+.toolset .mini{max-width:110px}
+.bar{gap:6px 9px}
+/* A wrapping flex row wraps before it shrinks, so the shrink basis above
+   never got a chance and the pager kept dropping to its own line. On a
+   desktop the row does not wrap at all: the caption and the menus give
+   ground instead, which is what the ellipsis on them is for. Below the
+   desktop breakpoint wrapping is still the right behaviour. */
+@media (min-width:1180px){
+  /* .binder>.bar sets wrap earlier at the same breakpoint and outranks a
+     bare .bar, so this has to match its specificity to win. */
+  .binder>.bar{flex-wrap:nowrap}
+  .bar>.toolset{flex:0 1 auto;min-width:0}
+  .toolset .mini{min-width:0}
+}
+.bar>#view-tabs{order:-1;margin-left:0;flex:0 0 auto}
+/* The caption gets a fixed slot. Letting it size to its text meant a short
+   heading ("Collection") kept the bar on one row while a long one
+   ("Asian-English sets · P59,348") pushed it onto two - so the whole
+   toolbar changed height and every control in it jumped. Fixed slot, text
+   ellipsises inside it, row structure is the same in every view.       */
+/* 330px of caption was the last thing forcing a second row. 210 is enough
+   for "COLLECTION 5,003 cards · 100 copies" and the count ellipsises past
+   that rather than pushing the pager down a line. */
+/* Basis, not a fixed width: the caption gives ground when the row is tight
+   instead of pushing the pager onto a second line. It still shrinks by the
+   same amount in every view, because the basis does not depend on the text,
+   so it cannot reintroduce the shifting this rule exists to stop. */
+@media (min-width:920px){
+  .bar>.bar-left{flex:0 1 180px;min-width:104px;max-width:180px;overflow:hidden}
+}
+/* The count is wider than its slot when you are inside a core ("1 / 1 cards
+   · 100% · 2 copies"), and the SLOT was doing the clipping - so the text was
+   cut mid-word with no ellipsis, which reads as a rendering fault rather
+   than as truncation. Giving the child min-width:0 lets it shrink inside the
+   flex row, so its own ellipsis fires and the cut is legible. */
+.bar>.bar-left{display:flex;align-items:center;min-width:0}
+.bar>.bar-left>*{min-width:0;flex:0 1 auto}
+.bar>.bar-left .tag,.bar>.bar-left .count{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.bar>.nav{margin-left:auto;flex:0 0 auto;order:9}
+.bar>.toolset{flex:0 1 auto}
+/* the phone layout for this element lives in the mobile grouping block
+   above, which sets it to share a row with the pager */
+/* Below the desktop breakpoint a hidden control folding away costs a whole
+   row on a phone, so only the rarity menu keeps its slot - it is the one
+   that disappears just by moving between Binder, Sets and Cores, and its
+   folding was dragging the grid/list toggle 123px sideways. Bulk add and
+   Clear filters still fold: they appear only when you deliberately drill
+   into a set, and on a 375px screen that row is worth more than the
+   symmetry.                                                            */
+@media (max-width:1179px){
+  .toolset #t-rar.gone{display:block;visibility:hidden;pointer-events:none}
+}
+
+/* ============================================================
+   MOTION - one authored moment, not scattered effects.
+
+   This world's own motion is a playhead: a band that travels down a score
+   while the score itself holds still. So the beat band is the only thing
+   here that animates, it sweeps rather than blinks, and everything else
+   changes state instantly.
+
+   The rule that outranks the rest: this is used one-handed in a shop, so
+   nothing may delay a tap being answered. Every control below inverts on
+   :active with no transition at all - the feedback is already there before
+   any animation starts. Motion is spent on where you are, never on whether
+   the button heard you.
+   ============================================================ */
+:root{
+  /* exponential ease-out: leaves immediately, settles softly */
+  --ease:cubic-bezier(.16,1,.3,1);
+  --fast:120ms;
+  --slow:220ms;
+}
+/* The band's sweep is declared with the band itself, above, so that how it
+   looks and how it moves are edited in one place. */
+
+/* the tab marker travels; it does not cross-fade */
+.tabs::before{transition:transform var(--slow) var(--ease),
+                          width var(--slow) var(--ease),
+                          height var(--slow) var(--ease)}
+
+/* a tap is answered before any animation runs */
+.btn:active,.mini:active,.tabs button:active,#view-tabs button:active,
+.regsw button:active,.seg2 button:active,.step button:active{
+  transition:none;background:var(--text);color:var(--on-accent)}
+
+/* the plane transforms between modes rather than swapping two screens */
+.vfade{animation:vfade var(--slow) var(--ease)}
+@keyframes vfade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  .crow::before,.trow::before,.ditem::before{transform:none}}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="./icon.svg">
@@ -1117,10 +1786,70 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
 <meta name="apple-mobile-web-app-title" content="Binder">
 </head>
 <body>
+<!--
+THESIS: A notation, not a dashboard. Every printing is a block on a staff:
+fill is rarity tier, length is price, position is set number, side is holding
+versus market. It refuses the card-art grid with filter chips this category
+always ships.
+OWN-WORLD: Score paper and one ink. Paper #FFFFFF, ink #111111, beat band
+#E6E6E6. Hairline rules, no shadows, no radii. Level fills - hatch, dot,
+checker, stipple - carry weight instead of colour. Active states invert to
+solid ink. Rarity foil is the only colour permitted anywhere on the page.
+STORY: You read a whole set's worth as a shape before you read one number,
+then take a single block into Tool mode and get the price.
+FIRST VIEWPORT: Centre staff, numbered down its left. Holding column left of
+the line, market column right. Beat band across the active row, full width.
+Notation legend bottom-left. Mode and region switches never move.
+FORM: Score Notation (Labanotation), a competitive challenger that beat the
+assigned direction on product clarity. Seed key 23ac955b, reroll 3, bolder.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the
+finish review, the verdict, DESIGN.md, and every shipping raster carrying its
+provenance
+-->
 
 <header class="top">
   <div class="top-in">
-    <div class="mark"><h1 id="mark-title">Asian-English Binder</h1><div class="regsw" id="regsw" role="group" aria-label="Which collection"><button type="button" data-r="ae" aria-pressed="true" title="Asian-English printings, priced by TCG Corner and Players Club">AE</button><button type="button" data-r="ocg" aria-pressed="false" title="Japanese OCG printings from 2020 on, priced by Yuyu-tei">JP</button></div></div>
+    <!-- The wordmark is a constant. It used to be rewritten on every region
+         change - "Asian-English Binder" then "OCG-JP Binder" - and those are
+         different widths, so the AE/JP switch shuffled sideways every time
+         you used it. The switch is the one control that must never move. -->
+    <div class="mark"><h1 id="mark-title">OCG · AE Binder</h1><div class="regsw" id="regsw" role="group" aria-label="Which collection"><button type="button" data-r="ae" aria-pressed="true" title="Asian-English printings, priced by TCG Corner and Players Club">AE</button><button type="button" data-r="ocg" aria-pressed="false" title="Japanese OCG printings from 2020 on, priced by Yuyu-tei">JP</button></div></div>
+    <!-- ---- search lives here now ----
+         It used to sit in the rail, and below 920px the rail drops beneath
+         the card grid - so on a phone the single most-used control in the
+         app was 552px below the fold with an EMPTY binder, and further
+         still with cards in it. In a shop, holding a card, that is the one
+         thing you need first. It is now in the sticky header, reachable
+         from any scroll position at any width. -->
+    <div class="hdr-search">
+      <svg viewBox="0 0 16 16" aria-hidden="true" class="mag"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <input class="inp" id="f-text" placeholder="Card name, text, or set code" aria-label="Search cards and sets" readonly aria-haspopup="dialog">
+      <button type="button" class="x-btn" id="f-clear-hdr" hidden aria-label="Clear the search box">&times;</button>
+      <kbd class="hdr-kbd" aria-hidden="true">/</kbd>
+      <div class="rec" id="f-recent" hidden role="listbox" aria-label="Recent searches"></div>
+    </div>
+    <!-- ---- the search panel ----
+         Typing used to re-render the page underneath the box, so the grid
+         reflowed under your hand and the thing you were reading jumped. The
+         panel puts results in one place that opens over the page and closes
+         when you are done, and the page beneath it does not move until you
+         pick something. The refinements live here too, beside the query
+         they refine, rather than in a sidebar behind the results. -->
+    <div class="sp-veil" id="sp-veil" hidden></div>
+    <div class="sp" id="sp" hidden role="dialog" aria-modal="true" aria-label="Search">
+      <div class="sp-top">
+        <svg viewBox="0 0 16 16" aria-hidden="true" class="mag"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input class="inp" id="sp-q" placeholder="Card name, text, or set code" aria-label="Search cards and sets" autocomplete="off">
+        <button type="button" class="btn btn-sm sp-x" id="sp-close" aria-label="Close search"><span aria-hidden="true">&times;</span> Close <kbd>Esc</kbd></button>
+      </div>
+      <div class="sp-ref" id="sp-ref">
+        <select class="inp" id="sp-cat" aria-label="Category"><option value="">Any type</option><option>Monster</option><option>Spell</option><option>Trap</option></select>
+        <select class="inp" id="sp-rar" aria-label="Rarity"></select>
+        <label class="sp-chk"><input type="checkbox" id="sp-owned"> Only cards I own</label>
+        <button type="button" class="btn btn-sm act-quiet" id="sp-reset">Reset</button>
+      </div>
+      <div class="sp-body" id="sp-body"></div>
+    </div>
     <div class="acts">
       <span class="fxbox" id="hdr-fx"></span>
       <span id="hdr-px"></span>
@@ -1134,7 +1863,24 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
 </header>
 
 <div class="shell">
-  <aside class="rail">
+  <!-- The bulk bar. Listing twenty cards for sale used to be twenty separate
+       trips through the detail panel; this is the one place in the app where
+       a repeated action was costing real time. -->
+  <div class="bulkbar" id="bulkbar" hidden role="region" aria-label="Selected cards">
+    <span class="bb-n" id="bb-n">0 selected</span>
+    <div class="bb-acts">
+      <button class="btn btn-sm" id="bb-sell">Move to Selling</button>
+      <button class="btn btn-sm" id="bb-keep">Move to Collection</button>
+      <button class="btn btn-sm act-quiet" id="bb-want">Add to wishlist</button>
+      <button class="btn btn-sm act-quiet" id="bb-none">Done</button>
+    </div>
+  </div>
+  <div class="sheet-veil" id="sheet-veil" hidden></div>
+  <button class="filt-fab" id="filt-fab" type="button" aria-expanded="false" aria-controls="rail">
+    <svg viewBox="0 0 16 16" aria-hidden="true" width="15" height="15"><rect x="1.5" y="3" width="13" height="1.6" fill="currentColor"/><rect x="4" y="7.2" width="8" height="1.6" fill="currentColor"/><rect x="6.5" y="11.4" width="3" height="1.6" fill="currentColor"/></svg>
+    Filters<span class="badge" id="filt-count" hidden>0</span>
+  </button>
+  <aside class="rail" id="rail">
     <section class="grp">
       <div class="switch-row">
         <label class="switch">
@@ -1158,10 +1904,21 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
         <span class="track"></span>
         <span class="lbl">Include pre-2018 sets</span>
       </label>
-      <button class="btn btn-sm" id="open-deals" style="width:100%;margin-top:9px">Deals</button>
-      <button class="btn btn-sm" id="open-trade" style="width:100%;margin-top:9px">Trade calculator</button>
-      <button class="btn btn-sm" id="open-paste" style="width:100%;margin-top:9px">Paste a list</button>
-      <button class="btn btn-sm" id="open-settings" style="width:100%;margin-top:9px">Settings</button>
+      <!-- Four identical grey buttons said these were four equal things.
+           They are not: two are what you reach for mid-deal with a buyer
+           standing in front of you, two are housekeeping you touch once a
+           month. Primary and secondary now look different, which is the
+           whole job of a sidebar group. -->
+      <div class="acts-grp" role="group" aria-label="While you are dealing">
+        <h3>At the table</h3>
+        <button class="btn btn-sm act-primary" id="open-deals">Deals</button>
+        <button class="btn btn-sm act-primary" id="open-trade">Trade calculator</button>
+      </div>
+      <div class="acts-grp" role="group" aria-label="Managing the binder">
+        <h3>Manage</h3>
+        <button class="btn btn-sm act-quiet" id="open-paste">Paste a list</button>
+        <button class="btn btn-sm act-quiet" id="open-settings">Settings</button>
+      </div>
       <p class="hint hint-row">
         <span>Two binders, kept separate.</span>
         <button class="infob" id="i-binders" aria-label="What these switches do" title="What these switches do">i</button>
@@ -1169,32 +1926,45 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
     </section>
 
     <section class="grp">
-      <h2>Search</h2>
-      <div class="fld"><input class="inp" id="f-text" placeholder="Card name or text"></div>
+      <h2>Key</h2>
+      <!-- ---- retired ----
+           Category, sub-type, attribute, type, level and scale were a second
+           filtering system living behind the results they filtered, and with
+           search now owning finding, they were a sidebar you had to remember
+           existed. Type and rarity earned their place and moved into the
+           search panel beside the query; the rest are gone.
 
-      <div class="fld">
-        <label for="f-cat">Category</label>
-        <div class="pair">
-          <select class="inp" id="f-cat"><option value="">All</option><option>Monster</option><option>Spell</option><option>Trap</option></select>
-          <select class="inp" id="f-sub"><option value="">(N/A)</option></select>
+           The nodes stay in the document because the paste importer and the
+           clear-filters handler still address them by id, and a hidden input
+           is cheaper than rewriting five call sites for controls nobody
+           will see. They are inert: nothing renders them. -->
+      <div hidden aria-hidden="true" id="retired-filters">
+        <select class="inp" id="f-cat"><option value="">All</option><option>Monster</option><option>Spell</option><option>Trap</option></select>
+        <select class="inp" id="f-sub"><option value="">(N/A)</option></select>
+        <div class="sub-filters" id="mon-filters" hidden>
+          <select class="inp" id="f-attr"></select>
+          <select class="inp" id="f-race"></select>
+          <input class="inp" id="f-lvl" inputmode="numeric">
+          <input class="inp" id="f-scale" inputmode="numeric">
         </div>
+        <button class="btn btn-sm" id="f-clear">Clear all filters</button>
       </div>
 
-      <div class="sub-filters" id="mon-filters" hidden>
-        <div class="fld"><label for="f-attr">Attribute</label><select class="inp" id="f-attr"></select></div>
-        <div class="fld"><label for="f-race">Type</label><select class="inp" id="f-race"></select></div>
-        <div class="fld">
-          <div class="pair">
-            <div><label for="f-lvl">Lv / Rank</label><input class="inp" id="f-lvl" inputmode="numeric" placeholder="—"></div>
-            <div><label for="f-scale">Scale</label><input class="inp" id="f-scale" inputmode="numeric" placeholder="—"></div>
+      <div class="sub-filters" id="rar-wrap" style="border-top:none;padding-top:0;margin-top:0">
+        <!-- The legend. A notation only works if the reader learns it, and
+             this app cannot teach - so the key that used to list rarities
+             now also names what each visual channel means. Four channels,
+             four lines, then the rarity ladder underneath. -->
+        <details class="rkey"><summary>How to read this</summary>
+          <div class="legend">
+            <div class="lg-row"><span class="lg-s lg-colour"></span><span><b>Colour</b> is rarity, and nothing else on the page is coloured.</span></div>
+            <div class="lg-row"><span class="lg-s lg-fill"></span><span><b>Fill</b> is condition — plain, hatched, dense for A, B, C.</span></div>
+            <div class="lg-row"><span class="lg-s lg-inv"></span><span><b>Inverted</b> is selected or active.</span></div>
+            <div class="lg-row"><span class="lg-s lg-band"></span><span><b>The band</b> marks the row you are on.</span></div>
           </div>
-        </div>
-      </div>
-
-      <div class="sub-filters" id="rar-wrap" style="border-top:none;padding-top:0;margin-top:7px">
-        <p class="hint" style="margin:0 0 7px">Order and rarity now sit on the binder bar, so they stay reachable with the sidebar folded.</p>
-        <button class="btn btn-sm" id="f-clear" style="width:100%;margin-top:7px">Clear search</button>
-        <details class="rkey"><summary>Rarity key</summary><div id="rkey-list"></div></details>
+          <div class="lg-h">Rarities</div>
+          <div id="rkey-list"></div>
+        </details>
       </div>
     </section>
 
@@ -1223,19 +1993,36 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
           <select class="mini" id="t-rar" aria-label="Rarity"></select>
           <div class="seg2 gone" id="core-mult" role="group" aria-label="Copies of each card"><button data-x="1" class="on">&times;1</button><button data-x="2">&times;2</button><button data-x="3">&times;3</button></div>
           <button class="mini gone" id="t-bulk">Bulk add</button>
+          <button class="mini" id="t-select" aria-pressed="false" title="Pick several cards and move them together">Select</button>
           <button class="mini ghost gone" id="t-clear">Clear filters</button>
           <div class="seg2" id="mode-tog" role="group" aria-label="Display">
             <button data-m="grid" class="on" title="Images" aria-label="Images"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg></button>
             <button data-m="list" title="List" aria-label="List"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="2" width="14" height="2.2" rx="1.1"/><rect x="1" y="6.9" width="14" height="2.2" rx="1.1"/><rect x="1" y="11.8" width="14" height="2.2" rx="1.1"/></svg></button>
           </div>
         </div>
+        <!-- The pager and the overflow button are one right-hand group, in
+             one container, so the auto margin that pins them to the right
+             edge applies once. Two separately-anchored groups always strand
+             the second one on its own row.
+
+             Cards-per-page is set once and then never touched, so it costs
+             88px of a bar that had none to spare. It moves into the overflow
+             menu with the other set-and-forget controls. -->
         <div class="nav">
           <button class="btn btn-sm" id="bm-exit" title="Leave binder mode (Esc)">Exit</button>
-          <select class="mini" id="t-per" aria-label="Cards per page" title="Cards per page"></select>
           <button class="btn btn-sm" id="prev">‹</button>
           <input class="jump" id="jump" value="1" inputmode="numeric" aria-label="Page number">
           <span class="of" id="of">/ 1</span>
           <button class="btn btn-sm" id="next">›</button>
+          <div class="more" id="more-wrap">
+            <button class="btn btn-sm ico more-btn" id="more-btn" aria-haspopup="true" aria-expanded="false" aria-label="More controls" title="More controls">···</button>
+            <div class="more-menu" id="more-menu" hidden role="menu">
+              <label class="more-row"><span>Cards per page</span><select class="mini" id="t-per" aria-label="Cards per page"></select></label>
+              <div class="more-sep"></div>
+              <button class="more-item" id="m-bulk" role="menuitem">Bulk add to this set</button>
+              <button class="more-item" id="m-clear" role="menuitem">Clear filters</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="page" id="page"></div>
@@ -1260,6 +2047,31 @@ let REGION=(()=>{try{return localStorage.getItem(KEY_REGION)==='ocg'?'ocg':'ae';
 const ocgOn=()=>REGION==='ocg';
 const regionKey=()=>REGION==='ocg'?KEY+'-ocg':KEY;
 const regionLabel=()=>REGION==='ocg'?'OCG-JP':'Asian-English';
+
+/* ---- device settings live outside the collection ----
+   Switching region replaces DB wholesale, and the theme, the card size and
+   the exchange rates were all sitting inside DB - so going from AE to JP
+   threw your display settings away and handed you whatever the other
+   binder happened to be set to. These are preferences of the device, not
+   facts about a collection. They get their own key, they are written the
+   moment they change rather than waiting for the next save, and they are
+   laid back over DB every time DB is replaced.                          */
+const KEY_PREFS='ygo-binder-prefs-v1';
+const PREF_FIELDS=['theme','density','spread','mode',
+                   'fx','fxHkd','fxJpy','fxManual','fxAuto','fxAt'];
+let PREFS=(()=>{try{return JSON.parse(localStorage.getItem(KEY_PREFS)||'{}')||{};}
+                catch(e){return {};}})();
+function savePrefs(){
+  for(const k of PREF_FIELDS) if(DB[k]!==undefined) PREFS[k]=DB[k];
+  try{localStorage.setItem(KEY_PREFS,JSON.stringify(PREFS));}catch(e){}
+}
+function applyPrefs(){
+  for(const k of PREF_FIELDS) if(PREFS[k]!==undefined) DB[k]=PREFS[k];
+}
+/* Has this device ever been set up? Used once, to open settings on a first
+   run instead of dropping someone into an empty binder with no explanation. */
+const seenSetup=()=>{try{return localStorage.getItem('ygo-binder-setup-v1')==='1';}catch(e){return true;}};
+const markSetup=()=>{try{localStorage.setItem('ygo-binder-setup-v1','1');}catch(e){}};
 /* ============ storage ============
    IndexedDB first, localStorage as the fallback. The reason is capacity: a
    binder used to carry a copy of the whole card - name, text, art urls, stats -
@@ -1345,7 +2157,12 @@ const RARITIES_AE=[
   {k:'PScR',n:'Prismatic Secret Rare',f:'f-prismatic',w:8},
   {k:'QCSR',n:'Quarter Century Secret Rare',f:'f-qcsr',w:9},
   {k:'CR',n:"Collector's Rare",f:'f-collector',w:10},
-  {k:'HGR',n:'Holographic Rare',f:'f-holo',w:11}
+  {k:'HGR',n:'Holographic Rare',f:'f-holo',w:11},
+  /* Overframe. A real Asian-English rarity the ladder simply did not carry,
+     so even a correctly harvested Overframe printing had nowhere to go.
+     Added at the top rather than inserted, so no existing weight shifts and
+     no stored copy re-sorts underneath the user.                        */
+  {k:'OVF',n:'Overframe',f:'f-overframe',w:12}
 ];
 const RARITIES_JP=[
   {k:'C',n:'Common',f:'f-common',w:1},
@@ -1394,9 +2211,24 @@ const CONDITIONS=['NM','LP','MP','HP','DMG'];
    puts in a name — their "Retaliating C" is Konami's Retaliating "C" — so both
    sides are keyed on a stripped form. Fifteen cards, several of them staples,
    were falling out of the pool entirely on that one character.              */
+/* Angle brackets are part of real card names - Maliss <C> GWC-06, Maliss <P>
+   White Rabbit - and the shops type them without. Nine Maliss cards were
+   therefore in the pool twice: the real one with its art, and a nameless
+   stub the price feed created because the two names never collapsed to the
+   same key. Brackets normalise to a space on both sides so they meet.
+   The same applies to full-width brackets, which the JP feed uses.      */
+/* "(card)" is a disambiguator the catalogue adds, not part of the printed
+   name - nameKey has always stripped it for matching, so the display should
+   not be the one place it survives.                                      */
+const cardName=c=>{
+  const n=String((c&&c.name)||'');
+  const t=n.replace(/\s*\((?:card|archetype|series|anime|manga)\)\s*$/i,'').trim();
+  return t||n;
+};
 const nameKey=s=>String(s||'').toLowerCase()
   .replace(/\s*\((?:card|archetype|series|anime|manga)\)\s*$/,'')
   .replace(/[\u2018\u2019\u201C\u201D"']/g,'')
+  .replace(/[<>\u3008\u3009\u300A\u300B\uFF1C\uFF1E]/g,' ')
   .replace(/\s+/g,' ').trim();
 const peso=
 n=>'\u20B1'+(+n||0).toLocaleString(undefined,{maximumFractionDigits:(Math.abs(n)<100?2:0)});
@@ -1495,7 +2327,31 @@ function sellMargin(){
 /* The card whose holding moved most since the last price pull. This is the one
    thing worth opening the app for after a sync, and nothing surfaced it.   */
 function biggestMover(){
-  let best=null;
+  const m=movers(1);
+  return m.length?m[0]:null;
+}
+/* ---- coming back lands where you left ----
+   Opening a set from page four of the Sets board and pressing back put you
+   on page one at the top, so finding the next set meant paging and
+   scrolling again. The board's position is kept while you are inside a set
+   and restored on the way out - which is what "back" has always implied. */
+const BOARD_POS={};
+function keepBoard(){
+  BOARD_POS[VIEW]={page:page,scroll:window.scrollY||0};
+}
+function restoreBoard(){
+  const s=BOARD_POS[VIEW];
+  page=s?s.page:0;
+  if(s)requestAnimationFrame(()=>window.scrollTo({top:s.scroll,behavior:'auto'}));
+}
+/* ---- what actually moved ----
+   The dashboard used to report one biggest mover and three other totals. A
+   single number cannot tell you whether one card jumped or forty drifted,
+   which is the only question worth asking when you open the app after a
+   week away. This returns the whole list, biggest first, so the panel can
+   show the shape of the change instead of its maximum.                  */
+function movers(limit){
+  const out=[];
   Object.keys(DB.own).forEach(id=>{
     const c=cardById(id); if(!c)return;
     let sum=0;
@@ -1503,9 +2359,10 @@ function biggestMover(){
       const d=priceChange(cp,c);
       if(d!=null)sum+=shopToPeso(d)*(+cp.qty||0);
     });
-    if(sum&&(!best||Math.abs(sum)>Math.abs(best.d)))best={name:c.name,d:sum};
+    if(sum)out.push({id:id,name:c.name,d:sum});
   });
-  return best;
+  out.sort((a,b)=>Math.abs(b.d)-Math.abs(a.d));
+  return limit?out.slice(0,limit):out;
 }
 /* What one binder is worth. totalValue counts every copy you own regardless of
    which binder it sits in, which is right for total assets and wrong for the
@@ -1797,6 +2654,13 @@ function setMembers(pre){
   const cat=AE_BY_SET.get(p);
   return (cat&&cat.size)?cat:namesInSet(p);
 }
+/* Which pile the boards are describing. Sets and Cores have always been
+   scoped to the pile you are in - copiesIn filters by it - but nothing on
+   screen said so, so the boards read as a second, unrelated way of
+   organising the app and their numbers looked wrong. The pile is the spine,
+   the view is a lens on it, and the heading now says both.             */
+const pileName=()=>VIEW==='wants'?'Wishlist':
+  ((BINDERS.find(b=>b.id===F.binder)||{}).name||'Collection');
 function setGroups(){
   const g=new Map();
   const blank=code=>({code,nums:new Set(),cards:new Set(),copies:0,value:0,total:0});
@@ -1888,6 +2752,7 @@ function gridFor(w){
   return g;
 }
 function autoLayout(keepFirst){
+  fitPage();                    /* the sheet is sized against real chrome */
   const g=gridFor(document.documentElement.clientWidth);
   /* a chosen page size keeps the column count the window asked for and just
      stacks however many rows it takes to hold that many cards               */
@@ -2037,6 +2902,7 @@ async function setRegion(r){
         binders:BINDERS.map(b=>Object.assign({},b)),seq:0};
     const saved=await Store.get();
     if(saved)DB=migrate(saved);
+    applyPrefs();       /* theme, card size and rates survive the swap */
     DB.fx=DB.fx||58;
     DB.fxHkd=DB.fxHkd||7.88;
     DB.fxJpy=DB.fxJpy||0.39;
@@ -2045,7 +2911,7 @@ async function setRegion(r){
        not exist over here, so the view starts clean                        */
     F.rar='';F.set='';F.arch='';F.text='';F.binder='b-main';
     page=0;
-    MODE=DB.mode==='list'?'list':'grid';
+    MODE=defaultMode();
     VIEW='binder';   /* clearing F.set and F.arch already backs out of a drill */
 
     refilterPool();
@@ -2072,7 +2938,10 @@ function paintRegion(){
   paintLegacySwitch();
   document.title=ocgOn()?'OCG-JP Binder \u2014 Japanese Collection'
                        :'Asian-English Binder \u2014 OCG Collection';
-  const t=$('#mark-title'); if(t)t.textContent=ocgOn()?'OCG-JP Binder':'Asian-English Binder';
+  /* The wordmark names the region again, but it can no longer move the
+     switch beside it: the h1 holds a fixed slot wide enough for either
+     string, so only the two letters change and nothing shifts.        */
+  const t=$('#mark-title'); if(t)t.textContent=ocgOn()?'OCG · JP Binder':'OCG · AE Binder';
   document.querySelectorAll('#regsw button').forEach(b=>{
     const on=(b.dataset.r||'ae')===REGION;
     b.classList.toggle('on',on);
@@ -2134,8 +3003,32 @@ function visible(){
   }else if(F.ownedOnly){
     list=allCards().filter(c=>F.binder?copiesIn(c.id).length:allCopies(c.id)>0);
   }else list=allCards();
+  /* ---- search matches the code on the card, not just its name ----
+     A card in your hand has its set code printed on it, and for a JP card
+     that code is often the only part you can read at a glance. Matching
+     name and rules text alone meant typing INFO-JP006 or DOOD returned
+     nothing. Now the code counts too: the copies you hold, and the
+     printings the catalogue knows about.                              */
   const q=F.text.trim().toLowerCase();
-  if(q)list=list.filter(c=>(c.name||'').toLowerCase().includes(q)||(c.desc||'').toLowerCase().includes(q));
+  if(q){
+    const codeQ=q.replace(/\s+/g,'');
+    list=list.filter(c=>{
+      if((c.name||'').toLowerCase().includes(q))return true;
+      if((c.desc||'').toLowerCase().includes(q))return true;
+      /* a copy you own carries its own set and number */
+      const held=copiesIn(c.id);
+      for(const x of held){
+        const code=((x.set||'')+(x.num?'-'+x.num:'')).toLowerCase();
+        if(code&&code.replace(/\s+/g,'').includes(codeQ))return true;
+      }
+      /* and the catalogue knows every set this card was printed in */
+      try{
+        const sets=(printingsOf(c)||{}).sets||[];
+        for(const s of sets) if(String(s).toLowerCase().includes(codeQ))return true;
+      }catch(e){}
+      return false;
+    });
+  }
   if(F.cat)list=list.filter(c=>broadType(c)===F.cat);
   if(F.sub){
     if(F.cat==='Monster')list=list.filter(c=>new RegExp(F.sub.replace('-','.'),'i').test(c.type||''));
@@ -2323,7 +3216,9 @@ function paintSlots(grid,slice,bn,selling){
     p.innerHTML=`<img src="${esc(c.img)}" alt="" loading="lazy" onerror="this.classList.add('bad')">
       <span class="glare"></span><span class="sleeve"></span>
       ${badge}`;
-    p.onclick=()=>openDetail(c.id);
+    p.dataset.cid=c.id;
+    if(SELMODE&&SEL.has(String(c.id)))p.classList.add('picked');
+    p.onclick=()=>{ if(SELMODE)toggleSel(String(c.id)); else openDetail(c.id); };
     slot.appendChild(p);
     const chg=changeOf(c.id);
     /* Set code and rarity sit here rather than over the art: the picture stays
@@ -2420,13 +3315,20 @@ function renderBinder(dir){
   /* One heading, not a heading plus a chip repeating it. When you are inside a
      set, core or deck the heading turns accent and grows its own way out. */
   const tag=$('#page-tag');
-  const drill=F.arch?{t:F.arch+' core',clr:()=>{F.arch='';},b:'Back to all cores'}
-    :F.set?{t:(F.set==='\u2014'?'No set code':'Set '+F.set),clr:()=>{F.set='';},b:'Back to all sets'}
+  /* ---- a breadcrumb, not a dismiss button ----
+     Drilling into a set used to leave a bare "x" as the only way back, which
+     says nothing about where back goes. A crumb names the parent, so the
+     path you took is readable and the way out is the obvious thing to press.
+     One affordance doing one job: the parent link IS the way out.        */
+  const drill=F.arch?{up:'Cores',here:F.arch,clr:()=>{F.arch='';}}
+    :F.set?{up:'Sets',here:(F.set==='\u2014'?'No set code':F.set),clr:()=>{F.set='';}}
     :null;
   tag.classList.toggle('drill',!!drill);
   if(drill){
-    tag.innerHTML=`<span>${esc(drill.t)}</span><button title="${drill.b}">\u00d7</button>`;
-    tag.querySelector('button').onclick=()=>{drill.clr();page=0;renderBinder();};
+    tag.innerHTML=`<button class="crumb" title="Back to all ${esc(drill.up.toLowerCase())}">`+
+                  `${esc(drill.up)}</button><span class="sep" aria-hidden="true">/</span>`+
+                  `<span class="here" aria-current="page">${esc(drill.here)}</span>`;
+    tag.querySelector('.crumb').onclick=()=>{drill.clr();restoreBoard();renderBinder();};
   }else if(VIEW==='wants')tag.textContent='Wishlist';
   else tag.textContent=bn?bn.name:(F.ownedOnly?'Collection':'Full OCG pool');
 
@@ -2662,7 +3564,7 @@ function renderCores(grid){
   }
   groups.forEach(g=>{
     const pct=g.total?Math.round(g.owned/g.total*100):0;
-    const open=()=>{F.arch=g.name;page=0;renderBinder();};
+    const open=()=>{keepBoard();F.arch=g.name;page=0;renderBinder();};
     if(MODE==='list'){
       grid.appendChild(boardRow(g.name,g.owned+' of '+g.total+' held'+estText(g),g.owned,g.total,pct,g.value,open,null));
       return;
@@ -2677,19 +3579,29 @@ function renderCores(grid){
     /* opening a core is the point of the view: drop into the binder with the
        whole archetype on screen so the missing ones read as gaps            */
     /* stay in Cores and drill in; the chip above is the way back out */
-    card.onclick=()=>{F.arch=g.name;page=0;renderBinder();};
+    card.onclick=()=>{keepBoard();F.arch=g.name;page=0;renderBinder();};
     grid.appendChild(card);
   });
-  $('#page-tag').textContent='Archetype cores';
+  $('#page-tag').textContent='Cores · '+pileName();
   $('#count').textContent=groups.length+' core'+(groups.length===1?'':'s')+' \u00b7 '+peso(groups.reduce((s,g)=>s+g.value,0));
   $('#of').textContent='/ 1';$('#jump').value=1;
   $('#prev').disabled=true;$('#next').disabled=true;
   paintBinders();
 }
 function renderSets(grid,dk,bn){
-  const groups=setGroups();
+  let groups=setGroups();
+  /* OCG-JP carries 454 sets. An unfiltered wall of them is not a list, it is
+     a scroll, so the header search narrows this board by code and by name -
+     the same box, doing the obvious thing in whichever view you are in. */
+  const q=F.text.trim().toLowerCase();
+  if(q){
+    const named=g=>((DB.setNames||{})[g.code]||((setInfo(g.code)||{}).name)||'').toLowerCase();
+    groups=groups.filter(g=>String(g.code).toLowerCase().includes(q)||named(g).includes(q));
+  }
   if(!groups.length){
-    grid.appendChild(el('div','state','<b>No sets to show</b>The set list comes from the price feed, which has not finished loading.'));
+    grid.appendChild(el('div','state',q
+      ?'<b>No set matches “'+esc(F.text.trim())+'”</b>Clear the search to see every set.'
+      :'<b>No sets to show</b>The set list comes from the price feed, which has not finished loading.'));
   }
   groups.forEach(g=>{
     const inf=setInfo(g.code);
@@ -2697,7 +3609,7 @@ function renderSets(grid,dk,bn){
     const target=(DB.setTargets||{})[g.code]||(inf?Math.max(inf.count,inf.max):0);
     const have=g.nums.size||g.cards.size;
     const pct=target?Math.min(100,Math.round(have/target*100)):0;
-    const open=()=>{F.set=g.code;page=0;renderBinder();};
+    const open=()=>{keepBoard();F.set=g.code;page=0;renderBinder();};
     const edit=g.code==='\u2014'?null:()=>editSet(g.code,named,target);
     if(MODE==='list'){
       grid.appendChild(boardRow(g.code,named||(g.code==='\u2014'?'Copies with no set code':'Tap Edit to name this set'),
@@ -2710,7 +3622,7 @@ function renderSets(grid,dk,bn){
       <div class="meter"><i style="width:${target?pct:0}%"></i></div>
       <div class="foot"><span>${have}${target?' / '+target:''} cards${target?' \u00b7 '+pct+'%':''}</span><span>${esc(peso(g.value))}</span></div>`;
     /* the tile opens the set; the corner button is how you rename or retarget it */
-    card.onclick=()=>{F.set=g.code;page=0;renderBinder();};
+    card.onclick=()=>{keepBoard();F.set=g.code;page=0;renderBinder();};
     if(g.code!=='\u2014'){
       const ed=el('button','set-edit','Edit');
       ed.title='Rename this set or change its card count';
@@ -2719,7 +3631,9 @@ function renderSets(grid,dk,bn){
     }
     grid.appendChild(card);
   });
-  $('#page-tag').textContent='Asian-English sets';
+  /* the region already reads in the header, so this names the pile instead -
+     and it stops saying "Asian-English sets" while you are in OCG-JP */
+  $('#page-tag').textContent='Sets · '+pileName();
   $('#count').textContent=groups.length+' sets \u00b7 '+peso(groups.reduce((s,g)=>s+g.value,0));
   $('#of').textContent='/ 1';$('#jump').value=1;
   $('#prev').disabled=true;$('#next').disabled=true;
@@ -2814,26 +3728,42 @@ function paintDash(){
     mg='<b class="'+mc+'">'+(pc>0?'+':'')+Math.round(pc)+'%</b>'+
        '<div class="sub2">'+esc(peso(M.ask))+' asked \u00b7 '+esc(peso(M.srp))+' SRP</div>';
   }
-  const B=biggestMover();
-  const mv=B
-    ? '<b class="'+(B.d>0?'up':'down')+'">'+(B.d>0?'\u25b2':'\u25bc')+esc(peso(Math.abs(B.d)))+'</b>'+
-      '<div class="sub2" title="'+esc(B.name)+'">'+esc(B.name)+'</div>'
-    : '<b class="muted">\u2014</b><div class="sub2">no earlier prices yet</div>';
+  /* ---- one headline, then the movements ----
+     Four tiles of one big number and a small label is the arrangement every
+     dashboard ships, and three of these four read "\u2014" until there is price
+     history. Worse, they answered nothing: "biggest mover" cannot tell you
+     whether one card jumped or forty drifted. The value stays, because it
+     is the one figure worth a headline; the other three tiles become the
+     list of what actually changed, which is what you open the app to see. */
+  const M2=movers(4);
+  const moveRows=M2.length
+    ? M2.map(m=>`<button class="mv-row" data-id="${esc(m.id)}" title="Open ${esc(m.name)}">
+        <span class="mv-n">${esc(m.name)}</span>
+        <span class="mv-d ${m.d>0?'up':'down'}">${m.d>0?'\u25b2':'\u25bc'} ${esc(peso(Math.abs(m.d)))}</span>
+      </button>`).join('')
+    : `<p class="mv-empty">${h.length>1
+        ? 'Nothing moved since your last session.'
+        : 'No earlier prices yet. Sync prices twice and changes show up here.'}</p>`;
+  const more=movers().length-M2.length;
+
   d.innerHTML=`
-    <div>
+    <div class="dash-head">
       <div class="cap">${selling?'Selling value':'Collection value'}</div>
       <div class="big">${esc(peso(val))}</div>
       <div class="delta ${cls}">${esc(arrow)}</div>
+      <div class="sub2">${esc(peso(keep))} kept \u00b7 ${esc(peso(sell))} listed${rsv>0?' \u00b7 '+esc(peso(rsv))+' reserved':''}</div>
     </div>
-    <div class="cell"><div class="cap">Total assets</div><b>${esc(peso(keep+sell))}</b>${rsv>0?`<div class="sub2" title="Held by pending deals">${esc(peso(rsv))} reserved</div>`:''}
-      <div class="sub2">${esc(peso(keep))} kept \u00b7 ${esc(peso(sell))} listed</div></div>
-    <div class="cell"><div class="cap">Against SRP</div>${mg}</div>
-    <div class="cell"><div class="cap">Biggest mover</div>${mv}</div>
+    <div class="dash-moves">
+      <div class="cap">Since last session${movers().length?` <span class="mv-more">${movers().length} moved</span>`:''}</div>
+      <div class="mv-list">${moveRows}</div>
+      ${M.n&&M.srp>0?`<div class="mv-foot">Asking ${esc(peso(M.ask))} against ${esc(peso(M.srp))} ${esc(shopName())} \u2014 <b class="${(M.ask-M.srp)/M.srp*100<-0.5?'up':((M.ask-M.srp)/M.srp*100>0.5?'down':'flat')}">${((M.ask-M.srp)/M.srp*100)>0?'+':''}${Math.round((M.ask-M.srp)/M.srp*100)}%</b></div>`:''}
+    </div>
 `;
+  d.querySelectorAll('.mv-row').forEach(b=>{
+    b.onclick=()=>openDetail(b.dataset.id);
+  });
   const big=d.querySelector('.big');
   if(big)rollTo(big,'headline:'+F.binder,val,peso);
-  const tot=d.querySelector('.cell b');
-  if(tot)rollTo(tot,'total',keep+sell,peso);
   paintTopTools();}
 /* The sidebar folds away so the cards get the full width. Remembered in the
    collection file, so it stays how you left it next time.                  */
@@ -2842,6 +3772,7 @@ function paintDash(){
 /* One bar, three contexts: a page of cards, the Sets board, the Cores board.
    The sort menu swaps to match, and rarity only shows where cards do.      */
 function paintTools(showingCards){
+  paintFiltCount();
   const board=!showingCards&&(VIEW==='sets'||VIEW==='cores');
   /* Deals is its own thing: no cards to sort, no rarities to filter. */
   if(!showingCards&&VIEW==='deals'){
@@ -2951,7 +3882,7 @@ function bmFlip(dir){
    applies the moment you pick it, so there is nothing to save or cancel.  */
 const THEMES=[['dark','Dark'],['light','Light']];
 function applyTheme(){
-  const t=DB.theme==='light'?'light':'dark';
+  const t=DB.theme==='dark'?'dark':'light';
   document.documentElement.setAttribute('data-theme',t);
   const m=document.querySelector('meta[name="color-scheme"]');
   if(m)m.setAttribute('content',t);
@@ -2965,7 +3896,8 @@ const PASTE_RAR={C:'C',COM:'C',COMMON:'C',N:'C',R:'R',RARE:'R',
   SR:'SR',SUPER:'SR',UR:'UR',ULTRA:'UR',UL:'UtR',UTR:'UtR',ULT:'UtR',ULTIMATE:'UtR',
   SCR:'ScR',SER:'ScR',SE:'ScR',SECRET:'ScR',
   EXSR:'ExSR',EXSER:'ExSR',PSCR:'PScR',PSER:'PScR',PSE:'PScR',PRISMATIC:'PScR',
-  QCSR:'QCSR',QCSE:'QCSR',CR:'CR',COLLECTOR:'CR',HGR:'HGR',HOLO:'HGR'};
+  QCSR:'QCSR',QCSE:'QCSR',CR:'CR',COLLECTOR:'CR',HGR:'HGR',HOLO:'HGR',
+  OVF:'OVF',OF:'OVF',OVER:'OVF',OVERFRAME:'OVF'};
 /* One line in, one intention out. Order matters: the code is the strongest
    signal, so it is pulled before anything is guessed from the words.      */
 function parsePasteLine(raw){
@@ -3602,13 +4534,17 @@ function openSettings(){
     opts.map(([v,n])=>'<button data-v="'+esc(v)+'"'+(v===cur?' class="on"':'')+'>'+esc(n)+'</button>').join('')+
     '</div></div>';
   box.innerHTML=
-    seg('set-theme','Theme',THEMES,DB.theme==='light'?'light':'dark',
+    seg('set-theme','Theme',THEMES,DB.theme==='dark'?'dark':'light',
         'Rarity colours stay the same in both.')+
     seg('set-density','Card size',[['cosy','Comfortable'],['compact','Compact']],
         DB.density==='compact'?'compact':'cosy',
         'Compact fits one more column at every width.')+
-    seg('set-spread','Facing pages',[['off','Off'],['on','On']],DB.spread?'on':'off',
-        'Draws the sheet as two leaves with a spine. Needs a window at least 760px wide.')+
+    /* Facing pages needs 760px and a phone does not have it, so the control
+       is not shown there rather than shown and silently ignored. A setting
+       that cannot take effect is a setting you can only get wrong. */
+    (isPhone()?'':
+      seg('set-spread','Facing pages',[['off','Off'],['on','On']],DB.spread?'on':'off',
+          'Draws the sheet as two leaves with a spine. Needs a window at least 760px wide.'))+
     '<div class="set-row"><div><div class="set-lbl">Your name on shared binders</div>'+
     '<div class="set-hint">Shown to anyone you send a binder to, with a way to reach you.</div></div>'+
     '<input class="inp set-in" id="set-name" placeholder="Your name"></div>'+
@@ -3686,9 +4622,12 @@ function openSettings(){
     });
     requestAnimationFrame(()=>slideTabs(g));
   };
-  pick('set-theme',v=>{DB.theme=v;applyTheme();});
-  pick('set-density',v=>{DB.density=v;applyDensity();autoLayout(true);renderBinder();});
-  pick('set-spread',v=>{DB.spread=(v==='on');autoLayout(true);renderBinder();});
+  /* each of these writes straight through to the device preferences, so the
+     choice is kept the instant it is made rather than riding along on the
+     next save of something else                                          */
+  pick('set-theme',v=>{DB.theme=v;applyTheme();savePrefs();});
+  pick('set-density',v=>{DB.density=v;applyDensity();autoLayout(true);renderBinder();savePrefs();});
+  if($('#set-spread'))pick('set-spread',v=>{DB.spread=(v==='on');autoLayout(true);renderBinder();savePrefs();});
   const nm=body.querySelector('#set-name'),ct=body.querySelector('#set-contact');
   DB.seller=DB.seller||{};
   nm.value=DB.seller.name||'';ct.value=DB.seller.contact||'';
@@ -3743,9 +4682,15 @@ function paintDealsBtn(){
   const b=$('#open-deals'); if(!b)return;
   const inDeals=VIEW==='deals';
   const open=dealsPending().length;
-  b.textContent=inDeals?'Back to binder':('Deals'+(open?' · '+open:''));
+  /* A count buried in the label as "Deals · 3" reads as part of the word.
+     A badge is a separate object, so a waiting deal is visible without
+     reading anything.                                                   */
+  b.innerHTML=inDeals?'Back to binder'
+    :('Deals'+(open?'<span class="badge" aria-label="'+open+' waiting">'+open+'</span>':''));
   b.classList.toggle('btn-a',inDeals);
-  b.title=inDeals?'Leave the deals board':'Pending deals and sales history';
+  b.classList.toggle('has-badge',!inDeals&&open>0);
+  b.title=inDeals?'Leave the deals board'
+    :(open?open+' deal'+(open===1?'':'s')+' waiting on you':'Pending deals and sales history');
 }
 function paintBinders(){
   paintDealsBtn();
@@ -3755,6 +4700,10 @@ function paintBinders(){
 }
 /* Binder, Sets and Cores are ways of looking; the wishlist is not one of
    them, so leaving it selects Binder rather than nothing.             */
+/* Binder/Tool was tried here and removed: Collection/Selling/Wishlist
+   already draws that line, in nouns rather than abstractions, and a second
+   switch over the top of it made two controls answer the same question.
+   The piles are the intuitive one, so the piles are what stayed.        */
 function paintViewTabs(){
   const v=VIEW==='wants'?'binder':VIEW;
   document.querySelectorAll('#view-tabs button').forEach(b=>
@@ -4321,10 +5270,20 @@ function askConfirm(title,msg,okLabel,cb){
 }
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
+    if(document.documentElement.getAttribute('data-sheet')==='open'){openSheet(false);return;}
     if($('#layer').children.length)closeModal();
     else if(BM)exitBinderMode();
     else closeModal();
   }
+  /* ---- reach search without the mouse ----
+     "/" is the web's search key and Ctrl/Cmd+K is the app one; both land in
+     the same box. Escape inside the box clears it and hands focus back, so
+     a mistyped query costs one key rather than a reach for the mouse.   */
+  if((e.key==='/'||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'))
+     &&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){
+    e.preventDefault();spOpen(true);return;
+  }
+  if(!$('#sp').hidden&&e.key==='Escape'){spOpen(false);return;}
   if($('#layer').children.length||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;
   const k=e.key.toLowerCase();
   /* a and d sit under the hand that is already on the keyboard */
@@ -4371,6 +5330,7 @@ function ensureOwn(id){
 let SAVE_FAILED=false;
 async function save(){
   DATA_V++;
+  savePrefs();          /* device settings, kept clear of the region swap */
   const ok=await Store.set(DB);
   if(!ok&&!SAVE_FAILED){
     SAVE_FAILED=true;
@@ -4493,9 +5453,18 @@ function openDetail(id){
 
   const c=cardById(id);if(!c)return;
   const wrap=el('div','detail');
-  const artBox=el('div',null,`<div class="art"><img src="${esc(c.imgFull||c.img)}" alt="${esc(c.name)}" onerror="this.style.opacity=.12"></div>`);
-  artBox.querySelector('.art').onclick=()=>openArt(c);
-  artBox.querySelector('.art').title='See the card full size';
+  /* An <img> with an empty src renders the browser's broken-image icon and
+     the alt text beside it, which is how a token with no art in the source
+     ended up looking like a bug. Tokens genuinely are not in the art feed,
+     so say that plainly instead of showing a broken picture. */
+  const hasArt=!!(c.imgFull||c.img);
+  const artBox=el('div',null, hasArt
+    ? `<div class="art"><img src="${esc(c.imgFull||c.img)}" alt="${esc(cardName(c))}" onerror="this.closest('.art').classList.add('noart')"></div>`
+    : `<div class="art noart"><span>No art in the card feed</span></div>`);
+  if(hasArt){
+    artBox.querySelector('.art').onclick=()=>openArt(c);
+    artBox.querySelector('.art').title='See the card full size';
+  }
   wrap.appendChild(artBox);
   const right=el('div');
   const m=c.mon||{};
@@ -4505,7 +5474,7 @@ function openDetail(id){
        <div><dt>Type</dt><dd>${esc(m.race||'—')}</dd></div>
        <div><dt>ATK / DEF</dt><dd>${m.atk!=null?esc(m.atk):'—'} / ${m.def!=null?esc(m.def):'—'}</dd></div>`
     : `<div><dt>Card</dt><dd>${esc(c.type||'—')}</dd></div><div><dt>Property</dt><dd>${esc(m.race||'—')}</dd></div>`;
-  right.innerHTML=`<div class="nm-big">${esc(c.name)}</div>
+  right.innerHTML=`<div class="nm-big">${esc(cardName(c))}</div>
     <div class="meta">${esc(c.type||'')}${c.archetype?' · '+esc(c.archetype):''}</div>
     <details class="cd">
       <summary>Details</summary>
@@ -8619,6 +9588,9 @@ function shopLinks(c){
 
 const KEY_PRICES='ygo-binder-tcgc-v1';
 let PX={},PX_PREV={},PX_DATE='',PX_NAME={},PX_META={},PX_ROWS=[],PX_SRC='',PX_CUR='USD';
+/* Set by readCode when an incoming binder was valued against a different
+   price set than this device holds. */
+let PX_MISMATCH=null;
 /* Cheapest clean price per printing, keyed CODE|RARITY. One code holds up to
    eight rarities, so this is the only key a change figure can honestly use. */
 let PX_KEY={};
@@ -10229,7 +11201,17 @@ function transferCode(){
     (d.items||[]).map(i=>[i.id,i.rar||'',i.set||'',i.qty,i.price||0,i.agreed===false?0:1])]);
   /* Stamped with the region so a Japanese binder cannot be merged into an
      Asian-English one: the set codes would be nonsense on the other side. */
+  /* ---- the price stamp ----
+     A transfer carries what you OWN, never what those cards were worth: the
+     price tables are megabytes and belong to the device, not the binder. So
+     the same collection can total differently on two devices, and nothing
+     used to say why - it just looked like the numbers had scrambled.
+
+     Two fields, a few bytes: which price set valued this binder, and when.
+     The receiving device compares and says plainly whether it is looking at
+     the same prices or older ones.                                       */
   const pay={v:1,r:REGION,t:new Date().toISOString().slice(0,10),own,want,deals,
+    px:PX_DATE||'',pxs:PX_SRC||'',
     manual:Object.values(DB.manual||{})};
   return TCODE+b64enc(JSON.stringify(pay));
 }
@@ -10246,6 +11228,14 @@ function readCode(code){
     const e=new Error('wrong region');
     e.region=from;
     throw e;
+  }
+  /* Values will differ between devices whenever the price sets differ, so
+     say so at the moment of import rather than leaving it to be discovered
+     as scrambled totals. Nothing is blocked - the collection is correct
+     either way, only what it is valued against changes. */
+  PX_MISMATCH=null;
+  if(pay.px&&PX_DATE&&pay.px!==PX_DATE){
+    PX_MISMATCH={from:pay.px,fromSrc:pay.pxs||'unknown',here:PX_DATE,hereSrc:PX_SRC||'baked in'};
   }
   const out={own:{},manual:{},want:{},binders:[],seq:0};
   out.deals2=(pay.deals||[]).map(d=>({id:d[0],who:d[1],contact:d[2],status:d[3],
@@ -10311,6 +11301,13 @@ function openTransfer(){
       const r=mergeIn(readCode(v));
       closeModal();
       toast('Merged in — '+r.added+' new, '+r.merged+' already here');
+      /* The collection arrived intact; the values may not match what you saw
+         on the other device, and that is worth saying out loud. */
+      if(PX_MISMATCH){
+        const m=PX_MISMATCH;
+        setTimeout(()=>toast('Your cards are all here. Prices differ though — that binder was valued on '
+          +m.from+', this device has '+m.here+'. Sync prices to make the totals match.'),2600);
+      }
     }catch(e){
       if(e&&e.region)toast('That code is a '+(e.region==='ocg'?'OCG-JP':'Asian-English')
         +' binder — switch to it first, then load the code');
@@ -10501,7 +11498,338 @@ const bind=(sel,key,imm)=>{
   if(imm)n.oninput=()=>{clearTimeout(tId);tId=setTimeout(fire,160);};
   else n.onchange=fire;
 };
-$('#f-text').oninput=e=>{F.text=e.target.value;page=0;clearTimeout(tId);tId=setTimeout(()=>renderBinder(),160);};
+function paintClearBtn(){
+  const b=$('#f-clear-hdr'),sb=$('#f-text');
+  if(b&&sb)b.hidden=!sb.value;
+}
+/* ---- the binder fills what is actually left ----
+   --page-h was a hard-coded "100dvh - 176px", a guess at how tall the chrome
+   above the grid would be. The chrome has changed repeatedly since - the
+   dashboard shrank, the toolbar went from three rows to one - and the guess
+   was never re-measured, so the sheet was sized against a height that no
+   longer existed and its bottom row fell past the fold.
+
+   Measured, not guessed: whatever sits above the grid, the grid gets the
+   rest. Re-run on resize and after any render that can change the chrome. */
+function fitPage(){
+  const g=document.getElementById('page'); if(!g)return;
+  if(document.body.classList.contains('bm'))return;   /* binder mode owns its own */
+  const top=g.getBoundingClientRect().top+(window.scrollY||0);
+  const avail=Math.max(320,Math.round(window.innerHeight-top-28));
+  document.documentElement.style.setProperty('--page-h',avail+'px');
+}
+let fitT=null;
+const fitSoon=()=>{clearTimeout(fitT);fitT=setTimeout(fitPage,60);};
+window.addEventListener('resize',fitSoon);
+
+/* ---- a lighter app on a phone ----
+   The binder grid is a nine-pocket sheet, and a nine-pocket sheet does not
+   fit a 375px screen - it collapses to one or two columns of thumbnails with
+   the code and price squeezed underneath. A list row carries the same card
+   with its set code, rarity and price on one readable line, which is what
+   you actually need standing in a shop.
+
+   So the list is the default on a phone. A default, not a lock: the toggle
+   is still there, and once you pick one that choice is stored and honoured
+   everywhere.                                                            */
+const isPhone=()=>window.matchMedia('(max-width:919px)').matches;
+function defaultMode(){
+  if(DB.mode==='list'||DB.mode==='grid')return DB.mode;   /* you chose */
+  return isPhone()?'list':'grid';
+}
+/* ---- the overflow menu ----
+   The bar needed 1473px and had 1020. Rather than shrink everything until
+   nothing is readable, the controls you set once and forget move behind one
+   button, which is what an overflow menu is for. The two drill-in actions
+   live here too, so appearing they can no longer reflow the row.       */
+function paintMore(){
+  const wrap=$('#more-wrap'); if(!wrap)return;
+  const bulk=$('#m-bulk'),clr=$('#m-clear');
+  const drilled=!!(F.set||F.arch);
+  if(bulk)bulk.hidden=!drilled;
+  if(clr)clr.hidden=!(F.rar||F.sort!=='price'||(DB.setSort&&DB.setSort!=='old')||(DB.coreSort&&DB.coreSort!=='name'));
+}
+function openMore(on){
+  const m=$('#more-menu'),b=$('#more-btn'); if(!m||!b)return;
+  const want=on===undefined?m.hidden:!!on;
+  m.hidden=!want; b.setAttribute('aria-expanded',String(want));
+}
+/* ---- selecting several cards at once ----
+   Everything in this app was a one-card-at-a-time operation, which is fine
+   for adding a card and wrong for listing twenty. Select mode turns the
+   pockets into checkboxes and puts one bar at the bottom that acts on all
+   of them; nothing else about the page changes, so leaving the mode leaves
+   you exactly where you were.                                           */
+let SELMODE=false;
+const SEL=new Set();
+function paintSel(){
+  const bar=$('#bulkbar'),btn=$('#t-select');
+  if(btn){btn.setAttribute('aria-pressed',String(SELMODE));btn.classList.toggle('on',SELMODE);}
+  document.body.classList.toggle('selmode',SELMODE);
+  if(!bar)return;
+  bar.hidden=!SELMODE;
+  const n=SEL.size;
+  const lbl=$('#bb-n'); if(lbl)lbl.textContent=n?(n+' selected'):'Tap cards to select';
+  ['#bb-sell','#bb-keep','#bb-want'].forEach(s=>{const b=$(s);if(b)b.disabled=!n;});
+  document.querySelectorAll('.pocket[data-cid]').forEach(p=>
+    p.classList.toggle('picked',SEL.has(p.dataset.cid)));
+}
+function setSelMode(on){
+  SELMODE=!!on;
+  if(!SELMODE)SEL.clear();
+  paintSel();
+}
+function toggleSel(id){
+  if(SEL.has(id))SEL.delete(id); else SEL.add(id);
+  paintSel();
+}
+/* Move every copy of each selected card into one pile. Copies keep their
+   set, rarity and condition; only which binder holds them changes.      */
+function bulkMove(target){
+  let moved=0;
+  SEL.forEach(id=>{
+    const o=DB.own[id]; if(!o)return;
+    (o.copies||[]).forEach(cp=>{if(cp.b!==target){cp.b=target;moved++;}});
+  });
+  const n=SEL.size;
+  SEL.clear();save();paintSel();renderBinder();paintDash();
+  toast(moved?(n+' card'+(n===1?'':'s')+' moved to '+(target==='b-sell'?'Selling':'Collection'))
+             :'Those were already there');
+}
+function bulkWant(){
+  let n=0;
+  SEL.forEach(id=>{const c=cardById(id);if(c&&typeof addWant==='function'){addWant(c);n++;}});
+  SEL.clear();save();paintSel();renderBinder();
+  toast(n?(n+' added to the wishlist'):'Nothing added');
+}
+/* ---- the filter sheet ----
+   One control, thumb-reachable, that slides the rail up over the grid on a
+   phone. It carries a count so you can see that something is narrowing your
+   results without opening it - which is the failure mode of every sheet:
+   filters applied and invisible.                                        */
+function activeFilters(){
+  let n=0;
+  ['cat','sub','attr','race','lvl','scale','rar'].forEach(k=>{if(F[k]!==''&&F[k]!=null)n++;});
+  return n;
+}
+function paintFiltCount(){
+  const b=$('#filt-count'); if(!b)return;
+  const n=activeFilters();
+  b.textContent=n; b.hidden=!n;
+}
+function openSheet(on){
+  const r=document.documentElement;
+  const want=on===undefined?r.getAttribute('data-sheet')!=='open':!!on;
+  r.setAttribute('data-sheet',want?'open':'shut');
+  const fab=$('#filt-fab'); if(fab)fab.setAttribute('aria-expanded',String(want));
+  const v=$('#sheet-veil'); if(v)v.hidden=!want;
+  if(want){
+    const rail=$('#rail');
+    if(rail&&!rail.querySelector('.sheet-done')){
+      const done=el('button','sheet-done','Show results');
+      done.type='button'; done.onclick=()=>openSheet(false);
+      rail.appendChild(done);
+    }
+  }
+}
+/* ---- the search panel ----
+   One place to find things. It opens over the page, searches cards and sets
+   together, and does not touch the view underneath until you pick a result -
+   so the grid you were reading stays where it was.
+
+   It also owns the refinements. The rail's category, attribute, type, level
+   and scale menus were a second filtering system living behind the results
+   they filtered; the two that earn their place - type and rarity - moved in
+   here beside the query, and the rest are gone rather than hidden.      */
+let SP_ROWS=[];
+function spOpen(on){
+  const p=$('#sp'),v=$('#sp-veil');if(!p)return;
+  const want=on===undefined?p.hidden:!!on;
+  p.hidden=!want;v.hidden=!want;
+  document.documentElement.classList.toggle('sp-on',want);
+  /* Closing used to leave focus sitting in the header box, which is the
+     control that opens the panel - so the next stray focus event reopened
+     it and the app felt stuck until you pressed Escape. */
+  if(!want){const h=$('#f-text');if(h&&document.activeElement===h)h.blur();}
+  if(want){
+    const q=$('#sp-q');
+    q.value=F.text||'';
+    /* Deliberately NOT inherited from the page. The binder defaults to
+       showing only what you own, which is right for browsing and exactly
+       wrong for searching: you look a card up precisely because you are
+       holding one you do not have yet. Search spans the whole pool unless
+       you narrow it here. */
+    $('#sp-owned').checked=false;
+    $('#sp-cat').value='';
+    const r=$('#sp-rar');
+    if(r&&r.dataset.done!==REGION){
+      r.dataset.done=REGION;
+      r.innerHTML=opts(RARITIES.map(x=>x.n),'Any rarity');
+    }
+    r.value=F.rar||'';
+    spRender();
+    setTimeout(()=>{q.focus();q.select();},20);
+  }
+}
+/* Cards and sets in one list, because "DOOD" is a reasonable thing to type
+   whether you want the set or a card from it. */
+function spResults(q){
+  q=String(q||'').trim().toLowerCase();
+  if(q.length<1)return {cards:[],sets:[]};
+  const codeQ=q.replace(/\s+/g,'');
+  const cat=$('#sp-cat')?$('#sp-cat').value:'';
+  const rar=$('#sp-rar')?$('#sp-rar').value:'';
+  const ownedOnly=$('#sp-owned')?$('#sp-owned').checked:false;
+  const sets=[];
+  try{
+    setGroups().forEach(g=>{
+      const nm=((DB.setNames||{})[g.code]||((setInfo(g.code)||{}).name)||'');
+      if(String(g.code).toLowerCase().includes(q)||nm.toLowerCase().includes(q))
+        sets.push({code:g.code,name:nm,have:g.cards.size,value:g.value});
+    });
+  }catch(e){}
+  /* Ranked, not just filtered. Card text is searchable because it has to be,
+     but a card whose NAME matches is what you meant - typing "Magician of
+     Dark" should not lead with the token whose rules text happens to mention
+     it. Name beats code beats text, and an exact prefix beats a substring. */
+  const scored=[];
+  for(const c of POOL){
+    if(ownedOnly&&!totalCopies(c.id))continue;
+    if(cat&&broadType(c)!==cat)continue;
+    const nm=(c.name||'').toLowerCase();
+    let score=0;
+    if(nm===q)score=100;
+    else if(nm.startsWith(q))score=90;
+    else if(nm.includes(q))score=80;
+    if(!score){
+      for(const x of copiesIn(c.id)){
+        const code=((x.set||'')+(x.num?'-'+x.num:'')).toLowerCase();
+        if(code&&code.replace(/\s+/g,'')===codeQ){score=70;break;}
+        if(code&&code.replace(/\s+/g,'').includes(codeQ)){score=60;break;}
+      }
+    }
+    if(!score){try{
+      for(const s of ((printingsOf(c)||{}).sets||[]))
+        if(String(s).toLowerCase().includes(codeQ)){score=50;break;}
+    }catch(e){}}
+    if(!score&&(c.desc||'').toLowerCase().includes(q))score=20;
+    if(!score)continue;
+    if(rar){
+      const held=copiesIn(c.id);
+      const ok=held.some(x=>x.rarity===rar)||
+        (!held.length&&(printingsOf(c).rars||[]).includes(rar));
+      if(!ok)continue;
+    }
+    scored.push({c,score});
+    if(scored.length>400)break;                 /* enough to rank meaningfully */
+  }
+  scored.sort((a,b)=>b.score-a.score||
+    (a.c.name||'').length-(b.c.name||'').length);
+  return {cards:scored.slice(0,40).map(x=>x.c),sets:sets.slice(0,8)};
+}
+function spRender(){
+  const body=$('#sp-body');if(!body)return;
+  const q=$('#sp-q').value;
+  if(!q.trim()){
+    body.innerHTML=RECENT.length
+      ? '<div class="sp-h">Recent</div>'+RECENT.map(r=>
+          `<button type="button" class="sp-row sp-recent" data-q="${esc(r)}"><span class="sp-code">↺</span><span class="sp-nm">${esc(r)}</span></button>`).join('')
+      : '<p class="sp-empty">Type a card name, a word from its text, or a set code like DOOD.</p>';
+    bindSp();return;
+  }
+  const {cards,sets}=spResults(q);
+  if(!cards.length&&!sets.length){
+    body.innerHTML=`<p class="sp-empty">Nothing matches “${esc(q.trim())}”.</p>`;return;
+  }
+  let html='';
+  if(sets.length){
+    html+='<div class="sp-h">Sets</div>'+sets.map(s=>
+      `<button type="button" class="sp-row" data-set="${esc(s.code)}">
+         <span class="sp-code">${esc(s.code)}</span>
+         <span class="sp-nm">${esc(s.name||'Unnamed set')}</span>
+         <span class="sp-meta">${s.have} held</span>
+       </button>`).join('');
+  }
+  if(cards.length){
+    html+=`<div class="sp-h">Cards<span class="sp-n">${cards.length}${cards.length===40?'+':''}</span></div>`+
+      cards.map(c=>{
+        const held=totalCopies(c.id);
+        const code=(copiesIn(c.id)[0]||{}).set||((printingsOf(c)||{}).sets||[])[0]||'';
+        return `<button type="button" class="sp-row" data-id="${esc(c.id)}">
+          <span class="sp-code">${esc(code||'—')}</span>
+          <span class="sp-nm">${esc(cardName(c))}</span>
+          <span class="sp-meta">${held?held+' held':''}</span>
+        </button>`;
+      }).join('');
+  }
+  body.innerHTML=html;bindSp();
+}
+function bindSp(){
+  $('#sp-body').querySelectorAll('.sp-row').forEach(b=>{
+    b.onclick=()=>{
+      if(b.dataset.q){$('#sp-q').value=b.dataset.q;spRender();return;}
+      pushRecent($('#sp-q').value);
+      if(b.dataset.set){
+        keepBoard();VIEW='sets';F.set=b.dataset.set;F.arch='';page=0;
+        paintViewTabs();spOpen(false);renderBinder();return;
+      }
+      spOpen(false);openDetail(b.dataset.id);
+    };
+  });
+}
+/* ---- recent searches ----
+   Device-level, like the theme: which cards you looked up is a fact about
+   this phone, not about a collection, so it survives a region switch and
+   never travels in an export.                                          */
+const KEY_RECENT='ygo-binder-recent-v1';
+let RECENT=(()=>{try{return JSON.parse(localStorage.getItem(KEY_RECENT)||'[]')||[];}catch(e){return [];}})();
+function pushRecent(q){
+  q=String(q||'').trim(); if(q.length<2)return;
+  RECENT=[q].concat(RECENT.filter(x=>x.toLowerCase()!==q.toLowerCase())).slice(0,6);
+  try{localStorage.setItem(KEY_RECENT,JSON.stringify(RECENT));}catch(e){}
+}
+function paintRecent(show){
+  const box=$('#f-recent'); if(!box)return;
+  if(!show||!RECENT.length){box.hidden=true;return;}
+  box.innerHTML='<div class="rec-h">Recent<button type="button" id="rec-clear">Clear</button></div>'+
+    RECENT.map(q=>'<button type="button" class="rec-i" role="option" data-q="'+esc(q)+'">'+
+      '<span class="q">'+esc(q)+'</span></button>').join('');
+  box.hidden=false;
+  box.querySelector('#rec-clear').onclick=()=>{
+    RECENT=[];try{localStorage.removeItem(KEY_RECENT);}catch(e){}
+    paintRecent(false);$('#f-text').focus();
+  };
+  box.querySelectorAll('.rec-i').forEach(b=>{
+    b.onclick=()=>{
+      const sb=$('#f-text');sb.value=b.dataset.q;F.text=b.dataset.q;page=0;
+      pushRecent(b.dataset.q);paintClearBtn();paintRecent(false);renderBinder();
+    };
+  });
+}
+$('#f-text').oninput=e=>{F.text=e.target.value;page=0;paintClearBtn();paintRecent(!e.target.value);clearTimeout(tId);tId=setTimeout(()=>renderBinder(),160);};
+$('#f-clear-hdr').onclick=()=>{const sb=$('#f-text');sb.value='';F.text='';page=0;paintClearBtn();renderBinder();sb.focus();paintRecent(true);};
+/* The header box is now the door to the panel rather than a live filter, so
+   focusing or typing in it opens the panel and hands the query over. */
+$('#f-text').onfocus=()=>spOpen(true);
+$('#f-text').onclick=()=>spOpen(true);
+
+let spT=null;
+$('#sp-q').oninput=e=>{clearTimeout(spT);spT=setTimeout(spRender,120);};
+$('#sp-q').onkeydown=e=>{
+  if(e.key==='Escape'){spOpen(false);return;}
+  if(e.key==='Enter'){
+    const first=$('#sp-body').querySelector('.sp-row');
+    if(first)first.click();
+  }
+};
+['#sp-cat','#sp-rar','#sp-owned'].forEach(s=>{
+  const e=$(s); if(e)e.onchange=spRender;
+});
+$('#sp-close').onclick=()=>spOpen(false);
+$('#sp-veil').onclick=()=>spOpen(false);
+$('#sp-reset').onclick=()=>{
+  $('#sp-cat').value='';$('#sp-rar').value='';$('#sp-owned').checked=false;spRender();
+};
 $('#f-cat').onchange=e=>{F.cat=e.target.value;syncCategory();page=0;renderBinder();};
 bind('#f-sub','sub');bind('#f-attr','attr');bind('#f-race','race');
 bind('#f-lvl','lvl',true);bind('#f-scale','scale',true);
@@ -10645,6 +11973,20 @@ document.querySelectorAll('#binder-tabs button').forEach(b=>{
 document.querySelectorAll('#regsw button').forEach(b=>{
   b.onclick=()=>setRegion(b.dataset.r);
 });
+$('#filt-fab').onclick=()=>openSheet();
+$('#sheet-veil').onclick=()=>openSheet(false);
+$('#t-select').onclick=()=>setSelMode(!SELMODE);
+$('#more-btn').onclick=e=>{e.stopPropagation();openMore();};
+$('#m-bulk').onclick=()=>{openMore(false);openBulk();};
+$('#m-clear').onclick=()=>{openMore(false);$('#t-clear').click();};
+document.addEventListener('click',e=>{
+  const w=$('#more-wrap');
+  if(w&&!w.contains(e.target))openMore(false);
+});
+$('#bb-sell').onclick=()=>bulkMove('b-sell');
+$('#bb-keep').onclick=()=>bulkMove('b-main');
+$('#bb-want').onclick=bulkWant;
+$('#bb-none').onclick=()=>setSelMode(false);
 $('#do-sale').onclick=doSaleList;
 $('#do-transfer').onclick=openTransfer;
 $('#file-in').onchange=e=>{if(e.target.files[0]){doImport(e.target.files[0]);closeModal();}e.target.value='';};
@@ -10695,7 +12037,8 @@ syncCategory();
 (async()=>{
   const saved=await Store.get();
   if(saved)DB=migrate(saved);
-  MODE=DB.mode==='list'?'list':'grid';
+  applyPrefs();
+  MODE=defaultMode();
   RARITIES = ocgOn()?RARITIES_JP:RARITIES_AE;
   $('#t-rar').innerHTML=opts(RARITIES.map(r=>r.n),'Any rarity');
   paintRegion();
@@ -10718,6 +12061,19 @@ syncCategory();
   loadPool();
   if(PX_SRC==='synced'&&PX_DATE!==new Date().toISOString().slice(0,10))setTimeout(()=>refreshPrices(null),1500);
   refreshRate(false);        /* quietly tops up the exchange rate; no-op offline */
+  /* ---- first run ----
+     An empty binder with no explanation is the worst possible first screen:
+     every control is live but nothing on the page says what the app is for
+     or which of the two jobs you are in. On a device that has never been set
+     up, settings opens itself once - theme, card size and the exchange rate
+     are the three things worth choosing before anything else - and the flag
+     is written immediately so this never happens twice.                  */
+  if(!seenSetup()){
+    markSetup();
+    setTimeout(()=>{ openSettings();
+      toast('Welcome — set the theme, card size and rate here. This opens once.');
+    },700);
+  }
 })();
 </script>
 </body>
