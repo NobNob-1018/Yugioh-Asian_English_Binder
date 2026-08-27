@@ -10,11 +10,15 @@ open the **Console** tab, paste the whole of `get-prices-from-browser.js` and
 press Enter. It pages through their catalogue and downloads `tcgc-prices.json`.
 Running it on their own tab means nothing can block it.
 
-**Or with Node** (18+, for `fetch`):
+**Or from a terminal**, needing nothing beyond Perl and curl:
 
 ```bash
-node fetch-tcgc-prices.js
+perl Tools/ae-prices-tcgcorner.pl
 ```
+
+This replaced `fetch-tcgc-prices.js`, which needed Node and so could never run
+on this machine while the OCG-JP scripts beside it could. It writes the same
+file, plus `Tools/played-stock.json` for the graded copies.
 
 **Or from the app itself:** Prices → Sync, then Export .json. *(Export is
 currently disabled — see the warning under "Load it back".)*
@@ -48,22 +52,15 @@ its `rows` over the `BAKED_PRICES` array between the `BAKED_PRICES_START` /
 
 ## 3. Test the matching
 
-```bash
-node test-prices.js ../ygo_binder.html tcgc-prices.json
-```
+Open the app, press F12, and run the snippet in section 21 in the Console. It
+calls the app's own `bestMatch` on cards whose prices were checked by hand, so
+it tests what actually ships rather than a copy of it.
 
-It loads the app's own functions straight out of the HTML — so it tests what
-actually ships, not a copy — then checks each card in the `EXPECTED` list at the
-top of `test-prices.js`. Add cards you have price-checked by hand:
-
-```js
-{ name: 'Maxx "C"', set: 'RC04', rarity: 'ScR', peso: 2400.00 },
-```
-
-Output tells you the matched listing and how it was found (`code`,
-`set + rarity`, or `rarity`), plus every rarity tag present in the feed — useful
-for spotting tags the app does not yet map, which are the usual cause of a
-wrong price.
+This used to be `node test-prices.js`, which loaded the functions out of the
+HTML with a stubbed DOM. It needed Node, which is not installed here, so it
+had quietly stopped being runnable. The console does the same job with nothing
+to install, and the hand-checked prices it relied on now live in section 21
+rather than buried inside a script.
 
 ## Why prices go wrong
 
@@ -558,3 +555,51 @@ Two things this got wrong first, both worth remembering:
   stylesheet uses, so the two cannot disagree. `placePiles()` also runs on every
   render, because not every shell delivers resize or mediaquery events; the call
   returns immediately when nothing needs moving.
+
+## 21. Prices checked by hand
+
+These were verified on the TCG Corner site by eye, and are the reference the
+price matching is judged against. They lived inside `test-prices.js`, which
+needed Node and so could never run here; the file is gone, the knowledge is not.
+
+Checked 2026-08-18, in pesos:
+
+| Card | Set | Rarity | Price |
+|---|---|---|---|
+| Ash Blossom & Joyous Spring | RC04 | UtR | 1,260.81 |
+| Ash Blossom & Joyous Spring | RC04 | UR | 252.16 |
+| Ash Blossom & Joyous Spring | RC04 | ScR | 945.61 |
+| Ash Blossom & Joyous Spring | RC04 | QCSR | 11,347.29 |
+| Ash Blossom & Joyous Spring | RC04 | CR | 1,134.73 |
+| Ash Blossom & Joyous Spring | RC04 | ExSR | 1,576.01 |
+| Ash Blossom & Joyous Spring | RC04 | HGR | 8,825.67 |
+| Droll & Lock Bird | ES02 | UtR | 1,765.13 |
+| Droll & Lock Bird | ES02 | UR | 630.40 |
+| Droll & Lock Bird | ES02 | ScR | 1,134.73 |
+
+To check them now, open the app and run this in the browser console — the same
+thing the old script did, without needing Node:
+
+```js
+[['Ash Blossom & Joyous Spring','RC04','UtR',1260.81],
+ ['Ash Blossom & Joyous Spring','RC04','UR',252.16],
+ ['Droll & Lock Bird','ES02','UtR',1765.13]]
+.forEach(([name,set,rar,want])=>{
+  const m = bestMatch({set,rarity:rar}, {name});
+  const got = m ? Math.round(m.peso*100)/100 : null;
+  console.log(got===want ? 'ok  ' : 'FAIL', name, rar, got, 'want', want);
+});
+```
+
+## 22. Played stock
+
+`Tools/played-stock.json` holds the 255 listings TCG Corner grades A, B or C -
+cards someone has played with. The app never quotes them: a scratched copy at a
+third off is a different product, and quoting it would make a collection read
+as worth less than it is.
+
+They are kept because they answer two questions the clean prices cannot: what a
+used copy would cost you to buy, and what one of your own played cards is
+actually worth. `ae-prices-tcgcorner.pl` writes this file on every harvest.
+
+Grades in the 2026-08-18 pull: 59 A, 131 B, 65 C.

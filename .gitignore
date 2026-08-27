@@ -16,3 +16,9 @@ Thumbs.db
 
 # local preview server, not part of the app
 .claude/
+
+# generated knowledge graph - ~124 kB per build, rebuilt from source on demand
+graphify-out/
+
+# raw price harvest - 386 kB intermediate, rebuilt by Tools/ae-prices-tcgcorner.pl
+tcgc-prices.json
