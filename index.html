@@ -40,7 +40,7 @@
   --line-soft:#2C2C35;
   --text:#F5F3EF;
   --muted:#A3A3AE;
-  --faint:#767683;
+  --faint:#8A8A99;          /* 5.22:1 on --surface; was #767683 at 3.97 */
   --accent:#F0C24A;
   --accent-soft:rgba(240,194,74,.18);
   --danger:#E0736A;
@@ -50,9 +50,9 @@
   --r-pill:100px;
   /* Type ramp. Seventeen ad-hoc sizes collapsed to nine steps; every rule
      below picks one of these rather than inventing a number.            */
-  --fs-3xs:9px;   --fs-2xs:10px;  --fs-xs:11px;
-  --fs-sm:12px;   --fs-md:13px;   --fs-lg:14px;
-  --fs-xl:16px;   --fs-2xl:18px;  --fs-3xl:24px;
+  --fs-3xs:11px;  --fs-2xs:11.5px; --fs-xs:12px;
+  --fs-sm:13px;   --fs-md:14px;   --fs-lg:15px;
+  --fs-xl:17px;   --fs-2xl:20px;  --fs-3xl:28px;
   /* Spacing rhythm, used for the containers where it reads: panels, boards,
      modals, the sidebar. Small controls keep their own tuned padding.    */
   --sp-1:4px;  --sp-2:8px;  --sp-3:12px;
@@ -100,6 +100,15 @@ button{cursor:pointer;background:none;border:none}
 .hdr-sep{width:1px;height:22px;background:var(--line);flex:none}
 /* The region switch sits where the wordmark's subtitle used to, because that
    is the one place on the page that never scrolls away.                   */
+/* ---- reachable on a phone ----
+   Everything here measured under 44x44, which is the size a fingertip
+   actually covers. Rather than inflate the controls and reflow a layout tuned
+   to fit a binder page at 375px, each one grows an invisible hit area around
+   itself. The control looks identical and is twice as easy to hit.        */
+.regsw button,.infob,.rail-tog,.x-btn,.step button{position:relative}
+.regsw button::after,.infob::after,.rail-tog::after,.x-btn::after,
+.step button::after{content:'';position:absolute;left:50%;top:50%;
+  transform:translate(-50%,-50%);width:max(100%,44px);height:max(100%,44px)}
 .regsw{display:inline-flex;gap:2px;padding:2px;border-radius:var(--r-pill);
   background:var(--surface-3);border:1px solid var(--line-soft)}
 .regsw button{font-family:var(--mono);font-size:var(--fs-3xs);letter-spacing:.08em;
@@ -402,18 +411,20 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
    width and offset are set from JS because the options are not equal widths. */
 .tabs{display:flex;gap:2px;background:var(--surface-2);border:1px solid var(--line);
   border-radius:var(--r-sm);padding:2px;position:relative;isolation:isolate}
-.tabs::before{content:'';position:absolute;left:0;top:2px;bottom:2px;z-index:0;
-  width:var(--tw,0);transform:translateX(var(--tx,0));
+.tabs::before{content:'';position:absolute;left:0;top:0;z-index:0;
+  width:var(--tw,0);height:var(--th,0);
+  transform:translate(var(--tx,0),var(--ty,0));
   background:var(--accent);border-radius:var(--r-xs);opacity:var(--to,0);
   transition:transform .34s cubic-bezier(.34,1.12,.5,1),
              width .34s cubic-bezier(.34,1.12,.5,1),
+             height .34s cubic-bezier(.34,1.12,.5,1),
              opacity .2s ease}
 .tabs button{padding:4px 12px;font-size:var(--fs-sm);color:var(--muted);border-radius:var(--r-xs);
   position:relative;z-index:1;transition:color .22s ease}
 .tabs button:hover{color:var(--text)}
 .tabs button.on{color:var(--on-accent);font-weight:500}
 /* the rail is only 210px wide, so its tab groups wrap instead of being cut off */
-.rail .tabs{flex-wrap:wrap}
+.rail .tabs{flex-wrap:wrap;gap:2px;row-gap:2px}
 .rail .tabs button{flex:1 1 auto;min-width:0;white-space:nowrap;text-align:center}
 
 /* --- list view --- */
@@ -621,25 +632,27 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 
 /* A fingertip needs about 40px. Mice do not, so the desktop keeps its density. */
 @media (pointer:coarse){
-  .tabs button{min-height:40px;padding:0 14px;font-size:var(--fs-md)}
-  .rail .tabs button{padding:0 10px;font-size:var(--fs-sm)}
-  .btn-sm{min-height:40px;padding:0 12px;font-size:var(--fs-sm)}
-  .jump{min-height:40px;width:64px;font-size:var(--fs-md)}
-  .btn{min-height:40px}
-  .nav .btn-sm{min-width:40px}          /* the ‹ › arrows are one glyph wide */
-  .fxbox input{min-height:40px}
-  .fxbox button{min-width:40px;min-height:40px;font-size:var(--fs-lg)}
-  .set-edit{min-height:32px;padding:0 10px}
-  .mini{min-height:40px;font-size:var(--fs-sm)}
-  .seg2 button{min-height:40px;padding:0 14px;font-size:var(--fs-sm)}
+  .tabs button{min-height:44px;padding:0 14px;font-size:var(--fs-md)}
+  .rail .tabs button{padding:0 6px;font-size:var(--fs-xs)}
+  .btn-sm{min-height:44px;padding:0 12px;font-size:var(--fs-sm)}
+  .jump{min-height:44px;width:64px;font-size:var(--fs-md)}
+  .btn{min-height:44px}
+  .nav .btn-sm{min-width:44px}          /* the ‹ › arrows are one glyph wide */
+  .fxbox input{min-height:44px}
+  .fxbox button{min-width:44px;min-height:44px;font-size:var(--fs-lg)}
+  .set-edit{min-height:36px;padding:0 10px}
+  .mini{min-height:44px;font-size:var(--fs-sm)}
+  .seg2 button{min-height:44px;min-width:44px;padding:0 14px;font-size:var(--fs-sm)}
   /* two characters wide, so the generic segment padding triples them */
   #core-mult button{padding:0 9px;font-size:var(--fs-sm)}
-  .rail-tog{min-width:40px;min-height:40px}
-  .cd>summary{min-height:40px}
-  .infob{width:32px;height:32px;font-size:var(--fs-sm)}
-  .inp{min-height:40px}          /* set, price and condition fields in the card panel */
-  .x-btn{min-width:40px;min-height:40px}
-  .step button{min-width:38px;min-height:38px}
+  .rail-tog{min-width:44px;min-height:44px}
+  .cd>summary{min-height:44px}
+  .infob{width:36px;height:36px;font-size:var(--fs-sm)}
+  .inp{min-height:44px}          /* set, price and condition fields in the card panel */
+  .x-btn{min-width:44px;min-height:44px}
+  .step button{min-width:44px;min-height:44px}
+  .tabs button,.pxmore{min-width:44px}
+  .btn.ico{min-width:44px}       /* the label hides here, leaving just the glyph */
   .bar{gap:10px}
 }
 
@@ -1062,7 +1075,7 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
   --line-soft:#E2E6EC;
   --text:#14161B;
   --muted:#565C68;
-  --faint:#7B8290;
+  --faint:#6E7482;          /* 4.68:1 on white; was #7B8290 at 3.86 */
   --accent:#8A6508;
   --accent-soft:rgba(240,194,74,.26);
   --info:#3C6595;
@@ -3715,8 +3728,12 @@ function slideTabs(box){
   if(!box)return;
   const on=box.querySelector('button.on');
   if(!on||!box.clientWidth){box.style.setProperty('--to','0');return;}
+  /* both axes: the rail wraps its tabs onto two rows, and a pill that only
+     knew its x would cover every row at once                            */
   box.style.setProperty('--tw',on.offsetWidth+'px');
+  box.style.setProperty('--th',on.offsetHeight+'px');
   box.style.setProperty('--tx',on.offsetLeft+'px');
+  box.style.setProperty('--ty',on.offsetTop+'px');
   box.style.setProperty('--to','1');
 }
 const slideAllTabs=()=>document.querySelectorAll('.tabs').forEach(slideTabs);
