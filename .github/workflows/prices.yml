@@ -96,3 +96,56 @@ jobs:
           echo "  perl Tools/ae-prices-tcgcorner.pl"
           echo "  perl Tools/pc-prices-playersclub.pl"
           echo "  perl Tools/verify-harvest.pl"
+
+  # OCG-JP is deliberately not on the schedule. Its four scripts scrape
+  # Yugipedia and Yuyu-tei as HTML rather than reading a JSON endpoint, which
+  # is a good deal more fragile than the two Shopify shops above - a layout
+  # change breaks them in ways a row count may not notice. So it runs when you
+  # ask for it and you read the log, until it has proved itself a few times.
+  #
+  # The scripts pass intermediates through /tmp, which is exactly what a
+  # runner gives each job, so they need no changes to work here.
+  refresh-jp:
+    if: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.region == 'jp' || github.event.inputs.region == 'both') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record what is baked now
+        run: perl Tools/verify-harvest.pl --baked
+
+      # In order: the set list feeds the price walk and the catalogue walk,
+      # and the bake needs all three.
+      - name: Harvest OCG-JP
+        run: |
+          perl Tools/jp-sets.pl
+          perl Tools/jp-prices-yuyutei.pl
+          perl Tools/jp-catalogue-yugipedia.pl
+
+      - name: Bake OCG-JP
+        run: perl Tools/jp-bake.pl
+
+      - name: Verify the result
+        run: perl Tools/verify-harvest.pl --baked
+
+      - name: Commit if anything changed
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "OCG-JP unchanged - nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "OCG-JP refreshed" \
+                     -m "Harvested and verified by .github/workflows/prices.yml."
+          git push
+
+      - name: Say what broke
+        if: failure()
+        run: |
+          echo "::error::OCG-JP refresh failed - index.html was NOT changed."
+          echo "These are HTML scrapes, so a page layout change is the usual cause."
+          echo "Tools/README.md section 11 covers the four scripts and their order."
