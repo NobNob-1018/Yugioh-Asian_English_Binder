@@ -2812,46 +2812,73 @@ function gridFor(w){
   if(spreadOn()&&g.c%2)g.c+=1;
   return g;
 }
-/* ---- how many rows actually fit ----
-   gridFor picks rows from the window's WIDTH, which cannot know how much
-   height is left after the header, dashboard and toolbar have taken theirs.
-   At 1280x720 it asked for two rows of six, which is 884px of cards in 720px
-   of window, so the bottom row sat below the fold and the page scrolled.
+/* ---- fit the sheet to the window ----
+   Two earlier attempts at this were wrong in different ways, and both are
+   worth recording because the second looked right.
 
-   A card is 1.458 times as tall as it is wide - measured, not assumed - so
-   once the column count is known the row count is arithmetic. Returns null
-   when it cannot measure yet, and the width-based guess stands.         */
-function rowsThatFit(cols){
+   gridFor picks BOTH numbers from the window's width, which cannot know how
+   much height is left after the header, dashboard and toolbar. So at a short
+   window it asked for two rows that did not fit and the page scrolled.
+
+   Then rowsThatFit kept the width's column count and reduced the ROWS until
+   they fit - which is why a wide screen showed one row of six with half the
+   window empty underneath. Keeping the cards huge and throwing away a row is
+   backwards: the cards should shrink so the row survives.
+
+   So the row count leads and the columns follow. A binder page is two rows;
+   given the height that leaves per card, the column count is whatever makes
+   a card that size - the MINIMUM columns whose cards are small enough, which
+   is a ceiling, not a floor. Getting that the wrong way round is what capped
+   it at six.                                                            */
+const CARD_ASPECT=1.458;        /* measured off a rendered pocket */
+const CARD_MIN_W=118;           /* below this the art stops being readable */
+const CARD_MAX_W=250;           /* above this a page holds too little to scan */
+function fitLayout(){
   const g=document.getElementById('page');
-  if(!g||!cols)return null;
+  if(!g)return null;
   const gr=g.getBoundingClientRect();
-  const width=gr.width;
-  if(width<40)return null;
-  const gap=parseFloat(getComputedStyle(g).rowGap||getComputedStyle(g).gap)||12;
-  const colW=(width-gap*(cols-1))/cols;
-  if(colW<20)return null;
-  /* the caption under each card is part of the row's height */
-  const p=g.querySelector('.pocket');
-  const cardH=p?p.getBoundingClientRect().height:(colW*1.458+26);
-  if(cardH<20)return null;
-  const top=gr.top+(window.scrollY||0);
-  const avail=window.innerHeight-top-16;
-  return Math.max(1,Math.floor((avail+gap)/(cardH+gap)));
+  const W=gr.width;
+  if(W<40)return null;
+  const cs=getComputedStyle(g);
+  const gap=parseFloat(cs.rowGap||cs.gap)||12;
+  /* the caption is under the card on a desktop and on top of it below 920px,
+     so it only costs height on the wider layout */
+  const cap=g.querySelector('.cap-row');
+  const overlaid=cap?getComputedStyle(cap).position==='absolute':false;
+  const capH=(cap&&!overlaid)?cap.getBoundingClientRect().height+3:0;
+  const avail=window.innerHeight-(gr.top+(window.scrollY||0))-16;
+  if(avail<120)return null;
+  /* Two rows, which is the binder's own shape and the thing being asked for,
+     falling to one only when two would make the cards unreadable. Not three:
+     it fills the window but at 129px a card stops being something you can
+     recognise across a table, and recognising it is the point. A very tall
+     window adds columns rather than growing the cards, via CARD_MAX_W. */
+  for(const rows of [2,1]){
+    const slotBudget=(avail-gap*(rows-1))/rows;
+    const cardH=slotBudget-capH;
+    const cardW=cardH/CARD_ASPECT;
+    if(cardW<CARD_MIN_W)continue;                 /* too small at this many rows */
+    let cols=Math.max(1,Math.ceil((W+gap)/(cardW+gap)));
+    /* do not let a very tall window blow the cards up to poster size */
+    while(cols>1&&(W-gap*(cols-1))/cols>CARD_MAX_W)cols++;
+    return {c:cols,r:rows};
+  }
+  return null;
 }
 function autoLayout(keepFirst){
   const g=gridFor(document.documentElement.clientWidth);
   /* a chosen page size keeps the column count the window asked for and just
      stacks however many rows it takes to hold that many cards               */
   const want=+DB.per||0;
-  let r=want?Math.max(1,Math.ceil(want/g.c)):g.r;
-  if(!want){
+  let c=g.c,r=want?Math.max(1,Math.ceil(want/g.c)):g.r;
+  if(!want&&MODE!=='list'){
     /* Only when the size is automatic. Choosing a page size by hand is an
        instruction, and an instruction outranks a fit. */
-    const fit=rowsThatFit(g.c);
-    if(fit)r=fit;
+    const fit=fitLayout();
+    if(fit){c=fit.c;r=fit.r;}
   }
-  if(g.c===LAYOUT.c&&r===LAYOUT.r)return false;
-  applyLayout(g.c,r,keepFirst);
+  if(c===LAYOUT.c&&r===LAYOUT.r)return false;
+  applyLayout(c,r,keepFirst);
   return true;
 }
 const $=s=>document.querySelector(s);
