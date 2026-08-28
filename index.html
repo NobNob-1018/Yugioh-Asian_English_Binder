@@ -16492,7 +16492,11 @@ function refilterPool(){
    Trimmed to the fields anything actually reads, the same pool is 6.39 MB,
    and it only needs fetching when it has gone stale. Seven days: new sets
    arrive weekly at most, and Sync forces it whenever you want.          */
-const KEY_POOL='ygo-binder-pool-v1';
+/* v2: the v1 record stored card text inline. A device holding one would
+   unpack it into the new shape, find desc empty and no text record beside
+   it, and quietly lose card text until the month turned. Bumping the key
+   makes the old record unreadable, so it refetches once and writes both. */
+const KEY_POOL='ygo-binder-pool-v2';
 let POOL_AT=0;
 /* ---- monthly, by the calendar ----
    Sets arrive on a monthly cadence, so the pool is stale when the month has
@@ -16505,15 +16509,56 @@ let POOL_AT=0;
    after it turns, whenever that happens to be.                          */
 const monthOf=t=>{const d=new Date(t||0);return d.getFullYear()*12+d.getMonth();};
 const poolStale=()=>!POOL_AT||monthOf(POOL_AT)!==monthOf(Date.now());
+/* ---- what is worth storing ----
+   The obvious pack of every field came to 7.38 MB and 100ms to read back.
+   Two thirds of that never needed to be there:
+
+   - Card text was 4.32 MB, 59% of the payload, and is read in exactly one
+     place: the detail panel, for one card at a time. It moves to its own
+     record and is fetched when a card is opened.
+   - The two image URLs were another 1.62 MB, and every one of the 14,166 is
+     the card's id in a fixed pattern. Storing a string you can compute is
+     paying to remember arithmetic.
+
+   What is left is 2.34 MB: the fields the grid, the filters and the search
+   actually read on boot.                                                */
+const CARD_IMG_FULL=id=>'https://images.ygoprodeck.com/images/cards/'+id+'.jpg';
 const packPool=arr=>arr.map(c=>{const m=c.mon||{};
-  return [c.id,c.name,c.type,c.desc,c.archetype,c.img,c.imgFull,
+  return [c.id,c.name,c.type,c.archetype,
           m.attribute||'',m.level==null?'':m.level,m.race||'',
           m.atk==null?'':m.atk,m.def==null?'':m.def,c.usd||0,c.ocg||''];});
-const unpackPool=rows=>rows.map(r=>({
-  id:r[0],name:r[1],type:r[2],desc:r[3],archetype:r[4],img:r[5],imgFull:r[6],
-  usd:r[12]||0,ocg:r[13]||'',
-  mon:{attribute:r[7]||'',level:r[8]===''?null:+r[8],race:r[9]||'',
-       atk:r[10]===''?null:+r[10],def:r[11]===''?null:+r[11]}}));
+const unpackPool=rows=>rows.map(r=>{
+  const id=r[0];
+  /* a stub built from the price feed has no art anywhere, and its id is not
+     a card number, so it must not be given a URL that cannot resolve */
+  const real=!String(id).startsWith('ae-')&&!String(id).startsWith('jp-');
+  return {id,name:r[1],type:r[2],desc:'',archetype:r[3],
+    img:real?CARD_IMG(id):'',imgFull:real?CARD_IMG_FULL(id):'',
+    usd:r[9]||0,ocg:r[10]||'',
+    mon:{attribute:r[4]||'',level:r[5]===''?null:+r[5],race:r[6]||'',
+         atk:r[7]===''?null:+r[7],def:r[8]===''?null:+r[8]}};});
+
+/* Card text, kept apart and read after the first paint rather than before it.
+   It cannot be fetched purely on demand: besides the detail panel it feeds
+   search-by-text and the archetype detection behind Cores, all of which want
+   it synchronously. So it is loaded once, in the background, and folded back
+   into the pool - the binder is on screen and usable by then, and the two
+   features that need it become available a moment later. */
+const KEY_TEXT='ygo-binder-text-v1';
+let TEXT_MAP=null;
+async function hydrateText(){
+  if(TEXT_MAP)return 0;
+  try{
+    const c=await Store.get(KEY_TEXT);
+    const m=(c&&c.t2)||null;
+    if(!m)return 0;
+    TEXT_MAP=m;
+    let n=0;
+    POOL_ALL.forEach(x=>{const d=m[x.id];if(d){x.desc=d;n++;}});
+    DATA_V++;                  /* anything derived from card text must fall */
+    return n;
+  }catch(e){return 0;}
+}
 
 async function loadPool(force){
   const slot=$('#load-slot');
@@ -16529,6 +16574,8 @@ async function loadPool(force){
         refilterPool();
         poolReady=true;slot.innerHTML='';
         renderBinder();
+        /* the binder is on screen; the text can arrive behind it */
+        hydrateText().then(n=>{if(n)renderBinder();});
         if(!poolStale())return true;
       }
     }catch(e){}
@@ -16567,7 +16614,13 @@ async function loadPool(force){
     refilterPool();
     poolReady=true;slot.innerHTML='';
     snapshot();save();renderBinder();cacheNames();
-    try{ await Store.set({t:POOL_AT,rows:packPool(POOL_ALL)},KEY_POOL); }catch(e){}
+    try{
+      await Store.set({t:POOL_AT,rows:packPool(POOL_ALL)},KEY_POOL);
+      /* text in its own record, written once alongside the pool it came from */
+      const txt={};POOL_ALL.forEach(c=>{if(c.desc)txt[c.id]=c.desc;});
+      TEXT_MAP=txt;
+      await Store.set({t:POOL_AT,t2:txt},KEY_TEXT).catch(()=>{});
+    }catch(e){}
     return true;
   }catch(e){
     /* A failed refresh over a cached pool is not a failure worth shouting
