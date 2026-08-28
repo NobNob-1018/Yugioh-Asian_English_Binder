@@ -1312,6 +1312,11 @@ body{font-variant-numeric:tabular-nums}
   .slot>.cap-row .cap-v{flex:1 1 100%;justify-content:flex-start;gap:5px}
   /* an empty pocket has no art to sit on */
   .pocket-empty+.cap-row{background:none}
+  /* The caption is on the artwork here, and the rarity chip sits at the
+     bottom of it too, so one moves. The chip goes to the top, where the only
+     other thing is the owned count on the opposite corner. */
+  .slot .pocket .pk-r{top:0;bottom:auto;align-items:flex-start;padding:4px 4px 16px;
+    background:linear-gradient(to bottom,rgba(0,0,0,.72) 0,rgba(0,0,0,.35) 55%,transparent 100%)}
   /* the owned badge would collide with the scrim's top edge */
   .pocket .qty,.pocket .add{z-index:5}
 }
@@ -1600,6 +1605,25 @@ html.sp-on{overflow:hidden}
 .art.noart img{display:none}
 .art.noart span{font-size:var(--fs-3xs);letter-spacing:.14em;text-transform:uppercase;
   color:var(--faint);background:var(--surface);padding:4px 8px;text-align:center}
+
+/* ---- the rarity chip, on the card ----
+   Bottom-left of the artwork, over a short scrim so it reads on any art. It
+   keeps its foil colours untouched, because those are the one coloured thing
+   in this interface that carries meaning. */
+.pk-r{position:absolute;left:0;right:0;bottom:0;z-index:3;
+  display:flex;align-items:flex-end;gap:3px;padding:14px 4px 4px;
+  pointer-events:none;
+  background:linear-gradient(to top,rgba(0,0,0,.78) 0,rgba(0,0,0,.45) 55%,transparent 100%)}
+.pk-r .cap-r{font-style:normal;font-size:var(--fs-3xs);font-weight:700;line-height:1.5;
+  padding:0 5px;color:#141410;flex:none;border-radius:var(--r-xs)}
+.pk-r .cap-more{font-style:normal;font-size:var(--fs-3xs);font-weight:700;
+  color:#FFFFFF;flex:none;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+/* the caption is now the code and the price, so it gets the room */
+.cap-row .cap-id{flex:0 1 auto;min-width:0}
+.cap-row .cap-v{flex:1 1 auto;justify-content:flex-end;min-width:0}
+.cap-row .cap-s{font-size:var(--fs-2xs)}
+/* an empty pocket has no rarity to show */
+.pocket-empty .pk-r{display:none}
 
 /* ---- the caption says only what nothing else is saying ----
    "SETS · Collection" repeated the lit tab and the lit pile tab, then got
@@ -2854,8 +2878,9 @@ function gridFor(w){
    is a ceiling, not a floor. Getting that the wrong way round is what capped
    it at six.                                                            */
 const CARD_ASPECT=1.458;        /* measured off a rendered pocket */
-const CARD_MIN_W=118;           /* below this the art stops being readable */
+const CARD_MIN_W=108;           /* below this the art stops being readable */
 const CARD_MAX_W=250;           /* above this a page holds too little to scan */
+const CARD_TARGET_COLS=8;       /* what a sheet reads best at; a preference, not a rule */
 function fitLayout(){
   const g=document.getElementById('page');
   if(!g)return null;
@@ -2878,17 +2903,23 @@ function fitLayout(){
      window adds columns rather than growing the cards, via CARD_MAX_W. */
   for(const rows of [2,1]){
     const slotBudget=(avail-gap*(rows-1))/rows;
-    const cardH=slotBudget-capH;
-    const cardW=cardH/CARD_ASPECT;
-    if(cardW<CARD_MIN_W)continue;                 /* too small at this many rows */
-    let cols=Math.max(1,Math.ceil((W+gap)/(cardW+gap)));
+    const maxCardH=slotBudget-capH;
+    const maxCardW=maxCardH/CARD_ASPECT;
+    if(maxCardW<CARD_MIN_W)continue;              /* no readable card at this many rows */
+    /* The fewest columns whose cards still fit the height - the biggest the
+       cards can be - and the most columns before they stop being readable. */
+    const minCols=Math.max(1,Math.ceil((W+gap)/(maxCardW+gap)));
+    const maxCols=Math.max(minCols,Math.floor((W+gap)/(CARD_MIN_W+gap)));
+    /* Between those two, aim for the target. Deriving the count purely from
+       the height gave the biggest cards that fit, which on a wide screen is
+       six enormous ones; a sheet is easier to scan at eight. */
+    let cols=Math.min(maxCols,Math.max(minCols,CARD_TARGET_COLS));
     /* do not let a very tall window blow the cards up to poster size */
     while(cols>1&&(W-gap*(cols-1))/cols>CARD_MAX_W)cols++;
     /* Facing pages draws a spine down the middle of the sheet, so the two
        leaves have to hold the same number of cards. An odd column count puts
-       that spine through a card rather than between two, which is what it
-       was doing. gridFor had this rule; deriving the columns from height
-       here lost it. */
+       that spine through a card rather than between two. gridFor had this
+       rule; deriving the columns from height here lost it. */
     if(spreadOn()&&cols%2)cols++;
     return {c:cols,r:rows};
   }
@@ -3412,7 +3443,17 @@ function paintSlots(grid,slice,bn,selling){
     const show=heldR.length?heldR:(r?[r]:[]);
     const chips=show.slice(0,2).map(x=>`<i class="cap-r ${x.f}" title="${esc(x.n)}">${esc(x.k)}</i>`).join('')+
       (show.length>2?`<i class="cap-more" title="${esc(show.slice(2).map(x=>x.n).join(', '))}">+${show.length-2}</i>`:'');
-    cap.innerHTML=`<span class="cap-id">${chips}`+
+    /* ---- rarity on the card, price underneath ----
+       The caption held the rarity chip, the set code and the price on one
+       line. At eight or more columns that line is under 200px and the chip
+       was the thing that lost - clipped to its first letter, which is the
+       one part of it that has to be read exactly.
+
+       It sits on the artwork now, bottom-left, where there is room for it at
+       any column count. That also empties the caption down to the code and
+       the price, which is what you actually scan along a row. */
+    if(chips)p.insertAdjacentHTML('beforeend','<span class="pk-r">'+chips+'</span>');
+    cap.innerHTML=`<span class="cap-id">`+
       `${code?`<i class="cap-s">${esc(code)}</i>`:''}</span><span class="cap-v">${money}</span>`;
     slot.appendChild(cap);
     grid.appendChild(slot);
