@@ -49,6 +49,11 @@
   --glass:rgba(255,255,255,.98);
   --line:#D6D6D2;
   --line-soft:#E8E8E4;
+  /* A third rule weight. --line is a hairline between things that belong
+     together; this is the edge of a control you are meant to see. Measured
+     at about 3:1 against the panel behind it in both renditions - visible
+     without competing with the ink border a primary action gets. */
+  --line-strong:#9A9A96;
   --text:#111111;
   --muted:#55555A;          /* 7.4:1 on paper */
   --faint:#666669;          /* 5.06:1 on the page ground, 4.59:1 on the beat band */
@@ -1137,6 +1142,7 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
   --surface-3:#141414;
   --line:#333330;
   --line-soft:#242422;
+  --line-strong:#5A5A55;
   --text:#F2F2EE;
   --muted:#A8A8A2;          /* 8.1:1 on the negative's surface */
   --faint:#94948D;          /* 6.04:1 on surface, 4.71:1 on the negative's band */
@@ -1692,13 +1698,21 @@ html.sp-on{overflow:hidden}
   text-transform:uppercase;color:var(--faint);margin:0 0 2px;
   display:flex;align-items:center;gap:8px}
 .acts-grp h3::after{content:'';flex:1;height:1px;background:var(--line-soft)}
-.acts-grp .btn{width:100%;justify-content:flex-start;text-align:left}
+/* Both groups get the same room. The difference between them is weight, not
+   size - a secondary action is still a real control and must not read as a
+   disabled one. */
+.acts-grp .btn{width:100%;justify-content:flex-start;text-align:left;
+  min-height:42px;padding:9px 12px}
 /* what you press mid-deal */
 .act-primary{border-color:var(--text);color:var(--text);font-weight:500}
 .act-primary:hover{background:var(--text);color:var(--on-accent)}
-/* what you press once a month */
-.act-quiet{border-color:var(--line-soft);color:var(--muted)}
-.act-quiet:hover{border-color:var(--text);color:var(--text)}
+/* What you press once a month. It was bordered in --line-soft, which is the
+   faintest rule in the file and on the dark rendition sat a few percent off
+   the panel it was drawn on - the button read as switched off rather than as
+   secondary. A full --line border and a filled ground give it an edge you
+   can see; the hierarchy is carried by weight and fill instead. */
+.act-quiet{border-color:var(--line-strong);color:var(--muted);background:var(--surface-2)}
+.act-quiet:hover{border-color:var(--text);color:var(--text);background:var(--surface)}
 
 /* ---- the bar does not move ----
    Three things were sliding around and all three came from the same
@@ -2870,6 +2884,12 @@ function fitLayout(){
     let cols=Math.max(1,Math.ceil((W+gap)/(cardW+gap)));
     /* do not let a very tall window blow the cards up to poster size */
     while(cols>1&&(W-gap*(cols-1))/cols>CARD_MAX_W)cols++;
+    /* Facing pages draws a spine down the middle of the sheet, so the two
+       leaves have to hold the same number of cards. An odd column count puts
+       that spine through a card rather than between two, which is what it
+       was doing. gridFor had this rule; deriving the columns from height
+       here lost it. */
+    if(spreadOn()&&cols%2)cols++;
     return {c:cols,r:rows};
   }
   return null;
