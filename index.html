@@ -2110,7 +2110,7 @@ provenance
       <span class="fxbox" id="hdr-fx"></span>
       <span id="hdr-px"></span>
       <span class="hdr-sep"></span>
-      <button class="btn ico" id="do-sale" hidden title="Save your selling binder as a view-only page you can send to a buyer"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="1.5" width="9" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="5.4" y="4.6" width="4.2" height="1.5" rx=".7"/><rect x="5.4" y="7.4" width="4.2" height="1.5" rx=".7"/></svg><span class="tl">Sale list</span></button>
+      <button class="btn ico" id="do-sale" hidden title="Send your selling shelf as a link, or save it as a page"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="1.5" width="9" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="5.4" y="4.6" width="4.2" height="1.5" rx=".7"/><rect x="5.4" y="7.4" width="4.2" height="1.5" rx=".7"/></svg><span class="tl">Selling list</span></button>
       <button class="btn ico" id="do-transfer" title="Move this binder to another device"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5h9M9 3l2.6 2.5L9 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 10.5h-9M7 8l-2.6 2.5L7 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tl">Transfer</span></button>
       <input type="file" id="file-in" accept="application/json" hidden>
     </div>
@@ -2327,6 +2327,18 @@ provenance
 <div id="say" aria-live="polite" class="sr-only"></div>
 
 <script>
+/* ---- a shared list, caught before anything can tidy it away ----
+   The fragment is already this app's router - #v=binder&r=ae&p=2 - and
+   writeUrl() rewrites it from the current view on the first render, dropping
+   anything it did not put there. A shared selling list arrives in that same
+   fragment and was being wiped before boot ever looked at it.
+
+   So it is taken here, on the first line the script runs, before any render
+   exists to overwrite it. What the address bar says afterwards no longer
+   matters, which is just as well: the router owns it. */
+const SHARE_TAG='#sale=';
+const SHARE_RAW=(location.hash||'').indexOf(SHARE_TAG)===0
+  ? location.hash.slice(SHARE_TAG.length) : '';
 /* ---- region ----
    Asian-English and OCG-JP are two collections that happen to share a card
    pool. Nothing crosses between them: separate binders, separate selling
@@ -5361,9 +5373,80 @@ function saleCards(){
   F.binder=was;
   return out;
 }
-function salePageHTML(){
-  const data=saleCards();
-  const me=DB.seller||{};
+/* ---- the same list, as a link ----
+   Saving the page and sending the file works, and for a buyer across a table
+   a link works better. There is no server here to put one on, so the list
+   travels in the URL's fragment - the part a browser never sends anywhere.
+   Nothing is uploaded, nothing is stored, and the link stops working the
+   moment you stop sending it.
+
+   The payload carries its own names and types rather than card ids alone, so
+   the page can be drawn the instant the app loads, without waiting for the
+   catalogue - and so a list made in one region still reads in the other. Art
+   comes from the id, which costs nothing to send. */
+function shareCode(){
+  const rows=saleCards().map(o=>[o.id,o.n,o.t||'',
+    o.cp.map(x=>[x.q,x.s||'',x.k||'',x.p==null?'':x.p,x.c||'',x.srp==null?'':x.srp])]);
+  return b64enc(JSON.stringify({v:1,r:REGION,t:Date.now(),
+    who:(DB.seller||{}).name||'',rows}))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');   /* URL-safe */
+}
+function readShare(code){
+  const s=String(code||'').replace(/-/g,'+').replace(/_/g,'/');
+  const pay=JSON.parse(b64dec(s+'==='.slice((s.length+3)%4)));
+  const data=(pay.rows||[]).map(([id,n,t,cps])=>({
+    id:String(id),n:n||'',img:CARD_IMG(id),t:t||'',a:'',
+    cp:(cps||[]).map(([q,set,k,p,cond,srp])=>{
+      const r=rarBy(k);
+      return {k:r.k,rn:r.n,f:r.f,w:r.w,s:set||'',c:cond||'',
+        q:+q||0,p:p===''?null:+p,srp:srp===''?null:+srp};
+    })}));
+  return {data,who:pay.who||'',when:pay.t||0,region:pay.r||''};
+}
+function shareLink(){
+  const base=location.origin+location.pathname;
+  return base+SHARE_TAG+shareCode();
+}
+/* A shared link that arrives before the app has done anything else is drawn
+   at once and nothing else runs: it is somebody else's list, and this device
+   has no business loading its own binder underneath it. */
+function showSharedList(){
+  if(!SHARE_RAW)return false;
+  let got;
+  try{
+    const raw=SHARE_RAW;
+    /* The rarity ladders differ by region - eleven against nineteen - so the
+       list is read with the ladder it was WRITTEN with, not the one this
+       device happens to be set to. Otherwise an Asian-English shelf opened on
+       a Japanese binder labels every card wrong. */
+    const peek=JSON.parse(b64dec((s=>s+'==='.slice((s.length+3)%4))
+      (raw.replace(/-/g,'+').replace(/_/g,'/'))));
+    RARITIES=peek.r==='ocg'?RARITIES_JP:RARITIES_AE;
+    got=readShare(raw);
+  }
+  catch(e){ return false; }
+  if(!got.data.length)return false;
+  const html=salePageHTML(got.data,{who:got.who,shared:true});
+  /* In a frame, not by rewriting this document. document.write() replaces the
+     DOM but keeps the same window, so the sale page's own script lands in a
+     realm where every name the app declared already exists - it died on
+     "peso has already been declared" and took its search and sorting with it.
+     A frame gets its own realm, which is what that page was written to have,
+     and the address bar keeps the link so it can be passed on again. */
+  const f=document.createElement('iframe');
+  f.setAttribute('title','Cards for sale');
+  f.style.cssText='position:fixed;inset:0;width:100%;height:100%;border:0;margin:0';
+  f.srcdoc=html;
+  document.body.textContent='';
+  document.body.style.cssText='margin:0;overflow:hidden';
+  document.body.appendChild(f);
+  document.title='Cards for sale';
+  return true;
+}
+function salePageHTML(rows,opt){
+  const data=rows||saleCards();
+  opt=opt||{};
+  const me=Object.assign({},DB.seller||{},opt.who?{name:opt.who}:{});
   const copies=data.reduce((s,o)=>s+o.cp.reduce((t,x)=>t+x.q,0),0);
   /* a copy is worth what you ask for it, or what TCG Corner asks if you have
      not priced it yet - the same fallback the binder itself uses */
@@ -5832,13 +5915,15 @@ function saleParses(html){
   try{ new Function(js); return ''; }
   catch(e){ return String(e&&e.message||e); }
 }
-function doSaleList(){
+function saveSalePage(){
   const data=saleCards();
   if(!data.length){toast('Nothing is on the selling shelf yet');return;}
   const html=salePageHTML();
   const bad=saleParses(html);
   if(bad){
-    toast('Sale page not written 2014 it would not open: '+bad);
+    /* was "not written 2014 it would not open" - an em dash that lost its
+       backslash to a script edit and left a stray year in a warning */
+    toast('Sale page not written — it would not open: '+bad);
     return;
   }
   const blob=new Blob([html],{type:'text/html'});
@@ -5846,6 +5931,51 @@ function doSaleList(){
   a.download='cards-for-sale-'+(ocgOn()?'ocg-':'')+new Date().toISOString().slice(0,10)+'.html';
   a.click();URL.revokeObjectURL(a.href);
   toast(data.length+' card'+(data.length===1?'':'s')+' saved as a page');
+}
+/* ---- one shelf, two ways to hand it over ----
+   The file and the link carry the same list; which you want depends on who is
+   asking and whether they are standing in front of you. So the button offers
+   both rather than choosing for you. */
+const SHARE_MAX=7500;      /* a real shelf fits; past this chat apps start
+                              cutting links in half, which is worse than a file */
+function doSaleList(){
+  const data=saleCards();
+  if(!data.length){toast('Nothing is on the selling shelf yet');return;}
+  const copies=data.reduce((s,o)=>s+o.cp.reduce((t,x)=>t+x.q,0),0);
+  const link=shareLink();
+  const tooBig=link.length>SHARE_MAX;
+  const box=el('div');
+  box.innerHTML=
+    '<p class="note">'+data.length+' card'+(data.length===1?'':'s')+', '+copies+
+      ' cop'+(copies===1?'y':'ies')+' on the selling shelf. Copies promised to a '+
+      'pending deal are left out — a shared shelf shows free stock only.</p>'+
+    '<h4 class="tf-h">Send a link</h4>'+
+    (tooBig
+      ? '<p class="note">This shelf is too long to travel in a link: '+
+        link.length.toLocaleString()+' characters, and messengers cut them. Save the '+
+        'page below and send that instead.</p>'
+      : '<p class="note">The list rides inside the link. Nothing is uploaded and nothing '+
+        'is stored anywhere, so it stops working when you stop sending it. It opens as a '+
+        'view-only page with prices, rarities and search, and no way to change anything.</p>'+
+        '<div class="tf-row"><button class="btn btn-sm btn-a" id="sl-copy">Copy link</button>'+
+        '<button class="btn btn-sm ghost" id="sl-open">Open it myself</button></div>'+
+        '<p class="note" id="sl-msg">'+link.length.toLocaleString()+' characters</p>')+
+    '<h4 class="tf-h">Save a page</h4>'+
+    '<p class="note">One file that needs no connection at all. Send it by mail or '+
+    'messenger, or keep it as a record of what you were asking.</p>'+
+    '<div class="tf-row"><button class="btn btn-sm'+(tooBig?' btn-a':'')+
+    '" id="sl-file">Save the page</button></div>';
+  const body=modal('Selling list — '+regionLabel(),box);
+  const msg=body.querySelector('#sl-msg');
+  const copy=body.querySelector('#sl-copy');
+  if(copy)copy.onclick=()=>{
+    (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject())
+      .then(()=>{if(msg)msg.textContent='Link copied.';toast('Selling list link copied');})
+      .catch(()=>{if(msg)msg.textContent='Could not reach the clipboard. Use "Open it myself" and copy from the address bar.';});
+  };
+  const open=body.querySelector('#sl-open');
+  if(open)open.onclick=()=>window.open(link,'_blank','noopener');
+  body.querySelector('#sl-file').onclick=()=>{closeModal();saveSalePage();};
 }
 
 /* ============ modal ============ */
@@ -5940,6 +6070,7 @@ async function save(){
   savePrefs();          /* device settings, kept clear of the region swap */
   stampChanges();       /* when each copy last moved, and what has been deleted */
   const ok=await Store.set(DB);
+  autoSyncSoon();       /* if it is on; a no-op otherwise */
   if(!ok&&!SAVE_FAILED){
     SAVE_FAILED=true;
     toast('Could not save — your device is out of storage. Export a copy before closing.');
@@ -17524,8 +17655,15 @@ function openTransfer(){
         'in any order.</p>'+
         '<div class="tf-row"><button class="btn btn-sm btn-a" id="gh-sync">Sync now</button>'+
         '<button class="btn btn-sm ghost" id="gh-forget">Forget this token</button></div>'+
+        '<label class="switch" style="margin-top:10px">'+
+        '<input type="checkbox" id="gh-auto"'+(PREFS.autoSync?' checked':'')+'>'+
+        '<span class="track"></span><span class="lbl">Sync on its own</span></label>'+
+        '<p class="note">When this is on it syncs on opening, a while after you stop '+
+        'editing, when a connection comes back, and when the phone goes into your '+
+        'pocket. Not on Data Saver or 2G, and never in a way you have to wait for.</p>'+
         '<p class="note" id="gh-msg">Token …'+esc(ghTok().slice(-4))+
-        (PREFS.gistId?' · gist '+esc(String(PREFS.gistId).slice(0,8)):' · no gist yet')+'</p>'
+        (PREFS.gistId?' · gist '+esc(String(PREFS.gistId).slice(0,8)):' · no gist yet')+
+        (PREFS.syncAt?' · last synced '+esc(agoText(PREFS.syncAt)):'')+'</p>'
       : '<p class="note">Sync through a private GitHub gist. No server of mine, nothing '+
         'public, and the binder still works with no signal — this is a button you press, '+
         'not something running behind you.</p>'+
@@ -17579,9 +17717,15 @@ function openTransfer(){
         :'No connection. Nothing was sent, and nothing here has changed.');
     }finally{ syncBtn.disabled=false; }
   };
+  const auto=body.querySelector('#gh-auto');
+  if(auto)auto.onchange=()=>{
+    PREFS.autoSync=auto.checked;savePrefs();
+    if(auto.checked){AUTO_FAIL=0;autoSyncWire();setMsg('On. It will keep itself in step.');}
+    else setMsg('Off. Sync when you press the button.');
+  };
   const forget=body.querySelector('#gh-forget');
   if(forget)forget.onclick=()=>{
-    delete PREFS.ghTok;delete PREFS.gistId;savePrefs();
+    delete PREFS.ghTok;delete PREFS.gistId;delete PREFS.autoSync;savePrefs();
     closeModal();openTransfer();
     toast('Token removed from this device');
   };
@@ -17852,6 +17996,73 @@ async function syncBinder(onLog){
   say('Writing back…');
   await ghCall('/gists/'+encodeURIComponent(id),{method:'PATCH',body:body()});
   return {created:false,stat};
+}
+/* ---- syncing without being asked ----
+   The button is honest but it is a thing to remember, and the failure it
+   invites is the expensive one: two devices drift for a week and the merge,
+   however correct, now has a week of divergence to reconcile.
+
+   Four moments are worth spending a request on, and they are the ones where
+   something actually happened:
+
+     opening the app, if the last sync is old enough to be worth checking
+     a while after you stop editing, so a burst of adds is one request
+     regaining a connection, because the last attempt is likely to have failed
+     putting the phone away, which is when a shop session ends
+
+   Everything else - a timer, a sync per change - spends battery and data to
+   discover nothing. Nothing here blocks the interface, and a failure is
+   silent apart from the status line: the binder is local, so being unable to
+   reach GitHub costs nothing you had.                                    */
+const agoText=t=>{
+  const m=Math.floor((Date.now()-(+t||0))/6e4);
+  return m<1?'just now':m<60?m+'m ago':m<1440?Math.floor(m/60)+'h ago':Math.floor(m/1440)+'d ago';
+};
+const AUTO_IDLE=25e3;          /* quiet after the last edit before writing */
+const AUTO_STALE=10*60e3;      /* on open, only if it has been this long */
+let AUTO_T=null,AUTO_BUSY=false,AUTO_FAIL=0,AUTO_AT=+(PREFS.syncAt||0);
+const autoOn=()=>!!(PREFS.autoSync&&ghTok()&&PREFS.gistId);
+/* The same connection policy the image prefetch uses. A sync is small, but on
+   Data Saver the rule is that nothing goes out unless it was asked for. */
+function autoAllowed(){
+  if(!autoOn()||!navigator.onLine)return false;
+  const link=navigator.connection||{};
+  if(link.saveData===true)return false;
+  if(/^slow-2g$|^2g$/.test(link.effectiveType||''))return false;
+  /* after a failure, wait longer each time, up to about ten minutes */
+  if(AUTO_FAIL&&Date.now()-AUTO_AT<Math.min(6e5,3e4*Math.pow(2,AUTO_FAIL-1)))return false;
+  return true;
+}
+async function autoSync(why){
+  if(AUTO_BUSY||!autoAllowed())return;
+  AUTO_BUSY=true;
+  try{
+    await syncBinder(()=>{});
+    AUTO_FAIL=0;AUTO_AT=Date.now();
+    PREFS.syncAt=AUTO_AT;savePrefs();
+    renderBinder();paintDash();
+  }catch(e){
+    AUTO_FAIL++;AUTO_AT=Date.now();
+  }finally{ AUTO_BUSY=false; }
+}
+/* Called from save(), so every edit path reaches it without knowing it does */
+function autoSyncSoon(){
+  if(!autoOn())return;
+  clearTimeout(AUTO_T);
+  AUTO_T=setTimeout(()=>autoSync('idle'),AUTO_IDLE);
+}
+let AUTO_WIRED=false;
+function autoSyncWire(){
+  if(AUTO_WIRED)return; AUTO_WIRED=true;
+  addEventListener('online',()=>{AUTO_FAIL=0;autoSync('online');});
+  /* Hidden, not unloaded: a phone going into a pocket never fires unload, and
+     what is pending at that moment is exactly what has not been written. */
+  addEventListener('visibilitychange',()=>{
+    if(document.visibilityState!=='hidden')return;
+    clearTimeout(AUTO_T);
+    if(Date.now()-AUTO_AT>3e4)autoSync('hidden');
+  });
+  if(Date.now()-AUTO_AT>AUTO_STALE)setTimeout(()=>autoSync('open'),4000);
 }
 /* Copies are merged, never replaced: bringing a phone's binder onto a desktop
    that already holds cards must not lose either side. A copy is the same copy
@@ -18588,7 +18799,7 @@ function paintOnline(){
   let n=document.getElementById('offline');
   if(!off){ if(n)n.remove(); return; }
   if(n)return;
-  n=el('div','offbar','Offline 00b7 working from the saved copy');
+  n=el('div','offbar','Offline · working from the saved copy');
   n.id='offline';
   document.body.appendChild(n);
 }
@@ -18596,6 +18807,10 @@ window.addEventListener('online',()=>{paintOnline();say('Back online');});
 window.addEventListener('offline',paintOnline);
 paintRarityKey();
 (async()=>{
+  /* Somebody else’s selling list, handed over as a link. It is drawn at
+     once and nothing else runs: this device has no business loading its own
+     binder underneath a page that is not about it. */
+  if(showSharedList())return;
   const saved=await Store.get();
   if(saved)DB=migrate(saved);
   LAST_SNAP=null;
@@ -18640,6 +18855,9 @@ paintRarityKey();
       toast('Welcome — set the theme, card size and rate here. This opens once.');
     },700);
   }
+  /* Last, and only if it was switched on: the binder is usable by now, and a
+     sync that delayed that would have the priority backwards. */
+  if(autoOn())autoSyncWire();
 })();
 </script>
 </body>
