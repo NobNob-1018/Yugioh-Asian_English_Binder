@@ -1309,6 +1309,17 @@ body{font-variant-numeric:tabular-nums}
   .slot>.cap-row .cap-srp,.slot>.cap-row .cap-ea{opacity:.72}
   .slot>.cap-row .cap-p{font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.6)}
   .slot>.cap-row .cap-s{text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  /* ---- one price on a phone, and it is the one per card ----
+     Under a 110px card "₱3,171 ea ₱9,513" does not fit, and the half that
+     got clipped was the total - so the line read "₱9". Between the two, the
+     per-card price is the one that means something at a table: the total is
+     that number times the ×3 badge sitting directly above it, which is
+     arithmetic you can do and a shopkeeper cannot argue with. So the total
+     goes, and the price that stays keeps "ea" to say which one it is. */
+  .slot>.cap-row .cap-v.stacked .cap-p{display:none}
+  .slot>.cap-row .cap-v.stacked .cap-ea{opacity:1;font-weight:600;
+    text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .slot>.cap-row .cap-ea i{font-style:normal;font-weight:400;opacity:.66}
   /* the price is the thing you came for, so it gets its own line under the
      rarity and code rather than fighting them for width */
   .slot>.cap-row{flex-wrap:wrap;justify-content:flex-start}
@@ -1714,6 +1725,45 @@ html.sp-on{overflow:hidden}
 .cap-row .cap-s{font-size:var(--fs-2xs)}
 /* an empty pocket has no rarity to show */
 .pocket-empty .pk-r{display:none}
+/* The strip itself stays transparent to the pointer so the card underneath
+   still opens; only the chips take the hover. */
+.pk-r .cap-r,.pk-r .cap-more{pointer-events:auto;cursor:help;position:relative}
+/* A chip is 39x17 - it has to be, it sits on a 110px card - and that is half
+   a thumb. The target grows without the chip growing, mostly downward into
+   the scrim's own padding where there is nothing else to hit. */
+.pk-r .cap-r::after,.pk-r .cap-more::after{content:'';position:absolute;
+  left:-4px;right:-4px;top:-6px;bottom:-12px}
+
+/* ---- what a rarity is worth ----
+   The chip named the printing you hold and stopped there, which is half a
+   fact: the reason to care that a copy is Ultra rather than Super is the
+   number attached to it, and that number was three taps away inside the
+   panel. Hover it on a desktop, tap it on a phone.
+
+   One element parked on the body rather than one per chip. The pocket clips
+   its own overflow so the art cannot spill, and anything drawn inside it
+   would be cut off at the card's edge - which is exactly where the chip
+   sits. */
+#rtip{position:fixed;z-index:120;left:0;top:0;max-width:min(248px,86vw);
+  padding:var(--sp-2) var(--sp-3);
+  background:var(--surface);border:1px solid var(--text);box-shadow:var(--sh-2);
+  font-family:var(--mono);font-size:var(--fs-2xs);color:var(--text);
+  font-variant-numeric:tabular-nums;pointer-events:none;
+  opacity:0;transform:translateY(3px);
+  transition:opacity var(--fast) var(--ease),transform var(--fast) var(--ease)}
+#rtip.on{opacity:1;transform:none}
+#rtip[hidden]{display:none}
+.t-row{display:grid;grid-template-columns:auto 1fr;gap:2px var(--sp-2);
+  align-items:baseline;padding:3px 0}
+.t-row+.t-row{border-top:1px solid var(--line-soft);margin-top:2px}
+.t-row .cap-r{grid-row:span 2;align-self:center}
+.t-row .t-n{font-size:var(--fs-3xs);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap}
+.t-row .t-px{font-size:var(--fs-sm);font-weight:700;line-height:1.2}
+.t-row .t-px.none{font-size:var(--fs-2xs);font-weight:400;color:var(--muted)}
+.t-src{grid-column:1/-1;font-size:var(--fs-3xs);color:var(--faint);
+  margin-top:1px}
+@media (prefers-reduced-motion:reduce){#rtip{transition:none;transform:none}}
 
 /* ---- the caption says only what nothing else is saying ----
    "SETS · Collection" repeated the lit tab and the lit pile tab, then got
@@ -3533,11 +3583,12 @@ function paintSlots(grid,slice,bn,selling){
     }else if(chg){
       tailBit=`<span class="cap-d ${chg>0?'up':'down'}">${chg>0?'\u25b2':'\u25bc'}${esc(peso(Math.abs(chg)))}</span>`;
     }
-    let money;
+    let money,stacked=false;
     if(ask){
       /* with room to spare, show what one copy is worth beside the stack total */
       const heldQty=copiesIn(c.id).reduce((n,cp)=>n+(+cp.qty||0),0);
-      const each=heldQty>1?`<span class="cap-ea">${esc(peso(ask/heldQty))} ea</span>`:'';
+      stacked=heldQty>1;
+      const each=stacked?`<span class="cap-ea">${esc(peso(ask/heldQty))} <i>ea</i></span>`:'';
       money=`${each}<span class="cap-p">${esc(peso(ask))}</span>${tailBit}`;
     }else{
       const rg=srpRange(c);
@@ -3550,8 +3601,14 @@ function paintSlots(grid,slice,bn,selling){
     const heldR=[...new Set(copiesIn(c.id).map(x=>x.rarity).filter(Boolean))]
       .map(k=>rarBy(k)).sort((a,b)=>b.w-a.w);
     const show=heldR.length?heldR:(r?[r]:[]);
-    const chips=show.slice(0,2).map(x=>`<i class="cap-r ${x.f}" title="${esc(x.n)}">${esc(x.k)}</i>`).join('')+
-      (show.length>2?`<i class="cap-more" title="${esc(show.slice(2).map(x=>x.n).join(', '))}">+${show.length-2}</i>`:'');
+    /* No title= any more: the chip answers with a real tooltip that carries
+       the price, and a native one would arrive a second later saying half as
+       much. The names go on the pocket's label instead so nothing is lost to
+       a screen reader. */
+    const chips=show.slice(0,2).map(x=>`<i class="cap-r ${x.f}" data-rk="${esc(x.k)}">${esc(x.k)}</i>`).join('')+
+      (show.length>2?`<i class="cap-more" data-rk="${esc(show.slice(2).map(x=>x.k).join(','))}">+${show.length-2}</i>`:'');
+    if(show.length)p.setAttribute('aria-label',
+      (p.getAttribute('aria-label')||'')+', '+show.map(x=>x.n).join(', '));
     /* ---- rarity on the card, price underneath ----
        The caption held the rarity chip, the set code and the price on one
        line. At eight or more columns that line is under 200px and the chip
@@ -3561,13 +3618,83 @@ function paintSlots(grid,slice,bn,selling){
        It sits on the artwork now, bottom-left, where there is room for it at
        any column count. That also empties the caption down to the code and
        the price, which is what you actually scan along a row. */
-    if(chips)p.insertAdjacentHTML('beforeend','<span class="pk-r">'+chips+'</span>');
+    if(chips)p.insertAdjacentHTML('beforeend',
+      `<span class="pk-r" data-cid="${esc(c.id)}" data-code="${esc(code)}">${chips}</span>`);
     cap.innerHTML=`<span class="cap-id">`+
-      `${code?`<i class="cap-s">${esc(code)}</i>`:''}</span><span class="cap-v">${money}</span>`;
+      `${code?`<i class="cap-s">${esc(code)}</i>`:''}</span>`+
+      `<span class="cap-v${stacked?' stacked':''}">${money}</span>`;
     slot.appendChild(cap);
     grid.appendChild(slot);
   }
 }
+/* ---- what a rarity is worth ----
+   Hover a chip on a desktop, tap one on a phone, and it says what that
+   printing costs. The price is worked out when it is asked for rather than
+   when the grid paints: bestMatch is the same call the whole page is already
+   making per card, and doing it twice more for sixty-four cards nobody
+   points at is the kind of cost this app cannot afford on a phone.        */
+let RTIP=null,RTIP_FOR=null;
+const rtipChip=t=>(t&&t.closest)?t.closest('.pk-r .cap-r,.pk-r .cap-more'):null;
+function rtipRows(chip){
+  const strip=chip.closest('.pk-r'); if(!strip)return '';
+  const c=cardById(strip.dataset.cid); if(!c)return '';
+  const code=strip.dataset.code||'';
+  return (chip.dataset.rk||'').split(',').filter(Boolean).map(k=>{
+    const r=rarBy(k),m=bestMatch({set:code,rarity:k,qty:1},c);
+    /* Where the number came from matters here in a way it does not in the
+       grid: this is the figure you are about to quote at a table, and the
+       two shops disagree often enough that "which one" is part of it. */
+    const src=!m?'no listing in this rarity'
+      :(m.only?m.shop:m.shop+' · '+m.otherShop+' '+peso(m.other));
+    return `<span class="t-row"><i class="cap-r ${r.f}">${esc(r.k)}</i>`+
+      `<span class="t-n">${esc(r.n)}</span>`+
+      (m?`<span class="t-px">${esc(peso(m.peso))}</span>`
+        :`<span class="t-px none">—</span>`)+
+      `<span class="t-src">${esc(src)}</span></span>`;
+  }).join('');
+}
+function showRtip(chip){
+  if(!RTIP){RTIP=el('div');RTIP.id='rtip';document.body.appendChild(RTIP);}
+  const html=rtipRows(chip); if(!html)return;
+  RTIP.innerHTML=html; RTIP.hidden=false; RTIP_FOR=chip;
+  /* measured with its content in place, then kept inside the viewport: the
+     chips sit at the very edge of the leftmost and rightmost cards */
+  const b=chip.getBoundingClientRect(),r=RTIP.getBoundingClientRect();
+  const x=Math.max(6,Math.min(b.left+b.width/2-r.width/2,innerWidth-r.width-6));
+  const above=b.top-r.height-8;
+  RTIP.style.left=Math.round(x)+'px';
+  RTIP.style.top=Math.round(above<6?b.bottom+8:above)+'px';
+  /* A reflow rather than a frame callback: it commits the start state now, so
+     the fade runs on the tap that asked for it instead of the one after, and
+     it still works where rAF is throttled to nothing. */
+  void RTIP.offsetHeight;
+  RTIP.classList.add('on');
+}
+function hideRtip(){
+  if(!RTIP)return;
+  RTIP.classList.remove('on');RTIP.hidden=true;RTIP_FOR=null;
+}
+document.addEventListener('pointerover',e=>{
+  if(e.pointerType&&e.pointerType!=='mouse')return;   /* touch taps instead */
+  const chip=rtipChip(e.target);
+  if(chip){if(chip!==RTIP_FOR)showRtip(chip);}
+  else if(RTIP_FOR)hideRtip();
+});
+/* Capture, so the chip is answered before the pocket underneath it opens the
+   card. In select mode it is not answered at all: there the whole card is one
+   target and stealing a corner of it would only lose taps.               */
+document.addEventListener('click',e=>{
+  const chip=SELMODE?null:rtipChip(e.target);
+  if(chip){
+    e.preventDefault();e.stopPropagation();
+    if(chip===RTIP_FOR)hideRtip();else showRtip(chip);
+    return;
+  }
+  if(RTIP_FOR)hideRtip();
+},true);
+/* the chip it is pinned to moves or goes away */
+addEventListener('scroll',()=>{if(RTIP_FOR)hideRtip();},true);
+addEventListener('resize',()=>{if(RTIP_FOR)hideRtip();});
 function paintPager(page,pages){
   $('#jump').value=page+1;
   $('#of').textContent='/ '+pages.toLocaleString();
@@ -15722,9 +15849,18 @@ function linkSetRarity(setSel,rarSel,card,o){
     const rars=printRars(card,wantSet);
     setSel.innerHTML=(anySet?'<option value="">'+esc(anySet)+'</option>':'')
       +sets.map(s=>'<option value="'+esc(s)+'">'+esc(setLabel(s))+'</option>').join('');
+    /* The price belongs on the option, not after the choice. Picking a rarity
+       was picking blind - the number only appeared once the copy had been
+       added and the grid repainted - and what one printing is worth against
+       another is the whole reason there is a choice to make. Cheapest shop
+       that carries it, the same way every other figure in the app is asked. */
+    const rarPx=k=>{
+      const m=card?bestMatch({set:wantSet||'',rarity:k,qty:1},card):null;
+      return m&&isFinite(m.peso)?'  ·  '+peso(m.peso):'';
+    };
     rarSel.innerHTML=(anyRar?'<option value="">'+esc(anyRar)+'</option>':'')
       +RARITIES.filter(r=>rars.includes(r.k))
-        .map(r=>'<option value="'+esc(r.k)+'">'+esc(r.n)+'</option>').join('');
+        .map(r=>'<option value="'+esc(r.k)+'">'+esc(r.n+rarPx(r.k))+'</option>').join('');
     /* put the choices back, falling to the first still-valid one */
     setSel.value = sets.includes(wantSet) ? wantSet : (anySet?'':(sets[0]||''));
     rarSel.value = rars.includes(wantRar) ? wantRar : (anyRar?'':(rars[0]||''));
