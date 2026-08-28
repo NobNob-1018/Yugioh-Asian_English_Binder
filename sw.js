@@ -7,7 +7,7 @@
    which is what makes a 1.6 MB file open instantly - and a fresh copy is
    fetched in the background for next time. So an update lands silently on the
    next open rather than making you wait for it on this one.              */
-const VERSION='ygo-binder-v14';
+const VERSION='ygo-binder-v15';
 const SHELL=VERSION+'-shell';
 const IMGS=VERSION+'-img';
 const DATA=VERSION+'-data';

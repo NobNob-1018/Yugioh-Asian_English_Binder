@@ -4,9 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Asian-English Binder — OCG Collection</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- No stylesheet link here, and that is deliberate. Nunito was dropped from
+     the type tokens a while ago - the note beside --mono says why - but the
+     three tags that fetched it stayed: two preconnects and a render-blocking
+     stylesheet on an origin this app otherwise never touches.
+
+     A render-blocking cross-origin stylesheet is the worst thing you can put
+     in front of a phone on a bad connection. Nothing paints until DNS, TLS,
+     request and response have all completed against a host that is not the
+     one serving the page - and with no signal at all it paints nothing until
+     that request times out, in an app whose whole point is working offline.
+     For a font no rule referenced. -->
 <meta name="color-scheme" content="dark">
 <style>
 /* ============================================================
@@ -3875,13 +3883,16 @@ function paintPager(page,pages){
    them once they arrive, so fetching the next page's art during the pause
    you are already taking turns the next tap into a cache hit.
 
-   Idle work only, and never on a connection that cannot spare it: on Data
-   Saver or 2G this does nothing at all, because there the request you did
-   not ask for is the one competing with the one you did.               */
+   Idle work only, and never on a connection that cannot spare it, because
+   there the request you did not ask for is the one competing with the one
+   you did. That now includes 3G: a screenful is around sixteen thumbnails
+   and a third of a megabyte, which is most of a minute on a real 3G link
+   and is spent before you have said you want the next page. Turning a page
+   there costs the same either way; NOT turning one should cost nothing. */
 let WARMED=new Set();
 function warmNext(list,page,per){
   const link=navigator.connection||{};
-  if(link.saveData===true||/^(slow-)?2g$/.test(link.effectiveType||''))return;
+  if(link.saveData===true||/^(slow-)?[23]g$/.test(link.effectiveType||''))return;
   const run=()=>{
     const next=list.slice((page+1)*per,(page+2)*per);
     for(const c of next){
@@ -5376,7 +5387,7 @@ function salePageHTML(){
  --hi:rgba(255,255,255,.65);--sl:rgba(255,255,255,.55);--sl2:rgba(120,130,150,.10);
  --veil:rgba(30,33,40,.42);--onac:#FFF}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 "Nunito",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
 select{font:inherit}
 header{position:sticky;top:0;z-index:20;padding:12px 18px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
@@ -15539,10 +15550,40 @@ function pxRowsFor(name){
 /* The name field is an index into AE_NAMES, or a string for the handful of
    printings whose spelling is not in the catalogue. Both are unfolded here,
    so everything downstream still sees a plain name.                      */
+/* ---- a name is a name; a rarity is not part of it ----
+   Fifteen rows in the price feed carry the rarity inside the card's name -
+   "Sky Striker Ace - Raye (QCSR)", "Invocation (P-N)", "Lock Bird (ScR)" -
+   because that is how the shop distinguishes an alternate printing on its own
+   page. Downstream that name matches nothing in either catalogue, so each one
+   became a whole phantom card sitting beside the real one with a single
+   price: "Sky Striker Ace — Zero" twice in the grid, one of them empty.
+
+   Only a KNOWN rarity is stripped. Plenty of real cards end in a bracket that
+   is part of the name - "Token (card)", "Concours de Cuisine (Culinary
+   Confrontation)" - and stripping those would merge cards that differ. */
+const RAR_TAG=new Set(['p-n','n','ser','alternate art','alt art']);
+function stripRarTag(name){
+  const m=/^(.*[^\s(])\s*\(([^)]{1,14})\)\s*$/.exec(String(name||''));
+  if(!m)return name;
+  const tag=m[2].toLowerCase();
+  const known=RAR_TAG.has(tag)||RARITIES.some(r=>r.k.toLowerCase()===tag);
+  return known?m[1]:name;
+}
+/* Wiki markup that survived the scrape. {{=}} is MediaWiki's escape for a
+   literal '=' inside a template call, and it reached the binder verbatim as
+   "Sky Striker Ace {{=}} Zero" - a second copy of a card already there. */
+function cleanName(s){
+  s=String(s||'');
+  if(!/[{[/]/.test(s))return s;             /* the overwhelming majority */
+  return s.replace(/\{\{=\}\}/g,'=')
+    .replace(/\s*\/\/description::\s*/g,' ')
+    .replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g,'$1')
+    .replace(/\s+/g,' ').trim();
+}
 function expandBaked(groups){
   const out=[];
   groups.forEach(([code,n,rs])=>{
-    const name=typeof n==='number'?(AE_NAMES[n]||''):n;
+    const name=stripRarTag(cleanName(typeof n==='number'?(AE_NAMES[n]||''):n));
     rs.forEach(([rar,price,av])=>out.push([code,price,name,rar,'',av==null?1:av]));
   });
   return out;
@@ -17077,10 +17118,19 @@ function refilterPool(){
      owning one at all, so stand in a minimal card, the name and the set, which
      is all the catalogue knows. No art and no text.                       */
   const known=new Set(POOL.map(c=>nameKey(c.name)));
+  /* The same names again with punctuation thrown away. This loop only ever
+     checked the exact key, so any catalogue spelling that differed from the
+     database by a bracket or a hash - "Sky Striker Ace {{=}} Zero" against
+     "Sky Striker Ace = Zero", "Hi-Speedroid Glider 2" against "#2" - was
+     taken for a card nobody had and stood in beside the real one. The
+     shop-only loop below has always compared both keys; this one did not. */
+  const knownLoose=new Set(POOL.map(c=>looseKey(c.name)));
   twinIndex();
   cat.forEach(k=>{
     if(known.has(k))return;
-    const nm=AE_NAME_BY_KEY.get(k); if(!nm)return;
+    const nm=cleanName(AE_NAME_BY_KEY.get(k)); if(!nm)return;
+    if(knownLoose.has(looseKey(nm)))return;
+    known.add(nameKey(nm)); knownLoose.add(looseKey(nm));
     const x=extraFor(nm);
     /* the harvest's own image first, then the fuller-named twin */
     const tw=x&&xImg(x[1])?null:artTwin(nm);
