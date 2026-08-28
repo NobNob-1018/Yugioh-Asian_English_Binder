@@ -25,3 +25,7 @@ tcgc-prices.json
 
 # impeccable scratch - decision-page payloads, regenerated per run
 .impeccable/
+
+# harvest intermediates - rebuilt by the Tools/ scripts
+pc-prices.json
+_baketest.html

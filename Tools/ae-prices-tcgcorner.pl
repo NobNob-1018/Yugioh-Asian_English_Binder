@@ -77,7 +77,13 @@ for my $page (1 .. 60) {
     my $price = $v->{price};
     $price = defined $price ? $price + 0 : 0;
     unless ($price > 0) { $skipped++; next }
-    push @rows, [ $t->{code}, $price, $t->{name}, $t->{rar}, $t->{cond} ];
+    # Stock, not just price. The app's rule is that an in-stock listing beats
+    # a cheaper one you cannot actually buy, and it could not apply that rule
+    # to Asian-English because this harvest never recorded availability.
+    # Shopify says so per variant; absent means assume it is buyable rather
+    # than quietly demote a shop that simply did not answer.
+    my $av = exists $v->{available} ? ($v->{available} ? 1 : 0) : 1;
+    push @rows, [ $t->{code}, $price, $t->{name}, $t->{rar}, $t->{cond}, $av ];
   }
   printf "%d products, %d priced so far\n", scalar @$products, scalar @rows;
   last if @$products < 250;

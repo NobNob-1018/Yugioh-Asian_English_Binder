@@ -30,9 +30,32 @@ All three produce the same file:
   "rows": [ ["ES02-AE005", 1765.13, "Droll & Lock Bird", "UL", ""] ] }
 ```
 
-`rows` are `[code, price, name, rarity, condition]`. Condition is `""` for a
-clean copy, or a letter for played/damaged stock — that distinction matters,
-because a `(Status B)` listing can be a third of the clean price.
+`rows` are `[code, price, name, rarity, condition, available]`. Condition is
+`""` for a clean copy, or a letter for played/damaged stock — that distinction
+matters, because a `(Status B)` listing can be a third of the clean price.
+`available` is `1` when the shop says it is in stock; the app prefers an
+in-stock listing over a cheaper one it cannot buy, and could not apply that
+rule to Asian-English until the harvest started recording it.
+
+### The second shop
+
+```bash
+perl Tools/pc-prices-playersclub.pl
+```
+
+Writes `pc-prices.json` from Players Club HK, in the same shape minus the
+condition column: `[code, rarity, price, name, available]`. Section 9 has
+described this endpoint since the shop was added, but the harvester itself was
+never written and its rows were produced by hand — which is why the
+Asian-English side could not be refreshed without a person.
+
+Neither harvester maps a rarity. Both pass the shop's own tag through
+untouched, because `ourRar()` in the app already owns every spelling both
+shops use and a second mapping would be a second thing to keep in step. This
+is also why the tag is read by *position* — the last bracket on the line — and
+not by length: capping it at five letters silently dropped `(Overframe)` and
+left it glued to the card name, so the card vanished from the binder entirely
+rather than merely arriving without a rarity.
 
 ## 2. Load it back
 
@@ -46,9 +69,37 @@ Prices → **Import .json**.
 > key. Re-enable only once both emit from `PX_ROWS` and `pricesAsCode()` also
 > writes `BAKED_CUR`.
 
-To hardwire a new list until then, use the browser scraper in step 1 and paste
-its `rows` over the `BAKED_PRICES` array between the `BAKED_PRICES_START` /
-`BAKED_PRICES_END` markers near the top of the HTML.
+**Or bake it, the way OCG-JP always could:**
+
+```bash
+perl Tools/ae-prices-tcgcorner.pl     # -> tcgc-prices.json
+perl Tools/pc-prices-playersclub.pl   # -> pc-prices.json
+perl Tools/ae-bake.pl                 # -> rewrites index.html
+```
+
+`ae-bake.pl` writes both shops between their existing markers —
+`BAKED_PRICES_START` / `_END` and `PC_PRICES_START` / `_END` — refreshing
+`BAKED_STAMP`, `BAKED_CUR`, `PC_STAMP` and `PC_CUR` as it goes. The OCG-JP
+side has had `jp-bake.pl` since it was added; this is its counterpart, and it
+is why the hand-paste below is no longer the only route.
+
+Two things it deliberately does not do:
+
+- **It does not collapse duplicate rows.** A shop really does list the same
+  printing twice. An earlier draft kept one row per code+rarity and lost 43
+  printings the file already held; `indexPrices()` already chooses between
+  them at runtime, in stock over cheaper, so choosing here would mean choosing
+  twice by two different rules.
+- **It does not re-encode.** The file is read and written as characters, not
+  bytes, and encoded exactly once. Mixing the two is what corrupted the
+  em-dash in `<title>` on an earlier bake.
+
+Verify a bake by re-baking a copy and comparing: 7,022 TCG Corner printings
+and 3,699 Players Club rows must survive unchanged, and `<title>` must still
+read `Asian-English Binder — OCG Collection` with a real em-dash.
+
+To hardwire a list by hand instead, use the browser scraper in step 1 and
+paste its `rows` over the `BAKED_PRICES` array between the markers.
 
 ## 3. Test the matching
 
