@@ -204,7 +204,11 @@ button{cursor:pointer;background:none;border:none}
 /* ---------- layout ---------- */
 /* The column itself is animated, so the binder widens into the space as the
    sidebar gives it up rather than both snapping to their new size.        */
-.shell{max-width:var(--shell-max);margin:0 auto;padding:var(--sp-2) var(--sp-4) var(--sp-5);display:grid;
+/* The bottom padding was --sp-5, a full 24px of nothing under a panel that
+   already has its own. The sheet cannot use it - at most widths the card is
+   limited by the ROW, so extra height only sits there - but the eye reads it
+   as the binder stopping short of the window. */
+.shell{max-width:var(--shell-max);margin:0 auto;padding:var(--sp-2) var(--sp-4) var(--sp-4);display:grid;
   grid-template-columns:210px minmax(0,1fr);gap:16px;align-items:start;
   transition:grid-template-columns .26s ease}
 /* folded sidebar: the binder takes the whole width and the cards grow into it */
@@ -17831,6 +17835,7 @@ function openTransfer(){
         'later edit; one deleted anywhere stays deleted. Safe to press on either device, '+
         'in any order.</p>'+
         '<div class="tf-row"><button class="btn btn-sm btn-a" id="gh-sync">Sync now</button>'+
+        '<button class="btn btn-sm ghost" id="gh-relink">Find my binder again</button>'+
         '<button class="btn btn-sm ghost" id="gh-forget">Forget this token</button></div>'+
         '<label class="switch" style="margin-top:10px">'+
         '<input type="checkbox" id="gh-auto"'+(PREFS.autoSync?' checked':'')+'>'+
@@ -17899,6 +17904,14 @@ function openTransfer(){
     PREFS.autoSync=auto.checked;savePrefs();
     if(auto.checked){AUTO_FAIL=0;autoSyncWire();setMsg('On. It will keep itself in step.');}
     else setMsg('Off. Sync when you press the button.');
+  };
+  /* Keeps the token, drops the pointer - so the next sync searches the
+     account again instead of going back to whichever gist this device made
+     before the search existed. */
+  const relink=body.querySelector('#gh-relink');
+  if(relink)relink.onclick=()=>{
+    delete PREFS.gistId;savePrefs();
+    setMsg('Forgotten. Press Sync now and it will look for the binder your other device is using.');
   };
   const forget=body.querySelector('#gh-forget');
   if(forget)forget.onclick=()=>{
@@ -18127,6 +18140,9 @@ function syncPayload(){
    leaked one can do is read and write gists. It is never put in a URL, never
    logged, and shown back only as its last four characters. */
 const GH_API='https://api.github.com';
+/* How a device recognises the binder its other device made. Both halves are
+   checked - a description someone edited by hand still leaves the filenames. */
+const GIST_DESC='Yu-Gi-Oh Binder — collection sync';
 const gistFile=()=>'ygo-binder-'+REGION+'.json';
 const ghTok=()=>PREFS.ghTok||'';
 function ghHeaders(){
@@ -18147,8 +18163,46 @@ async function syncBinder(onLog){
   const say=onLog||(()=>{});
   if(!ghTok())throw new Error('No token yet.');
   const body=()=>{const f={};f[gistFile()]=({content:JSON.stringify(syncPayload())});
-    return JSON.stringify({description:'Yu-Gi-Oh Binder — collection sync',public:false,files:f});};
+    return JSON.stringify({description:GIST_DESC,public:false,files:f});};
   let id=PREFS.gistId||'';
+  /* ---- find the binder before making another one ----
+     The gist's id is a device pref, so a second device has the token and no
+     id - and this went straight to "make a private gist". Two devices, two
+     gists, each faithfully syncing with itself and neither ever seeing the
+     other. Which is exactly what it looked like: a token entered on both, and
+     nothing crossing between them.
+
+     So a device with no id asks the account what is already there. The
+     description is ours and the filenames are ours, so either identifies it.
+     A gist is only created when the account genuinely has none. */
+  if(!id){
+    say('Looking for a binder already there…');
+    let list=[];
+    try{ list=await ghCall('/gists?per_page=100'); }catch(e){ list=null; }
+    if(list===null)throw new Error(
+      'That token cannot list your gists, so it cannot find the binder your '+
+      'other device made. Give it gist access and try again.');
+    const mine=(list||[]).filter(g=>g&&(g.description===GIST_DESC||
+      (g.files&&(g.files['ygo-binder-ae.json']||g.files['ygo-binder-ocg.json']))));
+    /* More than one, because every device used to make its own before this
+       was fixed. Prefer the one that already holds THIS region's binder, and
+       between two of those the one written most recently - which is the one
+       still being used. */
+    mine.sort((a,b)=>{
+      const has=g=>g.files&&g.files[gistFile()]?1:0;
+      return has(b)-has(a)||
+        String(b.updated_at||'').localeCompare(String(a.updated_at||''));
+    });
+    const hit=mine[0];
+    if(hit){
+      PREFS.gistId=id=hit.id;savePrefs();
+      say(mine.length>1
+        ? 'Found '+mine.length+' binders on this account and took the one most '+
+          'recently written. If that is the wrong one, delete the spares at '+
+          'gist.github.com and sync again.'
+        : 'Found the one your other device made.');
+    }
+  }
   if(!id){
     say('Making a private gist…');
     const made=await ghCall('/gists',{method:'POST',body:body()});

@@ -33,3 +33,7 @@ _baketest.html
 # OCG-JP bake intermediate, rebuilt by Tools/jp-bake.pl
 jp_blocks.json
 _jptest.html
+
+# local rollback copies, not part of the app
+backup-index-*.html
+backup-sw-*.js
