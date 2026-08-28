@@ -3125,6 +3125,11 @@ const CARD_ASPECT=1.458;        /* measured off a rendered pocket */
 const CARD_MIN_W=108;           /* below this the art stops being readable */
 const CARD_MAX_W=250;           /* above this a page holds too little to scan */
 const CARD_TARGET_N=12;         /* cards in the window at once, without scrolling */
+/* How much of the row the sheet has to cover. Nine tenths lets the sheet give
+   up a sliver to land on a bigger card - the one pixel that decides between
+   eight columns at 152px and nine at 135px - without ever leaving a margin
+   wide enough to read as a gap. */
+const SHEET_FILL_MIN=0.90;
 const CARD_MAX_ROWS=4;          /* past four the captions outweigh the pictures */
 function fitLayout(target){
   const want=Math.max(1,target||CARD_TARGET_N);
@@ -3173,21 +3178,24 @@ function fitLayout(target){
   const below=host?Math.max(8,host.getBoundingClientRect().bottom-gr.bottom):16;
   const avail=window.innerHeight-(gr.top+(window.scrollY||0))-below;
   if(avail<120)return null;
-  /* ---- the count is the count; the SHEET gives way, not the card count ----
-     The previous version treated the number as a floor and spent any spare
-     room on extra columns. On a short wide window that turned a page of
-     twelve into twenty cards at 135px, with the set code clipped to "RO..."
-     and the price wrapped onto a second line. It fitted, and it was worse
-     than the problem: nobody asked for more cards, they asked for the ones
-     they had chosen to be visible.
+  /* ---- three things at once: full width, no scrolling, big cards ----
+     Two earlier rules each got one of these and lost another. Treating the
+     number as a floor and spending spare room on columns filled the width and
+     shrank the cards to 135px with the set code clipped to "RO..."; holding
+     the number exactly gave 152px cards in a 972px sheet inside 1308px of
+     space, a quarter of the row empty. Neither is what a binder page looks
+     like.
 
-     So the count is held exactly and the sheet is what gives. A card has to
-     satisfy both budgets - the height left in the window and the width of
-     its column - and it takes the smaller of the two. Where the height is
-     the binding one, the sheet is narrower than the space it sits in and
-     centres, which is the one option the earlier versions never considered:
-     twelve cards at 152px in a 972px sheet, rather than twenty at 135px
-     filling every pixel of 1308. A binder page has margins. */
+     All three are available at once, and the thing that was missing is that
+     the answer can sit ONE COLUMN either side of what each rule picked. At
+     1600x790 eight columns want a 153px card and the height allows 152 - a
+     single pixel short, so the width-filling rule stepped to nine columns and
+     135px. Let the sheet give up that one pixel and eight columns fit at
+     152px across 1300px of a 1308px row: bigger cards AND a full row.
+
+     So: the card is as large as both budgets allow, the sheet must still
+     cover most of the row it is given, and the page holds at least the number
+     asked for. Among everything satisfying those, the biggest card wins. */
   /* There is exactly one readability test - whether the card that comes out
      rounds to CARD_MIN_W or better - and it is applied per shape below. An
      earlier column cap computed the same idea a second way, with a floor
@@ -3197,16 +3205,25 @@ function fitLayout(target){
      then fell to the overflow branch on a window that could hold them. */
   let best=null;
   for(let rows=1;rows<=CARD_MAX_ROWS;rows++){
-    let cols=Math.ceil(want/rows);
-    /* Facing pages draws a spine down the middle of the sheet, so the two
-       leaves have to hold the same number of cards. An odd column count puts
-       that spine through a card rather than between two. */
-    if(spreadOn()&&cols%2)cols++;
     const byH=((avail-gap*(rows-1))/rows-capH)/CARD_ASPECT;
-    const byW=(W-gap*(cols-1))/cols;
-    const w=Math.min(byH,byW,CARD_MAX_W);
-    if(Math.round(w)<CARD_MIN_W)continue; /* no readable card in this shape */
-    if(!best||w>best.w)best={c:cols,r:rows,w};
+    if(byH<CARD_MIN_W)break;              /* more rows only makes this worse */
+    for(let cols=1;cols<=64;cols++){
+      /* Facing pages draws a spine down the middle of the sheet, so the two
+         leaves have to hold the same number of cards. An odd column count
+         puts that spine through a card rather than between two. */
+      if(spreadOn()&&cols%2)continue;
+      const byW=(W-gap*(cols-1))/cols;
+      if(Math.round(byW)<CARD_MIN_W)break; /* more columns only get narrower */
+      const w=Math.min(byH,byW,CARD_MAX_W);
+      if(Math.round(w)<CARD_MIN_W)break;
+      const n=rows*cols;
+      if(n<want)continue;                  /* fewer than was asked for */
+      /* How much of the row the sheet covers. Below this it stops reading as
+         a page and starts reading as a page with a chunk missing. */
+      const fill=(cols*w+gap*(cols-1))/W;
+      if(fill<SHEET_FILL_MIN)continue;
+      if(!best||w>best.w||(w===best.w&&n>best.n))best={c:cols,r:rows,n,w};
+    }
   }
   /* Nothing holds the count at a readable size - a very short or very narrow
      window. Rather than quietly change the number, take the shape that comes
@@ -15546,6 +15563,10 @@ function shopLinks(c){
 
 const KEY_PRICES='ygo-binder-tcgc-v1';
 let PX={},PX_PREV={},PX_DATE='',PX_NAME={},PX_LOOSE={},PX_META={},PX_ROWS=[],PX_SRC='',PX_CUR='USD';
+/* Shop spellings already filed under the real card's name. refilterPool runs
+   on every region switch and filter change; without this the same rows would
+   be concatenated onto the real card again each time. Cleared with PX. */
+let PX_ALIASED=new Set();
 /* Set by readCode when an incoming binder was valued against a different
    price set than this device holds. */
 let PX_MISMATCH=null;
@@ -15659,6 +15680,7 @@ function ourRar(t,name){
 function indexPrices(rows){
   PX_BY_CODE=null;
   PX={};PX_NAME={};PX_LOOSE={};PX_META={};PX_ROWS=[];PX_KEY={};
+  PX_ALIASED=new Set();NEAR_MEMO=new Map();
   rows.forEach(([code,price,name,rar,cond,av])=>{
     const c=cond||'';
     const our=ourRar(rar,name);
@@ -17141,6 +17163,63 @@ function twinIndex(){
     if(lk&&!TWIN_BY_KEY.has(lk))TWIN_BY_KEY.set(lk,c); });
   TWIN_KEYS=[...TWIN_BY_KEY.keys()].sort();
 }
+/* ---- a shop that misspells a card by one letter ----
+   "Crystron Tristalos" against the database's "Crystron Tristaros", and
+   "Eleskeletas" against "Eleskeletus" - the l/r and a/u that Japanese-to-
+   English romanisation produces every time. The shop's spelling is in
+   neither catalogue, so it was standing in a whole phantom card beside the
+   real one: two entries, one picture, one price, and no way to tell from the
+   search results which was which.
+
+   An audit of all 5,028 names turned up fourteen pairs one character apart.
+   Twelve are genuinely different cards - Silent Swordsman LV3 and LV5,
+   B.E.S. Big Core MK-2 and MK-3, Mahunder and Pahunder, Linguriboh and
+   Linkuriboh - and merging any of them would be a real error, so the test
+   has to be narrow enough to leave them alone.
+
+   Two things make it narrow. Only a name the card database has never heard
+   of is a candidate at all, which excludes every real-to-real pair outright.
+   And only letters count: LV3/LV5 and MK-2/MK-3 differ by a DIGIT, which is
+   how this game distinguishes a card from its own sequel, so a digit is
+   never treated as a typo. */
+let NEAR_MEMO=new Map();
+function nearTwin(name,realByKey){
+  const s=String(name||'').toLowerCase();
+  if(s.length<6)return null;                 /* too short to be sure */
+  /* Forty shop names, each sweeping every letter position against the whole
+     catalogue, cost 55ms - and refilterPool runs on every region switch and
+     every filter change, not once. The answer only moves when the price data
+     does, so it is kept until PX is rebuilt. */
+  if(NEAR_MEMO.has(s))return NEAR_MEMO.get(s);
+  const found=nearTwinScan(s,realByKey);
+  NEAR_MEMO.set(s,found);
+  return found;
+}
+function nearTwinScan(s,realByKey){
+  const AZ='abcdefghijklmnopqrstuvwxyz';
+  const look=v=>{const c=realByKey.get(nameKey(v));return c||null;};
+  for(let i=0;i<s.length;i++){
+    const ch=s[i];
+    if(/[0-9]/.test(ch))continue;            /* a digit is never a typo */
+    /* one letter swapped for another - the l/r and a/u case */
+    for(const r of AZ){
+      if(r===ch)continue;
+      const hit=look(s.slice(0,i)+r+s.slice(i+1));
+      if(hit)return hit;
+    }
+    /* one letter dropped */
+    if(/[a-z]/.test(ch)){
+      const hit=look(s.slice(0,i)+s.slice(i+1));
+      if(hit)return hit;
+    }
+  }
+  /* one letter added */
+  for(let i=0;i<=s.length;i++)for(const r of AZ){
+    const hit=look(s.slice(0,i)+r+s.slice(i));
+    if(hit)return hit;
+  }
+  return null;
+}
 function artTwin(name){
   if(!TWIN_KEYS)return null;
   const p=looseKey(name);
@@ -17204,12 +17283,31 @@ function refilterPool(){
   if(!ocgOn()){
     const have=new Set(POOL.map(c=>nameKey(c.name)));
     const haveLoose=new Set(POOL.map(c=>looseKey(c.name)));
+    /* the real cards, to test a shop's spelling against */
+    const realByKey=new Map();
+    POOL.forEach(c=>{if(!c.stub)realByKey.set(nameKey(c.name),c);});
     Object.keys(PX_NAME).forEach(k=>{
       if(have.has(k))return;
       const row=(PX_NAME[k]||[])[0];
       if(!row||!row.name)return;
       const lk=looseKey(row.name);
       if(haveLoose.has(lk))return;
+      /* One letter out from a card the database DOES know: the shop has
+         misspelled it, so its rows are filed under the real card's name and
+         no phantom is created. Doing it here rather than in the matcher
+         keeps the fuzziness confined to names the database has never seen -
+         it can never reach across two real cards. */
+      const near=nearTwin(row.name,realByKey);
+      if(near){
+        const rk=nameKey(near.name),rlk=looseKey(near.name);
+        if(!PX_ALIASED.has(k)){
+          PX_ALIASED.add(k);
+          PX_NAME[rk]=(PX_NAME[rk]||[]).concat(PX_NAME[k]);
+          if(rlk)PX_LOOSE[rlk]=(PX_LOOSE[rlk]||[]).concat(PX_NAME[k]);
+        }
+        have.add(k); haveLoose.add(lk);
+        return;
+      }
       have.add(k); haveLoose.add(lk);
       const tw=artTwin(row.name);
       POOL.push({id:'ae-'+k,name:row.name,
