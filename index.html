@@ -3141,11 +3141,16 @@ const CARD_ASPECT=1.458;        /* measured off a rendered pocket */
 const CARD_MIN_W=108;           /* below this the art stops being readable */
 const CARD_MAX_W=250;           /* above this a page holds too little to scan */
 const CARD_TARGET_N=12;         /* cards in the window at once, without scrolling */
-/* How much of the row the sheet has to cover. Nine tenths lets the sheet give
-   up a sliver to land on a bigger card - the one pixel that decides between
-   eight columns at 152px and nine at 135px - without ever leaving a margin
-   wide enough to read as a gap. */
-const SHEET_FILL_MIN=0.90;
+/* How much of the row the sheet has to cover.
+   Nine tenths was too generous. It let a shape win on card size while leaving
+   156px of the row empty - a 201px card in a 1266px sheet inside 1422px of
+   space - and a binder page with a margin down each side reads as though the
+   window is the wrong size, whatever the cards measure. Nineteen twentieths
+   still allows the sliver that decides between eight columns and nine, and
+   refuses the gap you can see: the same window now answers seven across at
+   189px filling the row end to end. Cards give up a few pixels; the page
+   stops looking like it shrank. */
+const SHEET_FILL_MIN=0.95;
 const CARD_MAX_ROWS=4;          /* past four the captions outweigh the pictures */
 function fitLayout(target){
   const want=Math.max(1,target||CARD_TARGET_N);
