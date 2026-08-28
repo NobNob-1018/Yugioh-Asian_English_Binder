@@ -1611,7 +1611,6 @@ body.selmode .filt-fab{display:none}
    of queries sit under the box so the second lookup is one tap, not one
    retype - and they are the app's only history, so they are labelled as
    such rather than pretending to be suggestions.                       */
-@media (max-width:820px){.rec-i{min-height:44px}}
 
 /* ---- the dashboard is one headline and a list of movements ----
    Two columns, not four tiles: the value you came for, and what changed
@@ -4188,10 +4187,16 @@ function renderBinder(dir){
      again here, synchronously, is one extra measurement in the same frame
      and it cannot be raced. Once only - the second answer is computed from
      a settled page and there is nothing for a third to learn. */
-  if(!FITTING){
+  if(!FITTING&&SETTLE<3){
     FITTING=true;
-    try{ if(autoLayout(true)){ FITTING=false; renderBinder(dir); return; } }
+    let again=false;
+    /* what the shape SHOULD be now the dashboard has painted, and then what
+       actually landed - the second is the only measurement that cannot be
+       wrong about itself. Bounded, so a disagreement between them cannot
+       become a loop. */
+    try{ again=autoLayout(true)||fitVerify(); }
     finally{ FITTING=false; }
+    if(again){ SETTLE++; renderBinder(dir); SETTLE--; return; }
   }
 }
 function renderList(grid,list,dk,bn){
@@ -4652,20 +4657,13 @@ function paintDash(){
   const big=d.querySelector('.big');
   if(big)rollTo(big,'headline:'+F.binder,val,peso);
   paintTopTools();
-  /* The dashboard's height is what is left over for the grid, and this is the
-     one place it changes - a mover chip appearing, the status line wrapping.
-     Re-fit after it paints, on the next frame so the new height is real.
-     Guarded, because paintDash is called from renderBinder. */
-  if(!FITTING)requestAnimationFrame(()=>{
-    FITTING=true;
-    try{
-      if(autoLayout(true))renderBinder();
-      /* and then against what actually landed, which is the only measurement
-         that cannot be wrong about itself */
-      for(let i=0;i<4&&fitVerify();i++)renderBinder();
-    } finally { FITTING=false; }
-  });}
-let FITTING=false;
+  /* The re-fit that used to live here, on a frame callback, is gone: it did
+     the same job as the settle at the end of renderBinder and did it less
+     reliably - it needed a repaint, an uncontested guard and a settled
+     dashboard, and at 1600x778 it simply never ran. One mechanism, in the
+     place that cannot be raced. */
+}
+let FITTING=false,SETTLE=0;
 /* The sidebar folds away so the cards get the full width. Remembered in the
    collection file, so it stays how you left it next time.                  */
 /* keep the bar's controls in step, and hide them on the tile boards where a
