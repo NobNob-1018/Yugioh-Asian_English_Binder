@@ -105,7 +105,7 @@
   --cap:22px;
   /* binder inset; the toolbar pulls itself out by exactly this much */
   --bpad-x:12px;
-  --bpad-t:10px;
+  --bpad-t:6px;
   --bpad-b:12px;
   /* How wide the app is allowed to get. 1680 was set when the sheet was six
      across and a wider one only stretched whitespace. At eight across the
@@ -154,7 +154,7 @@ button{cursor:pointer;background:none;border:none}
 .top{position:sticky;top:0;z-index:40;backdrop-filter:blur(8px);
   background:linear-gradient(180deg,var(--top-a),var(--top-b));
   border-bottom:1px solid var(--line);padding:0 var(--sp-4);box-shadow:var(--sh-1)}
-.top-in{max-width:var(--shell-max);margin:0 auto;height:54px;display:flex;align-items:center;gap:16px}
+.top-in{max-width:var(--shell-max);margin:0 auto;height:46px;display:flex;align-items:center;gap:16px}
 .hdr-sep{width:1px;height:22px;background:var(--line);flex:none}
 /* The region switch sits where the wordmark's subtitle used to, because that
    is the one place on the page that never scrolls away.                   */
@@ -204,7 +204,7 @@ button{cursor:pointer;background:none;border:none}
 /* ---------- layout ---------- */
 /* The column itself is animated, so the binder widens into the space as the
    sidebar gives it up rather than both snapping to their new size.        */
-.shell{max-width:var(--shell-max);margin:0 auto;padding:var(--sp-4) var(--sp-4) var(--sp-5);display:grid;
+.shell{max-width:var(--shell-max);margin:0 auto;padding:var(--sp-2) var(--sp-4) var(--sp-5);display:grid;
   grid-template-columns:210px minmax(0,1fr);gap:16px;align-items:start;
   transition:grid-template-columns .26s ease}
 /* folded sidebar: the binder takes the whole width and the cards grow into it */
@@ -421,8 +421,8 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 /* Binder toolbar. Runs the full width of the binder's inner edge and is set off
    by a hairline rather than a floating pill, so it reads as part of the page. */
 .bar{display:flex;align-items:center;gap:8px 14px;min-height:26px;flex-wrap:wrap;
-  margin:calc(-1 * var(--bpad-t)) calc(-1 * var(--bpad-x)) 12px calc(-1 * var(--bpad-x));
-  padding:9px var(--bpad-x) 9px var(--bpad-x);
+  margin:calc(-1 * var(--bpad-t)) calc(-1 * var(--bpad-x)) 8px calc(-1 * var(--bpad-x));
+  padding:6px var(--bpad-x) 6px var(--bpad-x);
   border-bottom:1px solid var(--line-soft);
   border-radius:var(--r) var(--r) 0 0}
 .bar .tabs{margin-left:4px}
@@ -438,7 +438,7 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 /* --- portfolio dashboard --- */
 .dash{
   border:1px solid var(--line);border-radius:var(--r);background:var(--surface);
-  padding:var(--sp-4) var(--sp-5);margin-bottom:var(--sp-4);box-shadow:var(--sh-1);
+  padding:var(--sp-2) var(--sp-5);margin-bottom:var(--sp-2);box-shadow:var(--sh-1);
   display:grid;grid-template-columns:minmax(190px,auto) repeat(auto-fit,minmax(84px,auto));
   gap:var(--sp-4) var(--sp-6);align-items:end;
 }
@@ -1626,11 +1626,28 @@ body.selmode .filt-fab{display:none}
 .dash-head .cap{flex:0 0 100%;margin-bottom:-2px}
 .dash-head .delta{font-family:var(--mono);font-size:var(--fs-xs)}
 .dash-head .sub2{font-family:var(--mono);font-size:var(--fs-3xs);color:var(--faint)}
-.dash-moves{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2) var(--sp-3);
+.dash-moves{display:flex;align-items:center;flex-wrap:wrap;gap:6px var(--sp-3);
   flex:1 1 320px;min-width:0;border-left:1px solid var(--line-soft);padding-left:var(--sp-5)}
 .dash-moves .cap{flex:0 0 auto}
 /* the movers run along the strip as chips rather than down a column */
-.mv-list{display:flex;flex-wrap:wrap;gap:6px;min-width:0;flex:1 1 auto}
+/* ---- the movers are one strip, and they stay one strip ----
+   Four chips wrapped onto a second line below about 1700px, and that second
+   line cost the dashboard 29px, which came straight off the sheet: at 1600
+   the grid started 66px lower and the cards had to shrink from 153 to 125 to
+   keep the second row. A strip that changes height depending on how many
+   cards moved and how long their names are makes the whole page below it
+   move, which is the wrong thing to spend height on.
+
+   One line. If the chips do not fit they slide, and the strip's height is
+   the same whether there is one mover or six. */
+/* heading left, freshness right, one line */
+.mv-top{display:flex;align-items:baseline;gap:var(--sp-3);flex:1 1 100%;min-width:0}
+.mv-top .cap{flex:0 0 auto}
+.mv-top .sync-line{margin-left:auto;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mv-list{display:flex;flex-wrap:nowrap;gap:6px;min-width:0;flex:1 1 auto;
+  overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+.mv-list::-webkit-scrollbar{display:none}
+.mv-list>*{flex:0 0 auto}
 /* a mover is a chip on the strip: name, then how far it went */
 .mv-row{display:inline-flex;align-items:center;gap:7px;max-width:230px;
   padding:3px 8px;border:1px solid var(--line);text-align:left;
@@ -4152,6 +4169,26 @@ function renderBinder(dir){
   if(saleBtn)saleBtn.hidden=!(binderValue('b-sell')>0);
 
   paintBinders();
+
+  /* ---- settle the sheet before handing the frame over ----
+     autoLayout runs at the TOP of this function, against a dashboard that
+     has not been repainted yet. By the time we get here it has - a movers
+     row has appeared or gone, the status line has wrapped - and the space
+     left for the cards is a different number than the one the layout was
+     built from.
+
+     There was a frame callback doing this, and it was not reliable: it
+     depended on a repaint happening, on nothing else having claimed the
+     guard, and on the dashboard having settled by the time it ran. It left
+     the sheet a row short with the page scrolling underneath it. Asking
+     again here, synchronously, is one extra measurement in the same frame
+     and it cannot be raced. Once only - the second answer is computed from
+     a settled page and there is nothing for a third to learn. */
+  if(!FITTING){
+    FITTING=true;
+    try{ if(autoLayout(true)){ FITTING=false; renderBinder(dir); return; } }
+    finally{ FITTING=false; }
+  }
 }
 function renderList(grid,list,dk,bn){
   const per=24,pages=Math.max(1,Math.ceil(list.length/per));
@@ -4594,10 +4631,15 @@ function paintDash(){
       <div class="sub2">${esc(dashSub(selling,keep,sell,rsv))}</div>
     </div>
     <div class="dash-moves">
-      <div class="cap">Since last session${movers().length?` <span class="mv-more">${movers().length} moved</span>`:''}</div>
+      <!-- The heading and the freshness line are both small grey metadata
+           and each had a row of its own, which cost the sheet 31px of the
+           height it lays cards out in. They share one. -->
+      <div class="mv-top">
+        <div class="cap">Since last session${movers().length?` <span class="mv-more">${movers().length} moved</span>`:''}</div>
+        <div class="sync-line" title="Everything that comes over the network">${esc(syncStatus())}</div>
+      </div>
       <div class="mv-list">${moveRows}</div>
       ${footer}
-      <div class="sync-line" title="Everything that comes over the network">${esc(syncStatus())}</div>
     </div>
 `;
   d.querySelectorAll('.mv-row').forEach(b=>{
