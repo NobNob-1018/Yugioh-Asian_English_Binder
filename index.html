@@ -1575,6 +1575,10 @@ html.sp-on{overflow:hidden}
 .mv-empty{margin:0;font-size:var(--fs-xs);color:var(--faint)}
 .mv-foot{font-size:var(--fs-3xs);color:var(--muted);font-family:var(--mono);
   flex:0 0 auto;margin-left:auto;white-space:nowrap}
+/* what is current and what is not, in one place, because two of the three
+   things that come over the network used to be entirely invisible */
+.sync-line{flex:1 1 100%;font-family:var(--mono);font-size:var(--fs-3xs);
+  color:var(--faint);border-top:1px solid var(--line-soft);padding-top:5px;margin-top:2px}
 /* On a phone the dashboard is one line and nothing else. The mover chips and
    the SRP footnote are a desk-sized nicety; here they cost 90px of a screen
    that has to show cards, so the count carries the whole story and the
@@ -2772,13 +2776,44 @@ function gridFor(w){
   if(spreadOn()&&g.c%2)g.c+=1;
   return g;
 }
+/* ---- how many rows actually fit ----
+   gridFor picks rows from the window's WIDTH, which cannot know how much
+   height is left after the header, dashboard and toolbar have taken theirs.
+   At 1280x720 it asked for two rows of six, which is 884px of cards in 720px
+   of window, so the bottom row sat below the fold and the page scrolled.
+
+   A card is 1.458 times as tall as it is wide - measured, not assumed - so
+   once the column count is known the row count is arithmetic. Returns null
+   when it cannot measure yet, and the width-based guess stands.         */
+function rowsThatFit(cols){
+  const g=document.getElementById('page');
+  if(!g||!cols)return null;
+  const gr=g.getBoundingClientRect();
+  const width=gr.width;
+  if(width<40)return null;
+  const gap=parseFloat(getComputedStyle(g).rowGap||getComputedStyle(g).gap)||12;
+  const colW=(width-gap*(cols-1))/cols;
+  if(colW<20)return null;
+  /* the caption under each card is part of the row's height */
+  const p=g.querySelector('.pocket');
+  const cardH=p?p.getBoundingClientRect().height:(colW*1.458+26);
+  if(cardH<20)return null;
+  const top=gr.top+(window.scrollY||0);
+  const avail=window.innerHeight-top-16;
+  return Math.max(1,Math.floor((avail+gap)/(cardH+gap)));
+}
 function autoLayout(keepFirst){
-  fitPage();                    /* the sheet is sized against real chrome */
   const g=gridFor(document.documentElement.clientWidth);
   /* a chosen page size keeps the column count the window asked for and just
      stacks however many rows it takes to hold that many cards               */
   const want=+DB.per||0;
-  const r=want?Math.max(1,Math.ceil(want/g.c)):g.r;
+  let r=want?Math.max(1,Math.ceil(want/g.c)):g.r;
+  if(!want){
+    /* Only when the size is automatic. Choosing a page size by hand is an
+       instruction, and an instruction outranks a fit. */
+    const fit=rowsThatFit(g.c);
+    if(fit)r=fit;
+  }
   if(g.c===LAYOUT.c&&r===LAYOUT.r)return false;
   applyLayout(g.c,r,keepFirst);
   return true;
@@ -3694,8 +3729,9 @@ function paintTopTools(){
     '">\u21bb</button>';
   /* The pill used to open a panel that held another Sync button. It syncs now;
      the small caret beside it is what opens the panel.                      */
+  /* The tooltip now covers all three, because the button now syncs all three */
   if(pxb)pxb.innerHTML='<button class="btn btn-sm pxpill '+(pxFresh()?'fresh':'stale')+
-    '" id="px-sync" title="'+esc(pxTitle())+'"><i class="dot"></i>Sync</button>'+
+    '" id="px-sync" title="'+esc(syncStatus()+' — tap to sync all three')+'"><i class="dot"></i>Sync</button>'+
     '<button class="btn btn-sm pxmore" id="px-panel" aria-label="Price options" title="Price options">\u25be</button>';
   const fxi=$('#fx');
   if(fxi)fxi.onchange=()=>{DB.fx=Math.max(1,+fxi.value||58);DB.fxManual=true;save();paintTopTools();renderBinder();};
@@ -3707,7 +3743,7 @@ function paintTopTools(){
     paintTopTools();
   };
   const ps=$('#px-sync');
-  if(ps)ps.onclick=e=>refreshPrices(e.currentTarget);
+  if(ps)ps.onclick=e=>syncAll(e.currentTarget);
   const pp=$('#px-panel');
   if(pp)pp.onclick=pricePanel;
 }
@@ -3787,6 +3823,7 @@ function paintDash(){
       <div class="cap">Since last session${movers().length?` <span class="mv-more">${movers().length} moved</span>`:''}</div>
       <div class="mv-list">${moveRows}</div>
       ${M.n&&M.srp>0?`<div class="mv-foot">Asking ${esc(peso(M.ask))} against ${esc(peso(M.srp))} ${esc(shopName())} \u2014 <b class="${(M.ask-M.srp)/M.srp*100<-0.5?'up':((M.ask-M.srp)/M.srp*100>0.5?'down':'flat')}">${((M.ask-M.srp)/M.srp*100)>0?'+':''}${Math.round((M.ask-M.srp)/M.srp*100)}%</b></div>`:''}
+      <div class="sync-line" title="Everything that comes over the network">${esc(syncStatus())}</div>
     </div>
 `;
   d.querySelectorAll('.mv-row').forEach(b=>{
@@ -3794,7 +3831,16 @@ function paintDash(){
   });
   const big=d.querySelector('.big');
   if(big)rollTo(big,'headline:'+F.binder,val,peso);
-  paintTopTools();}
+  paintTopTools();
+  /* The dashboard's height is what is left over for the grid, and this is the
+     one place it changes - a mover chip appearing, the status line wrapping.
+     Re-fit after it paints, on the next frame so the new height is real.
+     Guarded, because paintDash is called from renderBinder. */
+  if(!FITTING)requestAnimationFrame(()=>{
+    FITTING=true;
+    try{ if(autoLayout(true))renderBinder(); } finally { FITTING=false; }
+  });}
+let FITTING=false;
 /* The sidebar folds away so the cards get the full width. Remembered in the
    collection file, so it stays how you left it next time.                  */
 /* keep the bar's controls in step, and hide them on the tile boards where a
@@ -14848,6 +14894,56 @@ const pxTitle=()=>{
   return PX_ROWS.length.toLocaleString()+' prices · '+(PX_SRC||'baked in')+' · '+
     (!isFinite(a)?'no date':a===0?'updated today':a===1?'1 day old':a+' days old')+
     ' · tap to sync';};
+
+/* ---- one sync ----
+   Three things arrive over the network - the card pool, the shop's prices and
+   the exchange rate - and until now each kept its own schedule and its own
+   silence. The pool refetched on every boot and never said so, the rate
+   refreshed twice a day and never said so, and only prices had a button. You
+   could not tell what was current because two thirds of it was invisible.
+
+   One button, one answer. They are independent of each other, so they run
+   together rather than in a queue, and the slowest one sets the wait.    */
+const ago=t=>{
+  if(!t)return 'never';
+  const m=Math.floor((Date.now()-t)/60000);
+  if(m<1)return 'just now';
+  if(m<60)return m+'m ago';
+  const h=Math.floor(m/60); if(h<24)return h+'h ago';
+  const d=Math.floor(h/24); return d===1?'yesterday':d+'d ago';
+};
+/* What is fresh and what is not, in one line. */
+function syncStatus(){
+  const a=pxAgeDays();
+  return [
+    'Cards '+ago(POOL_AT),
+    'Prices '+(!PX_ROWS.length?'none':!isFinite(a)?'no date':a===0?'today':a===1?'yesterday':a+'d ago'),
+    'Rate '+(DB.fxManual?'yours':ago(DB.fxAt))
+  ].join(' · ');
+}
+let SYNCING=false;
+async function syncAll(btn){
+  if(SYNCING)return;
+  SYNCING=true;
+  const label=btn?btn.textContent:null;
+  const say=t=>{if(btn)btn.textContent=t;};
+  say('Syncing…');
+  /* Prices report their own progress into the button, so they own the label
+     while they run; the other two are quiet and quick by comparison. */
+  const results=await Promise.allSettled([
+    loadPool(true),
+    refreshPrices(btn),
+    refreshRate(true)
+  ]);
+  const [pool,px,fx]=results.map(r=>r.status==='fulfilled'?r.value:false);
+  SYNCING=false;
+  if(btn&&label)btn.textContent='Sync';
+  paintTopTools();paintDash();renderBinder();
+  const done=[pool&&'cards',px!==false&&'prices',fx&&'rate'].filter(Boolean);
+  toast(done.length
+    ? 'Synced '+done.join(', ')+' — '+syncStatus()
+    : 'Nothing could be reached — you are offline, and the app is running on what it already had');
+}
 /* Shopify serves prices in the shop's own currency, which for this store is
    pesos. Guess from the numbers, but let it be corrected by hand.          */
 function guessCurrency(rows){
@@ -16386,9 +16482,48 @@ function refilterPool(){
   POOL.sort((a,b)=>a.name.localeCompare(b.name));
   POOL_BY_ID=null;DATA_V++;     /* the index and the caches fall with the pool */
 }
-async function loadPool(){
+/* ---- the card pool, kept ----
+   This used to fetch 23.64 MB from the card database on every single boot -
+   fifty times the size of the whole app - keep 5,028 of the 14,521 cards it
+   returned, and store none of it. A cache miss on a shop's wifi meant
+   downloading all of it again, and a first run with no signal could not open
+   the app at all.
+
+   Trimmed to the fields anything actually reads, the same pool is 6.39 MB,
+   and it only needs fetching when it has gone stale. Seven days: new sets
+   arrive weekly at most, and Sync forces it whenever you want.          */
+const KEY_POOL='ygo-binder-pool-v1';
+const POOL_MAX_AGE=7*24*3600*1000;
+let POOL_AT=0;
+const packPool=arr=>arr.map(c=>{const m=c.mon||{};
+  return [c.id,c.name,c.type,c.desc,c.archetype,c.img,c.imgFull,
+          m.attribute||'',m.level==null?'':m.level,m.race||'',
+          m.atk==null?'':m.atk,m.def==null?'':m.def,c.usd||0,c.ocg||''];});
+const unpackPool=rows=>rows.map(r=>({
+  id:r[0],name:r[1],type:r[2],desc:r[3],archetype:r[4],img:r[5],imgFull:r[6],
+  usd:r[12]||0,ocg:r[13]||'',
+  mon:{attribute:r[7]||'',level:r[8]===''?null:+r[8],race:r[9]||'',
+       atk:r[10]===''?null:+r[10],def:r[11]===''?null:+r[11]}}));
+
+async function loadPool(force){
   const slot=$('#load-slot');
-  slot.innerHTML='<span class="loading"><i></i>loading pool</span>';
+  /* The cache first, always. A stale pool beats no pool: it renders at once
+     and any refresh happens behind a usable app rather than in front of an
+     empty one. */
+  if(!force){
+    try{
+      const c=await Store.get(KEY_POOL);
+      if(c&&c.rows&&c.rows.length){
+        POOL_ALL=unpackPool(c.rows);
+        POOL_AT=c.t||0;
+        refilterPool();
+        poolReady=true;slot.innerHTML='';
+        renderBinder();
+        if(Date.now()-POOL_AT<POOL_MAX_AGE)return true;
+      }
+    }catch(e){}
+  }
+  slot.innerHTML='<span class="loading"><i></i>'+(poolReady?'updating cards':'loading pool')+'</span>';
   try{
     const r=await fetch(API+'?misc=yes');
     if(!r.ok)throw 0;
@@ -16402,14 +16537,22 @@ async function loadPool(){
        by hand stays regardless, and if no price list loaded we keep everything
        rather than show an empty binder.                                       */
     POOL_ALL=raw.map(normalise);
+    POOL_AT=Date.now();
     refilterPool();
     poolReady=true;slot.innerHTML='';
     snapshot();save();renderBinder();cacheNames();
+    try{ await Store.set({t:POOL_AT,rows:packPool(POOL_ALL)},KEY_POOL); }catch(e){}
+    return true;
   }catch(e){
+    /* A failed refresh over a cached pool is not a failure worth shouting
+       about - the app is already working. It only reads as an error when
+       there was nothing to fall back on. */
+    if(poolReady){slot.innerHTML='';return false;}
     poolReady=false;
     slot.innerHTML='<span class="loading" style="color:var(--danger)">pool did not load</span> <button class="btn btn-sm" id="pool-retry">Retry</button>';
-    const rb=document.getElementById('pool-retry');if(rb)rb.onclick=loadPool;
+    const rb=document.getElementById('pool-retry');if(rb)rb.onclick=()=>loadPool(true);
     renderBinder();
+    return false;
   }
 }
 
@@ -16813,24 +16956,20 @@ function paintClearBtn(){
   const b=$('#f-clear-hdr'),sb=$('#f-text');
   if(b&&sb)b.hidden=!sb.value;
 }
-/* ---- the binder fills what is actually left ----
-   --page-h was a hard-coded "100dvh - 176px", a guess at how tall the chrome
-   above the grid would be. The chrome has changed repeatedly since - the
-   dashboard shrank, the toolbar went from three rows to one - and the guess
-   was never re-measured, so the sheet was sized against a height that no
-   longer existed and its bottom row fell past the fold.
+/* ---- keep the binder inside the window ----
+   An earlier attempt at this wrote a --page-h custom property. Nothing reads
+   it: the grid's height comes from its row count, not from a height rule, so
+   that fix changed nothing and the measurement that seemed to confirm it was
+   a coincidence of the window size at the time.
 
-   Measured, not guessed: whatever sits above the grid, the grid gets the
-   rest. Re-run on resize and after any render that can change the chrome. */
-function fitPage(){
-  const g=document.getElementById('page'); if(!g)return;
-  if(document.body.classList.contains('bm'))return;   /* binder mode owns its own */
-  const top=g.getBoundingClientRect().top+(window.scrollY||0);
-  const avail=Math.max(320,Math.round(window.innerHeight-top-28));
-  document.documentElement.style.setProperty('--page-h',avail+'px');
-}
+   The row count is the lever, so autoLayout is what re-runs. Debounced,
+   because a resize fires continuously and relaying the sheet is not free. */
 let fitT=null;
-const fitSoon=()=>{clearTimeout(fitT);fitT=setTimeout(fitPage,60);};
+function fitPage(){
+  if(document.body.classList.contains('bm'))return;   /* binder mode owns its own */
+  if(autoLayout(true))renderBinder();
+}
+const fitSoon=()=>{clearTimeout(fitT);fitT=setTimeout(fitPage,90);};
 window.addEventListener('resize',fitSoon);
 
 /* ---- a lighter app on a phone ----
@@ -17369,9 +17508,13 @@ syncCategory();
   /* the address bar wins over the default view, so a shared link opens where
      it points rather than at the binder                                  */
   if((location.hash||'').length>1)await readUrl(); else renderBinder();
+  /* Boot reads the cache and nothing else. The pool comes from storage and
+     only reaches for the network when it is more than a week old; prices and
+     the rate are left to the Sync button, which now does all three at once.
+     Opening the app used to cost 23.64 MB and a price crawl nobody asked
+     for - and in a shop, on bad signal, that is the moment it matters. */
   loadPool();
-  if(PX_SRC==='synced'&&PX_DATE!==new Date().toISOString().slice(0,10))setTimeout(()=>refreshPrices(null),1500);
-  refreshRate(false);        /* quietly tops up the exchange rate; no-op offline */
+  refreshRate(false);        /* one small call, throttled to twice a day */
   /* ---- first run ----
      An empty binder with no explanation is the worst possible first screen:
      every control is live but nothing on the page says what the app is for
