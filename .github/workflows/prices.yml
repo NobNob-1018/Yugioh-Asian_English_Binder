@@ -124,8 +124,19 @@ jobs:
           perl Tools/jp-prices-yuyutei.pl
           perl Tools/jp-catalogue-yugipedia.pl
 
+      # jp-bake.pl stops at /tmp/jp_blocks.json and always has - the four
+      # blocks were pasted into index.html by hand. Without jp-write.pl this
+      # job would harvest all four scripts and then change nothing at all.
       - name: Bake OCG-JP
         run: perl Tools/jp-bake.pl
+
+      # Says what it would change and writes nothing, so the log carries the
+      # numbers even when the write is refused.
+      - name: Check the blocks
+        run: perl Tools/jp-write.pl --dry-run
+
+      - name: Write OCG-JP into index.html
+        run: perl Tools/jp-write.pl
 
       - name: Verify the result
         run: perl Tools/verify-harvest.pl --baked

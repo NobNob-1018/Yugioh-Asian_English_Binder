@@ -29,3 +29,7 @@ tcgc-prices.json
 # harvest intermediates - rebuilt by the Tools/ scripts
 pc-prices.json
 _baketest.html
+
+# OCG-JP bake intermediate, rebuilt by Tools/jp-bake.pl
+jp_blocks.json
+_jptest.html

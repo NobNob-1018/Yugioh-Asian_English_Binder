@@ -1379,7 +1379,7 @@ body{font-variant-numeric:tabular-nums}
     visibility:visible;pointer-events:auto;
     transition:transform var(--slow) var(--ease),visibility 0s}
   /* a grab bar, and a heading that names what the sheet is */
-  .shell>.rail::before{content:'Filters';position:sticky;top:0;z-index:2;
+  .shell>.rail::before{content:'Menu';position:sticky;top:0;z-index:2;
     display:block;padding:var(--sp-4) 0 var(--sp-3);background:var(--surface);
     border-bottom:1px solid var(--line-soft);margin-bottom:var(--sp-3);
     font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
@@ -1437,6 +1437,7 @@ body.selmode .pocket{cursor:copy}
 body.selmode .filt-fab{display:none}
 
 /* ---- a count you do not have to read ---- */
+.badge[hidden]{display:none}   /* display:inline-flex would otherwise win */
 .badge{display:inline-flex;align-items:center;justify-content:center;
   min-width:18px;height:18px;padding:0 5px;margin-left:auto;
   font-family:var(--mono);font-size:var(--fs-3xs);font-variant-numeric:tabular-nums;
@@ -1615,19 +1616,22 @@ html.sp-on{overflow:hidden}
    things that come over the network used to be entirely invisible */
 .sync-line{flex:1 1 100%;font-family:var(--mono);font-size:var(--fs-3xs);
   color:var(--faint);border-top:1px solid var(--line-soft);padding-top:5px;margin-top:2px}
-/* On a phone the dashboard is one line and nothing else. The mover chips and
-   the SRP footnote are a desk-sized nicety; here they cost 90px of a screen
-   that has to show cards, so the count carries the whole story and the
-   movers are one tap away in the list itself. */
+/* On a phone the dashboard is the number and nothing else.
+   What it is worth is the one thing worth a headline standing in a shop. The
+   change since last session, what is kept against what is listed, the movers
+   and the SRP footnote are all desk-sized reading, and here they cost 90px of
+   a screen that has to show cards. The freshness line stays: a price you
+   cannot date is a price you cannot trust. */
 @media (max-width:759px){
-  .dash{padding:var(--sp-2) var(--sp-3);gap:var(--sp-1) var(--sp-3)}
-  .dash .big{font-size:var(--fs-xl)}
-  .dash-head{flex:1 1 100%;align-items:baseline}
+  .dash{padding:var(--sp-2) var(--sp-3);gap:2px var(--sp-3)}
+  .dash .big{font-size:var(--fs-xl);line-height:1.1}
+  .dash-head{flex:1 1 100%;align-items:baseline;gap:var(--sp-2)}
   .dash-head .cap{flex:0 0 auto;margin-bottom:0}
-  .dash-head .sub2{flex:1 1 100%}
-  .dash-moves{border-left:none;padding-left:0;flex:1 1 100%;gap:6px}
-  .dash-moves .mv-list,.dash-moves .mv-foot{display:none}
-  .mv-empty{font-size:var(--fs-3xs)}
+  .dash-head .delta,.dash-head .sub2{display:none}
+  .dash-moves{border-left:none;padding-left:0;flex:1 1 100%;gap:0}
+  .dash-moves .cap,.dash-moves .mv-list,
+  .dash-moves .mv-foot,.dash-moves .mv-empty{display:none}
+  .sync-line{border-top:none;padding-top:0;margin-top:0}
 }
 
 /* ---- search in the header ----
@@ -1922,9 +1926,14 @@ provenance
     </div>
   </div>
   <div class="sheet-veil" id="sheet-veil" hidden></div>
-  <button class="filt-fab" id="filt-fab" type="button" aria-expanded="false" aria-controls="rail">
-    <svg viewBox="0 0 16 16" aria-hidden="true" width="15" height="15"><rect x="1.5" y="3" width="13" height="1.6" fill="currentColor"/><rect x="4" y="7.2" width="8" height="1.6" fill="currentColor"/><rect x="6.5" y="11.4" width="3" height="1.6" fill="currentColor"/></svg>
-    Filters<span class="badge" id="filt-count" hidden>0</span>
+  <!-- Called Filters, and it was not: sorting and rarity sit in the toolbar
+       above the cards, the piles and Show owned sit beside them, and what is
+       actually behind this button is Deals, the trade calculator, Paste a
+       list, Settings and the key. A control named after something it does
+       not contain is worse than one with no name at all. -->
+  <button class="filt-fab" id="filt-fab" type="button" aria-expanded="false" aria-controls="rail" aria-label="Menu">
+    <svg viewBox="0 0 16 16" aria-hidden="true" width="16" height="16"><rect x="2" y="3.2" width="12" height="1.7" fill="currentColor"/><rect x="2" y="7.15" width="12" height="1.7" fill="currentColor"/><rect x="2" y="11.1" width="12" height="1.7" fill="currentColor"/></svg>
+    Menu<span class="badge" id="filt-count" hidden>0</span>
   </button>
   <aside class="rail" id="rail">
     <section class="grp">
@@ -17233,10 +17242,17 @@ function activeFilters(){
   ['cat','sub','attr','race','lvl','scale','rar'].forEach(k=>{if(F[k]!==''&&F[k]!=null)n++;});
   return n;
 }
+/* The badge counted active filters, which belonged on a button called
+   Filters. On a menu it would count something the menu does not hold, so it
+   counts what is in there and worth noticing: deals waiting on you. Nothing
+   else in that sheet has a state you need told about. */
 function paintFiltCount(){
   const b=$('#filt-count'); if(!b)return;
-  const n=activeFilters();
+  let n=0;
+  try{ n=dealsPending().length; }catch(e){}
   b.textContent=n; b.hidden=!n;
+  const f=$('#filt-fab');
+  if(f)f.setAttribute('aria-label',n?('Menu, '+n+' deal'+(n===1?'':'s')+' waiting'):'Menu');
 }
 function openSheet(on){
   const r=document.documentElement;

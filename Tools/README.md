@@ -398,10 +398,43 @@ names — about 340 KB raw, 100 KB gzipped.
 
 ### Re-harvesting
 
-`jp-sets.pl` lists the prefixes and dates, `jp-prices-yuyutei.pl` walks Yuyu-tei,
-`jp-catalogue-yugipedia.pl` walks Yugipedia, and `jp-bake.pl` writes the two tables. Sanity
-check afterwards: every priced code should be one the catalogue knows —
-orphans mean a parser drifted.
+```bash
+perl Tools/jp-sets.pl                 # prefixes and dates -> /tmp/jp_sets.tsv
+perl Tools/jp-prices-yuyutei.pl       # walks Yuyu-tei     -> /tmp/yt_rows.tsv
+perl Tools/jp-catalogue-yugipedia.pl  # walks Yugipedia    -> /tmp/jp_cat.json
+perl Tools/jp-bake.pl                 # builds the blocks  -> /tmp/jp_blocks.json
+perl Tools/jp-write.pl --dry-run      # what would change, writes nothing
+perl Tools/jp-write.pl                # rewrites index.html
+```
+
+`jp-bake.pl` stops at `/tmp/jp_blocks.json` and always has; the four blocks
+were then pasted into `index.html` by hand, which is why OCG-JP could not be
+refreshed without a person. `jp-write.pl` is the missing step.
+
+**These are HTML scrapes, not JSON endpoints.** A layout change does not raise
+an error — it quietly returns less. So `jp-write.pl` checks shape before it
+writes anything, and a failure writes nothing:
+
+- **Floors** — 380 catalogue sets, 18,000 priced rows, 200 priced sets, 2,000
+  extra names. Yuyu-tei carries 257 of the 454 sets, not all of them; a first
+  guess of 300 for that floor failed on perfectly good data, which is what a
+  floor set by hope rather than measurement always does.
+- **A drop of more than 15%** against what is already in `index.html`.
+- **The rarity ladder is exactly 19.** A scrape that suddenly knows a
+  different number has found a page it does not understand.
+- **Price lines still look like `PRE|num,rarIdx,yen,qty`**, and no more than a
+  fifth of rows may be zero yen and zero stock — both selectors breaking at
+  once produces well-formed rows full of nothing.
+- **Orphans**: every priced code should be one the catalogue knows. This check
+  was described here in prose for a long time; it is enforced now.
+- **A backtick or `${` in scraped text is refused outright** — either would
+  end the template literal early and turn the rest of the file into syntax
+  errors.
+
+Verified by damaging the blocks in each of those ways: all seven are refused
+and `index.html` is left untouched. On good data all four blocks round-trip
+identically and the rewritten file boots, switches to OCG-JP and indexes
+22,164 priced codes.
 
 ### One code, several set-list pages
 
