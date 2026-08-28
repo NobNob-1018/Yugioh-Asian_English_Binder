@@ -1278,6 +1278,42 @@ body{font-variant-numeric:tabular-nums}
 ::-webkit-scrollbar-thumb{border-radius:0;background:var(--scroll);border:2px solid var(--bg)}
 :focus-visible{outline:2px solid var(--text);outline-offset:2px;border-radius:0}
 
+/* ---- on a phone the values sit on the card ----
+   Under a 110px-wide card, a rarity chip, a set code and a price competing
+   for one 22px line is unreadable - and it costs the card the height that
+   would have made the art legible in the first place. Overlaid on the art
+   they get the card's full width, the art keeps its full height, and the
+   scrim only covers the bottom eighth of the picture, which is border.
+
+   Only below the desktop breakpoint. On a desktop there is room for a
+   caption and it reads better underneath.                               */
+@media (max-width:919px){
+  .slot{position:relative;gap:0}
+  .slot>.cap-row{position:absolute;left:0;right:0;bottom:0;z-index:4;
+    height:auto;min-height:0;padding:16px 5px 4px;gap:4px;
+    background:linear-gradient(to top,rgba(0,0,0,.9) 0,rgba(0,0,0,.72) 52%,transparent 100%);
+    pointer-events:none;border-radius:0 0 var(--r-sm) var(--r-sm)}
+  /* white on the scrim, not the page's ink - this sits on artwork now */
+  .slot>.cap-row .cap-s,.slot>.cap-row .cap-p,.slot>.cap-row .cap-ea,
+  .slot>.cap-row .cap-srp,.slot>.cap-row .cap-more{color:#FFFFFF}
+  .slot>.cap-row .cap-srp,.slot>.cap-row .cap-ea{opacity:.72}
+  .slot>.cap-row .cap-p{font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  .slot>.cap-row .cap-s{text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  /* the price is the thing you came for, so it gets its own line under the
+     rarity and code rather than fighting them for width */
+  .slot>.cap-row{flex-wrap:wrap;justify-content:flex-start}
+  .slot>.cap-row .cap-id{flex:1 1 100%;gap:4px}
+  .slot>.cap-row .cap-v{flex:1 1 100%;justify-content:flex-start;gap:5px}
+  /* an empty pocket has no art to sit on */
+  .pocket-empty+.cap-row{background:none}
+  /* the owned badge would collide with the scrim's top edge */
+  .pocket .qty,.pocket .add{z-index:5}
+}
+@media (max-width:560px){
+  .slot>.cap-row{font-size:var(--fs-3xs);padding:14px 4px 3px}
+  .slot>.cap-row .cap-r{font-size:9px;padding:0 4px}
+}
+
 /* ---- one navigation block on a phone ----
    The controls were spread down the page: view tabs in one place, pile tabs
    in another, sort and display in a third, the pager in a fourth. Grouped,
@@ -3332,6 +3368,34 @@ function paintPager(page,pages){
   $('#prev').disabled=page===0;
   $('#next').disabled=page>=pages-1;
 }
+/* ---- warm the next page while you are reading this one ----
+   Turning a page meant waiting on a screenful of thumbnails, every time,
+   because nothing was fetched until it was needed. The service worker keeps
+   them once they arrive, so fetching the next page's art during the pause
+   you are already taking turns the next tap into a cache hit.
+
+   Idle work only, and never on a connection that cannot spare it: on Data
+   Saver or 2G this does nothing at all, because there the request you did
+   not ask for is the one competing with the one you did.               */
+let WARMED=new Set();
+function warmNext(list,page,per){
+  const link=navigator.connection||{};
+  if(link.saveData===true||/^(slow-)?2g$/.test(link.effectiveType||''))return;
+  const run=()=>{
+    const next=list.slice((page+1)*per,(page+2)*per);
+    for(const c of next){
+      if(!c||!c.img||WARMED.has(c.img))continue;
+      WARMED.add(c.img);
+      const i=new Image();
+      i.decoding='async';
+      i.fetchPriority='low';
+      i.src=c.img;
+    }
+    if(WARMED.size>4000)WARMED=new Set();   /* the SW is the real cache */
+  };
+  if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:2000});
+  else setTimeout(run,600);
+}
 function renderBinder(dir){
   /* Settle the grid before measuring anything. autoLayout only sets the CSS
      variables and PER, so this cannot recurse, and it means the sheet is right
@@ -3377,6 +3441,7 @@ function renderBinder(dir){
   paintSlots(grid,slice,bn,selling);
 
   paintPager(page,pages);
+  warmNext(list,page,PER);
   /* One heading, not a heading plus a chip repeating it. When you are inside a
      set, core or deck the heading turns accent and grows its own way out. */
   const tag=$('#page-tag');

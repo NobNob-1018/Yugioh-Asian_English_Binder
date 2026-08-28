@@ -7,11 +7,20 @@
    which is what makes a 1.6 MB file open instantly - and a fresh copy is
    fetched in the background for next time. So an update lands silently on the
    next open rather than making you wait for it on this one.              */
-const VERSION='ygo-binder-v4';
+const VERSION='ygo-binder-v5';
 const SHELL=VERSION+'-shell';
 const IMGS=VERSION+'-img';
 const DATA=VERSION+'-data';
-const IMG_CAP=600;          /* card art is small but endless; keep a window */
+/* Card art is small but endless, so the cache keeps a window rather than
+   everything. 600 was that window when the pool was smaller; against 5,028
+   Asian-English cards it is about eight pages, so paging back and forth
+   evicted art you had already downloaded and fetched it again - which is
+   most of what "slow on mobile" was.
+
+   A cards_small thumbnail runs 15-25 KB, so 2,400 of them is roughly 50 MB:
+   large enough to hold everything you actually browse, small enough that no
+   browser will evict the whole origin over it. */
+const IMG_CAP=2400;
 
 self.addEventListener('install',e=>{
   e.waitUntil((async()=>{
