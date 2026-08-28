@@ -16493,8 +16493,18 @@ function refilterPool(){
    and it only needs fetching when it has gone stale. Seven days: new sets
    arrive weekly at most, and Sync forces it whenever you want.          */
 const KEY_POOL='ygo-binder-pool-v1';
-const POOL_MAX_AGE=7*24*3600*1000;
 let POOL_AT=0;
+/* ---- monthly, by the calendar ----
+   Sets arrive on a monthly cadence, so the pool is stale when the month has
+   turned, not when some rolling number of days has elapsed. A rolling window
+   gets this wrong in both directions: synced on the 28th and refetched on
+   the 4th for nothing, or synced on the 2nd and still serving last month's
+   catalogue on the 30th when a set has already dropped.
+
+   Comparing year-and-month means one refresh per month, on the first launch
+   after it turns, whenever that happens to be.                          */
+const monthOf=t=>{const d=new Date(t||0);return d.getFullYear()*12+d.getMonth();};
+const poolStale=()=>!POOL_AT||monthOf(POOL_AT)!==monthOf(Date.now());
 const packPool=arr=>arr.map(c=>{const m=c.mon||{};
   return [c.id,c.name,c.type,c.desc,c.archetype,c.img,c.imgFull,
           m.attribute||'',m.level==null?'':m.level,m.race||'',
@@ -16519,13 +16529,29 @@ async function loadPool(force){
         refilterPool();
         poolReady=true;slot.innerHTML='';
         renderBinder();
-        if(Date.now()-POOL_AT<POOL_MAX_AGE)return true;
+        if(!poolStale())return true;
       }
     }catch(e){}
   }
+  /* ---- do not spend a slow connection on a background refresh ----
+     The monthly refresh is a nicety; having the app open is not. On a metered
+     or 2G connection, or with Data Saver on, an automatic refresh is skipped
+     and the cached pool stands until you ask for it by hand. A forced sync
+     always runs - that is you deciding it is worth the wait.            */
+  const link=navigator.connection||{};
+  const crawling=link.saveData===true||/^(slow-)?2g$/.test(link.effectiveType||'');
+  if(!force&&poolReady&&crawling){slot.innerHTML='';return false;}
+
   slot.innerHTML='<span class="loading"><i></i>'+(poolReady?'updating cards':'loading pool')+'</span>';
   try{
-    const r=await fetch(API+'?misc=yes');
+    /* A fetch with no ceiling can hang for minutes on a bad connection and
+       the spinner never resolves. Two minutes, then fall back to what is
+       already cached. */
+    const ac=('AbortController' in window)?new AbortController():null;
+    const timer=ac?setTimeout(()=>ac.abort(),120000):null;
+    let r;
+    try{ r=await fetch(API+'?misc=yes',ac?{signal:ac.signal}:undefined); }
+    finally{ if(timer)clearTimeout(timer); }
     if(!r.ok)throw 0;
     const j=await r.json();
     /* Prices load before the pool, so the shop's list is already available to
