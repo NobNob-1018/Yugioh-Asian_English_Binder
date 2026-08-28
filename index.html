@@ -443,15 +443,9 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .delta.up{color:var(--up);background:rgba(79,191,139,.12);border-color:rgba(79,191,139,.30)}
 .delta.down{color:var(--down);background:rgba(224,115,106,.12);border-color:rgba(224,115,106,.30)}
 .delta.flat{color:var(--faint);background:var(--surface-2);border-color:var(--line-soft)}
-.dash .cell{min-width:0}
-.dash .cell b{font-family:var(--mono);font-size:var(--fs-2xl);font-weight:600;display:block;
   line-height:1.15;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .dash .sub2{font-family:var(--mono);font-size:var(--fs-2xs);color:var(--faint);margin-top:4px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dash .cell b.up{color:var(--up)}
-.dash .cell b.down{color:var(--down)}
-.dash .cell b.flat,.dash .cell b.muted{color:var(--faint)}
-.dash .cell .btn{white-space:nowrap}
 .fxbox{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--faint);white-space:nowrap}
 .fxbox input{width:56px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:3px 6px;font-family:var(--mono);font-size:var(--fs-xs);color:var(--text);text-align:right}
 .fxbox button{color:var(--up);font-size:var(--fs-sm);line-height:1;padding:5px 9px;border:1px solid var(--line);border-radius:var(--r);background:transparent;transition:border-color .15s,background .15s}
@@ -1155,7 +1149,6 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
      push the first card most of a screen down.                          */
   .dash{padding:var(--sp-3) var(--sp-4);gap:var(--sp-3) var(--sp-4)}
   .dash .big{font-size:var(--fs-2xl)}
-  .dash .cell b{font-size:var(--fs-xl)}
   .dash>div:first-child{padding-right:0}
   .dash .delta{margin-top:5px}
   /* Sharing a line with the tabs left it 203px in some views and 337 in
@@ -1308,10 +1301,6 @@ body{font-variant-numeric:tabular-nums}
    Condition grades and the unowned state carry a fill, not a colour, so
    they survive a greyscale print, a colour-blind reader and a phone in
    direct sun.                                                        */
-.cond-a,.cond-b,.cond-c{position:relative;border:1px solid var(--text)}
-.cond-a{background:transparent}
-.cond-b{background-image:var(--fill-1)}
-.cond-c{background-image:var(--fill-3)}
 .pocket.unowned{background-image:var(--fill-2);background-color:var(--pocket-bg)}
 
 /* ---- THE STAFF ----
@@ -1602,23 +1591,6 @@ body.selmode .filt-fab{display:none}
    of queries sit under the box so the second lookup is one tap, not one
    retype - and they are the app's only history, so they are labelled as
    such rather than pretending to be suggestions.                       */
-.rec{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:60;
-  background:var(--surface);border:1px solid var(--text);padding:var(--sp-2);
-  display:flex;flex-direction:column;gap:1px}
-.rec[hidden]{display:none}
-.rec-h{font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;
-  color:var(--faint);padding:2px 6px 5px;display:flex;align-items:center;gap:var(--sp-2)}
-.rec-h button{margin-left:auto;color:var(--faint);font-size:var(--fs-3xs);
-  letter-spacing:.06em;text-transform:none;text-decoration:underline}
-.rec-h button:hover{color:var(--text)}
-.rec-i{display:flex;align-items:center;gap:var(--sp-2);min-height:34px;
-  padding:4px 6px;text-align:left;font-size:var(--fs-sm);color:var(--text);
-  position:relative;z-index:0}
-.rec-i::before{content:'';position:absolute;inset:0;background:var(--band);
-  opacity:0;z-index:-1;transition:opacity var(--fast) var(--ease)}
-.rec-i:hover::before,.rec-i:focus-visible::before{opacity:1}
-.rec-i .q{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-family:var(--mono)}
 @media (max-width:820px){.rec-i{min-height:44px}}
 
 /* ---- the dashboard is one headline and a list of movements ----
@@ -1726,6 +1698,11 @@ html.sp-on{overflow:hidden}
 .sp-h{font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;
   color:var(--faint);padding:var(--sp-3) 0 5px;display:flex;align-items:center;gap:8px}
 .sp-h::after{content:'';flex:1;height:1px;background:var(--line-soft)}
+/* sits after the rule, so the heading reads left and the action reads right */
+.sp-h-act{flex:none;font-size:var(--fs-3xs);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint);padding:4px 6px;
+  border:1px solid transparent;background:none}
+.sp-h-act:hover{color:var(--text);border-color:var(--line-strong)}
 .sp-n{font-family:var(--mono);letter-spacing:0}
 .sp-row{display:flex;align-items:center;gap:var(--sp-3);width:100%;min-height:40px;
   padding:6px 6px;text-align:left;font-size:var(--fs-sm);color:var(--text);
@@ -2120,7 +2097,6 @@ provenance
       <input class="inp" id="f-text" placeholder="Card name, text, or set code" aria-label="Search cards and sets" readonly aria-haspopup="dialog">
       <button type="button" class="x-btn" id="f-clear-hdr" hidden aria-label="Clear the search box">&times;</button>
       <kbd class="hdr-kbd" aria-hidden="true">/</kbd>
-      <div class="rec" id="f-recent" hidden role="listbox" aria-label="Recent searches"></div>
     </div>
     <div class="acts">
       <span class="fxbox" id="hdr-fx"></span>
@@ -2256,18 +2232,6 @@ provenance
            clear-filters handler still address them by id, and a hidden input
            is cheaper than rewriting five call sites for controls nobody
            will see. They are inert: nothing renders them. -->
-      <div hidden aria-hidden="true" id="retired-filters">
-        <select class="inp" id="f-cat"><option value="">All</option><option>Monster</option><option>Spell</option><option>Trap</option></select>
-        <select class="inp" id="f-sub"><option value="">(N/A)</option></select>
-        <div class="sub-filters" id="mon-filters" hidden>
-          <select class="inp" id="f-attr"></select>
-          <select class="inp" id="f-race"></select>
-          <input class="inp" id="f-lvl" inputmode="numeric">
-          <input class="inp" id="f-scale" inputmode="numeric">
-        </div>
-        <button class="btn btn-sm" id="f-clear">Clear all filters</button>
-      </div>
-
       <div class="sub-filters" id="rar-wrap" style="border-top:none;padding-top:0;margin-top:0">
         <!-- The legend. A notation only works if the reader learns it, and
              this app cannot teach - so the key that used to list rarities
@@ -2656,12 +2620,6 @@ function sellMargin(){
     });
   });
   return {ask,srp,n};
-}
-/* The card whose holding moved most since the last price pull. This is the one
-   thing worth opening the app for after a sync, and nothing surfaced it.   */
-function biggestMover(){
-  const m=movers(1);
-  return m.length?m[0]:null;
 }
 /* ---- coming back lands where you left ----
    Opening a set from page four of the Sets board and pressing back put you
@@ -3343,7 +3301,6 @@ const opts=(list,ph)=>`<option value="">${ph}</option>`+list.map(v=>`<option>${v
 const ownOf=id=>DB.own[id];
 const totalCopies=id=>copiesIn(id).reduce((s,x)=>s+(+x.qty||0),0);
 const allCopies=id=>{const o=ownOf(id);return o?(o.copies||[]).reduce((s,x)=>s+(+x.qty||0),0):0;};
-const askValue=id=>copiesIn(id).reduce((s,x)=>s+((+x.price||0)*(+x.qty||0)),0);
 const topRarity=id=>{const c=copiesIn(id);return c.map(x=>rarBy(x.rarity)).sort((a,b)=>b.w-a.w)[0]||null;};
 /* ---- wishlist ----
    The mirror of the Selling shelf: cards you are hunting, with the price you
@@ -3358,8 +3315,6 @@ const topRarity=id=>{const c=copiesIn(id);return c.map(x=>rarBy(x.rarity)).sort(
 const wantOf=id=>(DB.want||{})[id]||null;
 const wantRows=id=>{const w=wantOf(id);return (w&&w.rows)||[];};
 const wantCount=()=>Object.keys(DB.want||{}).length;
-const wantLineCount=()=>Object.keys(DB.want||{})
-  .reduce((s,id)=>s+wantRows(id).length,0);
 function wantEntry(id){
   DB.want=DB.want||{};
   if(!DB.want[id])DB.want[id]={rows:[],added:Date.now()};
@@ -3385,18 +3340,6 @@ function dropWantRow(id,i){
   e.rows.splice(i,1);
   if(!e.rows.length)delete DB.want[id];
   save();
-}
-function dropWant(id){
-  if(DB.want)delete DB.want[id];
-  save();
-}
-/* Kept so an older call still means something: one line, or the first. */
-function setWant(id,patch){
-  const rows=wantRows(id);
-  if(!rows.length)return addWantRow(id,patch);
-  Object.assign(rows[0],patch);
-  save();
-  return 0;
 }
 /* What one line would cost today at the cheaper shop. Without a rarity there
    is no single printing to price, so the card's cheapest stands in.      */
@@ -3611,15 +3554,6 @@ function visible(){
       return false;
     });
   }
-  if(F.cat)list=list.filter(c=>broadType(c)===F.cat);
-  if(F.sub){
-    if(F.cat==='Monster')list=list.filter(c=>new RegExp(F.sub.replace('-','.'),'i').test(c.type||''));
-    else list=list.filter(c=>((c.mon||{}).race||'')===F.sub);
-  }
-  if(F.attr)list=list.filter(c=>((c.mon||{}).attribute||'')===F.attr);
-  if(F.race)list=list.filter(c=>((c.mon||{}).race||'')===F.race);
-  if(F.lvl!=='')list=list.filter(c=>String((c.mon||{}).level)===String(F.lvl));
-  if(F.scale!=='')list=list.filter(c=>String((c.mon||{}).scale)===String(F.scale));
   /* matches a copy you hold, or — for cards you do not own yet — a printing
      that exists in that rarity, so the filter still means something in the
      pool and inside a core                                                */
@@ -3716,7 +3650,6 @@ function markUndo(label){
   try{ UNDO={label,json:JSON.stringify(DB),at:Date.now()}; }
   catch(e){ UNDO=null; }
 }
-function canUndo(){ return !!UNDO; }
 async function undoLast(){
   if(!UNDO)return;
   const snap=UNDO; UNDO=null;
@@ -4927,7 +4860,6 @@ function freeCopiesIn(id){
     return free>0?Object.assign({},cp,{qty:free}):null;
   }).filter(Boolean);
 }
-const freeTotal=id=>freeCopiesIn(id).reduce((s,x)=>s+(+x.qty||0),0);
 /* Everything reserved across the shelf, as a figure for the dashboard. */
 function reservedValue(){
   let v=0;
@@ -5193,99 +5125,6 @@ function salesSummary(){
   });
   const top=[...buyers.entries()].sort((a,b)=>b[1]-a[1])[0];
   return {deals:done.length,all,month,copies,top:top?{who:top[0],v:top[1]}:null};
-}
-function openDeals(){
-  const box=el('div');
-  box.innerHTML=
-    '<div class="sh">Take in an order</div>'+
-    '<textarea class="tf-code" id="d-in" rows="3" placeholder="'+ORDER_CODE+'…"></textarea>'+
-    '<div class="tf-row"><button class="btn btn-sm" id="d-load">Read the order</button></div>'+
-    '<div id="d-check"></div>'+
-    '<div class="sh">Deals</div><div id="d-list"></div>';
-  const body=modal('Deals',box,true);
-  const chk=body.querySelector('#d-check');
-
-  const list=()=>{
-    const host=body.querySelector('#d-list');host.innerHTML='';
-    const ds=dealsAll();
-    if(!ds.length){host.appendChild(el('p','note',
-      'Nothing yet. When a buyer sends an order code from a binder you shared, paste it above.'));return;}
-    ds.forEach(d=>{
-      const wrap=el('div','deal '+d.status);
-      const items=(d.items||[]).map((it,i)=>{
-        const c=cardById(it.id);
-        return '<label class="ditem'+(it.agreed===false?' off':'')+'">'+
-          '<input type="checkbox" data-i="'+i+'"'+(it.agreed===false?'':' checked')+'>'+
-          '<span class="r '+esc(rarBy(it.rar||'C').f)+'">'+esc(it.rar||'C')+'</span>'+
-          '<span class="dn">'+esc(c?c.name:it.id)+'</span>'+
-          '<span class="pm">'+esc(it.set||'')+'</span>'+
-          '<span class="dq">×'+it.qty+'</span>'+
-          '<b>'+esc(peso((+it.price||0)*(+it.qty||0)))+'</b></label>';
-      }).join('');
-      const when=new Date(d.created).toISOString().slice(0,10);
-      wrap.innerHTML=
-        '<div class="dhead"><span class="dwho">'+esc(d.who)+'</span>'+
-        '<span class="dstat '+d.status+'">'+d.status+'</span>'+
-        '<span class="pm">'+when+'</span>'+
-        '<b class="dval">'+esc(peso(dealValue(d)))+'</b></div>'+
-        (d.contact?'<div class="note dcontact">'+esc(d.contact)+'</div>':'')+
-        (d.note?'<div class="note">“'+esc(d.note)+'”</div>':'')+
-        (d.offer!=null?'<div class="note doffer">Offered '+esc(peso(d.offer))+
-          ' for the lot</div>':'')+
-        '<div class="ditems">'+items+'</div>'+
-        '<div class="tf-row">'+
-          (d.status==='pending'
-            ? '<button class="btn btn-sm btn-a" data-a="done">Mark done</button>'+
-              '<button class="btn btn-sm" data-a="postponed">Postpone</button>'
-            : '<button class="btn btn-sm" data-a="pending">Reopen</button>')+
-          '<button class="btn btn-sm ghost" data-a="drop">Remove</button>'+
-        '</div>';
-      wrap.querySelectorAll('.ditem input').forEach(cb=>cb.onchange=()=>{
-        d.items[+cb.dataset.i].agreed=cb.checked;save();list();renderBinder();});
-      wrap.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{
-        const a=b.dataset.a;
-        if(a==='drop')askConfirm('Remove deal',
-          'Remove this deal from '+d.who+'? Any copies it holds go back to free stock.',
-          'Remove',()=>{dropDeal(d.id);list();renderBinder();});
-        else {setDealStatus(d.id,a);list();renderBinder();}
-      });
-      host.appendChild(wrap);
-    });
-  };
-
-  body.querySelector('#d-load').onclick=()=>{
-    chk.innerHTML='';
-    let order;
-    try{order=readOrder(body.querySelector('#d-in').value);}
-    catch(e){toast('That is not an order code');return;}
-    const bad=orderConflicts(order);
-    const total=order.items.reduce((s,it)=>s+(+it.price||0)*(+it.qty||0),0);
-    const head='<div class="note">'+esc(order.who)+' wants '+order.items.length+
-      ' line'+(order.items.length===1?'':'s')+' · '+esc(peso(total))+
-      (order.offer!=null?' · offering '+esc(peso(order.offer)):'')+'</div>';
-    if(!bad.length){
-      chk.innerHTML=head+'<div class="tf-row"><button class="btn btn-a btn-sm" id="d-ok">Accept</button></div>';
-    }else{
-      /* Nothing is decided here - the clash is put in front of you with the
-         deal that already holds the copies, and you pick.                 */
-      chk.innerHTML=head+
-        '<div class="dwarn"><b>Not enough free stock</b>'+
-        bad.map(b=>'<div>'+esc(b.name)+' '+esc(b.rar)+' — wants '+b.want+
-          ', '+b.free+' free of '+b.held+
-          (b.holders.length?' · held by '+esc(b.holders.join(', ')):'')+'</div>').join('')+
-        '</div>'+
-        '<div class="tf-row">'+
-        '<button class="btn btn-a btn-sm" id="d-trim">Accept what is free</button>'+
-        '<button class="btn btn-sm" id="d-force">Accept anyway</button></div>';
-    }
-    const take=trim=>{const d=addDeal(order,trim);chk.innerHTML='';
-      body.querySelector('#d-in').value='';list();renderBinder();
-      toast('Deal from '+d.who+' recorded');};
-    const ok=chk.querySelector('#d-ok'); if(ok)ok.onclick=()=>take(false);
-    const tr=chk.querySelector('#d-trim'); if(tr)tr.onclick=()=>take(true);
-    const fo=chk.querySelector('#d-force'); if(fo)fo.onclick=()=>take(false);
-  };
-  list();
 }
 function openSettings(){
   const box=el('div');
@@ -5721,7 +5560,6 @@ var g=document.getElementById('g'),layer=document.getElementById('layer'),
 var CART={};
 var cartKey=function(i,ci){return i+':'+ci};
 function cartQty(i,ci){return CART[cartKey(i,ci)]||0}
-function cartFree(o,c){return c.q-cartQty(D.indexOf(o),o.cp.indexOf(c))}
 function cartAdd(i,ci,n){
   var o=D[i],c=o.cp[ci],k=cartKey(i,ci);
   var next=(CART[k]||0)+n;
@@ -5773,13 +5611,6 @@ function paintCart(){
 function o_inCart(i){
   return Object.keys(CART).reduce(function(s,k){
     return k.split(':')[0]==String(i)?s+CART[k]:s;},0);
-}
-/* One click takes every card of a core that is still listed. */
-function addCore(core){
-  D.forEach(function(o,i){
-    if(o.a!==core)return;
-    o.cp.forEach(function(c,ci){cartAdd(i,ci,c.q-cartQty(i,ci));});
-  });
 }
 function orderCode(who,contact,note,offer){
   var items=cartLines().map(function(l){
@@ -15579,12 +15410,6 @@ const PX_STALE_DAYS=7;
 const pxAgeDays=()=>{const t=PX_DATE?Date.parse(PX_DATE+'T00:00:00Z'):NaN;
   return isNaN(t)?Infinity:Math.max(0,Math.floor((Date.now()-t)/864e5));};
 const pxFresh=()=>PX_ROWS.length>0&&pxAgeDays()<=PX_STALE_DAYS;
-const pxTitle=()=>{
-  if(!PX_ROWS.length)return 'No prices loaded — tap to sync';
-  const a=pxAgeDays();
-  return PX_ROWS.length.toLocaleString()+' prices · '+(PX_SRC||'baked in')+' · '+
-    (!isFinite(a)?'no date':a===0?'updated today':a===1?'1 day old':a+' days old')+
-    ' · tap to sync';};
 
 /* ---- one sync ----
    Three things arrive over the network - the card pool, the shop's prices and
@@ -17831,20 +17656,6 @@ document.querySelectorAll('#core-mult button').forEach(b=>{
 document.querySelectorAll('#mode-tog button').forEach(b=>{
   b.onclick=()=>{MODE=b.dataset.m;DB.mode=MODE;save();page=0;renderBinder();};
 });
-$('#f-attr').innerHTML=opts(ATTRS,'(All)');
-$('#f-race').innerHTML=opts(MON_RACES,'(All)');
-function syncCategory(){
-  const cat=F.cat;
-  const sub=$('#f-sub');
-  if(cat==='Monster')sub.innerHTML=opts(MON_SUBS,'(All)');
-  else if(cat==='Spell')sub.innerHTML=opts(SPELL_PROPS,'(All)');
-  else if(cat==='Trap')sub.innerHTML=opts(TRAP_PROPS,'(All)');
-  else sub.innerHTML='<option value="">(N/A)</option>';
-  sub.disabled=!cat;
-  F.sub='';
-  $('#mon-filters').hidden=cat!=='Monster';
-  if(cat!=='Monster'){F.attr='';F.race='';F.lvl='';F.scale='';$('#f-attr').value='';$('#f-race').value='';$('#f-lvl').value='';$('#f-scale').value='';}
-}
 let tId;
 const bind=(sel,key,imm)=>{
   const n=$(sel);
@@ -17902,6 +17713,12 @@ function paintMore(){
 function openMore(on){
   const m=$('#more-menu'),b=$('#more-btn'); if(!m||!b)return;
   const want=on===undefined?m.hidden:!!on;
+  /* paintMore decides which of the menu's items apply where you are, and
+     nothing was calling it - so "Bulk add to this set" offered itself
+     outside a set and answered "Nothing here to add", and "Clear filters"
+     stood there with no filters on. As the menu opens is the only moment it
+     can be right, because both answers depend on where you are then. */
+  if(want)paintMore();
   m.hidden=!want; b.setAttribute('aria-expanded',String(want));
 }
 /* ---- selecting several cards at once ----
@@ -17951,16 +17768,6 @@ function bulkWant(){
   SEL.forEach(id=>{const c=cardById(id);if(c&&typeof addWant==='function'){addWant(c);n++;}});
   SEL.clear();save();paintSel();renderBinder();
   toast(n?(n+' added to the wishlist'):'Nothing added');
-}
-/* ---- the filter sheet ----
-   One control, thumb-reachable, that slides the rail up over the grid on a
-   phone. It carries a count so you can see that something is narrowing your
-   results without opening it - which is the failure mode of every sheet:
-   filters applied and invisible.                                        */
-function activeFilters(){
-  let n=0;
-  ['cat','sub','attr','race','lvl','scale','rar'].forEach(k=>{if(F[k]!==''&&F[k]!=null)n++;});
-  return n;
 }
 /* The badge counted active filters, which belonged on a button called
    Filters. On a menu it would count something the menu does not hold, so it
@@ -18143,10 +17950,21 @@ function spRender(){
   const body=$('#sp-body');if(!body)return;
   const q=$('#sp-q').value;
   if(!q.trim()){
+    /* The list is six searches you cannot get rid of, sitting under the box
+       every time you open it. Whatever you looked up last is on the screen of
+       a device you hand across a table, so being able to drop it is the
+       difference between a convenience and a thing you work around. */
     body.innerHTML=RECENT.length
-      ? '<div class="sp-h">Recent</div>'+RECENT.map(r=>
+      ? '<div class="sp-h">Recent<button type="button" class="sp-h-act" id="sp-rec-clear">Clear</button></div>'+
+        RECENT.map(r=>
           `<button type="button" class="sp-row sp-recent" data-q="${esc(r)}"><span class="sp-code">↺</span><span class="sp-nm">${esc(r)}</span></button>`).join('')
       : '<p class="sp-empty">Type a card name, a word from its text, or a set code like DOOD.</p>';
+    const rc=body.querySelector('#sp-rec-clear');
+    if(rc)rc.onclick=e=>{
+      e.stopPropagation();
+      RECENT=[];try{localStorage.removeItem(KEY_RECENT);}catch(e2){}
+      spRender();$('#sp-q').focus();
+    };
     bindSp();return;
   }
   const {cards,sets}=spResults(q);
@@ -18200,26 +18018,11 @@ function pushRecent(q){
   RECENT=[q].concat(RECENT.filter(x=>x.toLowerCase()!==q.toLowerCase())).slice(0,6);
   try{localStorage.setItem(KEY_RECENT,JSON.stringify(RECENT));}catch(e){}
 }
-function paintRecent(show){
-  const box=$('#f-recent'); if(!box)return;
-  if(!show||!RECENT.length){box.hidden=true;return;}
-  box.innerHTML='<div class="rec-h">Recent<button type="button" id="rec-clear">Clear</button></div>'+
-    RECENT.map(q=>'<button type="button" class="rec-i" role="option" data-q="'+esc(q)+'">'+
-      '<span class="q">'+esc(q)+'</span></button>').join('');
-  box.hidden=false;
-  box.querySelector('#rec-clear').onclick=()=>{
-    RECENT=[];try{localStorage.removeItem(KEY_RECENT);}catch(e){}
-    paintRecent(false);$('#f-text').focus();
-  };
-  box.querySelectorAll('.rec-i').forEach(b=>{
-    b.onclick=()=>{
-      const sb=$('#f-text');sb.value=b.dataset.q;F.text=b.dataset.q;page=0;
-      pushRecent(b.dataset.q);paintClearBtn();paintRecent(false);renderBinder();
-    };
-  });
-}
-$('#f-text').oninput=e=>{F.text=e.target.value;page=0;paintClearBtn();paintRecent(!e.target.value);clearTimeout(tId);tId=setTimeout(()=>renderBinder(),160);};
-$('#f-clear-hdr').onclick=()=>{const sb=$('#f-text');sb.value='';F.text='';page=0;paintClearBtn();renderBinder();sb.focus();paintRecent(true);};
+/* The recent list lives in the search panel, which is the only way in to a
+   search now - the header box is readonly and opens it. A second dropdown
+   hanging off that box duplicated the feature and could never be seen: the
+   readonly input has no input event to trigger it. */
+$('#f-clear-hdr').onclick=()=>{const sb=$('#f-text');sb.value='';F.text='';page=0;paintClearBtn();renderBinder();};
 /* The header box is now the door to the panel rather than a live filter, so
    focusing or typing in it opens the panel and hands the query over. */
 $('#f-text').onfocus=()=>spOpen(true);
@@ -18252,16 +18055,12 @@ $('#sp-veil').onclick=()=>spOpen(false);
 $('#sp-reset').onclick=()=>{
   $('#sp-cat').value='';$('#sp-rar').value='';$('#sp-owned').checked=false;spRender();
 };
-$('#f-cat').onchange=e=>{F.cat=e.target.value;syncCategory();page=0;renderBinder();};
-bind('#f-sub','sub');bind('#f-attr','attr');bind('#f-race','race');
-bind('#f-lvl','lvl',true);bind('#f-scale','scale',true);
-/* Two clears, because there are two places to filter from. The sidebar one
-   resets the search panel; the bar one resets the bar's own order and rarity. */
-$('#f-clear').onclick=()=>{
-  F=Object.assign(F,{text:'',cat:'',sub:'',attr:'',race:'',lvl:'',scale:''});
-  ['#f-text','#f-cat','#f-attr','#f-race','#f-lvl','#f-scale'].forEach(s=>$(s).value='');
-  syncCategory();page=0;renderBinder();
-};
+/* The bar's clear resets the bar's own order and rarity. The card-property
+   filters that used to sit beside it - category, attribute, race, level,
+   scale - were retired into a hidden div when the search panel took over,
+   and stayed there wired to controls nobody could reach. Removed: the panel
+   filters by type itself, and the six F fields they wrote could never hold
+   anything but an empty string. */
 $('#t-bulk').onclick=openBulk;
 $('#t-clear').onclick=()=>{
   F.rar='';F.sort='price';DB.setSort='old';DB.coreSort='name';save();
@@ -18489,7 +18288,6 @@ function paintOnline(){
 window.addEventListener('online',()=>{paintOnline();say('Back online');});
 window.addEventListener('offline',paintOnline);
 paintRarityKey();
-syncCategory();
 (async()=>{
   const saved=await Store.get();
   if(saved)DB=migrate(saved);
