@@ -522,6 +522,27 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .brow2 .k-qty{width:58px;flex:none;text-align:center;padding:3px 5px}
 .brow2 .k-px{width:78px;flex:none;padding:3px 5px}
 .brow2 .k-sell{display:flex;align-items:center;gap:4px;font-size:var(--fs-xs);color:var(--faint);flex:none}
+/* ---- bulk add, on a phone ----
+   One flex line carrying a name, a rarity menu, a quantity, a Sell box and a
+   price is 340px of fixed widths before the name gets anything. At 375 the
+   name is the only flexible thing in the row, so it collapsed to nothing and
+   the row still overflowed - three anonymous rows and a sideways scrollbar.
+   You were being asked how many you own of a card it would not name.
+
+   So each entry becomes a small card: the name on its own line, in full,
+   then the controls under it. Nothing is fixed-width any more except the
+   quantity, and every target clears 38px. */
+@media (max-width:600px){
+  .bulk{gap:8px}
+  .brow2{flex-wrap:wrap;gap:6px;padding:8px;
+    border:1px solid var(--line);background:var(--surface-2)}
+  .brow2 .k-nm{flex:1 1 100%;white-space:normal;overflow:visible;
+    font-size:var(--fs-sm);font-weight:500;color:var(--text);line-height:1.35}
+  .brow2 .k-rar{flex:1 1 120px;width:auto;min-width:0;min-height:40px;font-size:var(--fs-sm)}
+  .brow2 .k-qty{flex:0 0 58px;width:58px;min-height:40px;font-size:var(--fs-sm)}
+  .brow2 .k-sell{flex:0 0 auto;min-height:40px;padding:0 2px;font-size:var(--fs-sm)}
+  .brow2 .k-px{flex:1 1 76px;width:auto;min-width:0;min-height:40px;font-size:var(--fs-sm)}
+}
 .brow{position:relative;display:flex;align-items:center;gap:12px;width:100%;text-align:left;
   padding:9px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface-2)}
 .brow:hover{border-color:var(--accent)}
@@ -3092,7 +3113,8 @@ const CARD_MIN_W=108;           /* below this the art stops being readable */
 const CARD_MAX_W=250;           /* above this a page holds too little to scan */
 const CARD_TARGET_N=12;         /* cards in the window at once, without scrolling */
 const CARD_MAX_ROWS=4;          /* past four the captions outweigh the pictures */
-function fitLayout(){
+function fitLayout(target){
+  const want=Math.max(1,target||CARD_TARGET_N);
   const g=document.getElementById('page');
   if(!g)return null;
   const gr=g.getBoundingClientRect();
@@ -3140,7 +3162,7 @@ function fitLayout(){
   /* reaching the target matters more than card size; failing that, more
      cards; and between two equals, the bigger picture */
   const better=(n,w,b)=>{
-    const hit=n>=CARD_TARGET_N, bhit=b.n>=CARD_TARGET_N;
+    const hit=n>=want, bhit=b.n>=want;
     if(hit!==bhit)return hit;
     if(hit)return w>b.w;
     return n>b.n||(n===b.n&&w>b.w);
@@ -3164,16 +3186,63 @@ function fitLayout(){
   }
   return best?{c:best.c,r:best.r}:null;
 }
+/* ---- the sheet checks its own work ----
+   Everything above works out what SHOULD fit from measurements taken before
+   a single card exists, and plenty can still make that answer wrong
+   afterwards. A page size chosen by hand is the loudest: it sizes the grid
+   from the window's WIDTH and never asks about its height, so "12 a page"
+   lays out 6x2 and puts the second row under the fold on a short screen -
+   and because it is a setting rather than a fit, no amount of improving the
+   fit will touch it. Then there is a scrollbar appearing and narrowing the
+   grid that raised it, the dashboard gaining a line, browser zoom, a font
+   landing late.
+
+   Rather than model each of those, the sheet looks at where its own last row
+   actually landed and gives ground until it is inside the window. Columns
+   first, because more columns means smaller cards and the row survives; only
+   when the cards are as small as they are allowed to get does it drop a row.
+   It runs at all only when something overflowed, and it is bounded. */
+function fitVerify(){
+  if(MODE==='list'||BM)return false;
+  const g=document.getElementById('page');
+  if(!g||!g.children.length)return false;
+  const last=g.children[g.children.length-1].getBoundingClientRect();
+  if(last.bottom<=window.innerHeight+1)return false;
+  const gr=g.getBoundingClientRect();
+  const cs=getComputedStyle(g);
+  const gap=parseFloat(cs.rowGap||cs.gap)||12;
+  const step=spreadOn()?2:1;                 /* facing pages stay even */
+  const maxCols=Math.max(1,Math.floor((gr.width+gap)/(CARD_MIN_W+gap)));
+  let c=LAYOUT.c,r=LAYOUT.r;
+  if(c+step<=maxCols)c+=step;
+  else if(r>1)r--;
+  else return false;                          /* nothing left to give */
+  applyLayout(c,r,true);
+  return true;
+}
 function autoLayout(keepFirst){
   const g=gridFor(document.documentElement.clientWidth);
   /* a chosen page size keeps the column count the window asked for and just
      stacks however many rows it takes to hold that many cards               */
   const want=+DB.per||0;
   let c=g.c,r=want?Math.max(1,Math.ceil(want/g.c)):g.r;
-  if(!want&&MODE!=='list'){
-    /* Only when the size is automatic. Choosing a page size by hand is an
-       instruction, and an instruction outranks a fit. */
-    const fit=fitLayout();
+  if(MODE!=='list'){
+    /* This used to run only on Auto, on the reasoning that choosing a page
+       size by hand is an instruction and an instruction outranks a fit. That
+       was wrong, and it is the whole of the bug: a chosen size took its
+       COLUMN count from the window's width and never asked about its height,
+       so "12 a page" laid out 6x2 with 208px cards on a 790px-tall screen
+       and put the second row 124px under the fold. Worse, being a setting
+       rather than a fit, no improvement to the fit could ever reach it.
+
+       A page size says how many cards, not what shape, and the shape still
+       has to fit the window. So it becomes the target the fit aims at: at
+       least this many, and never off the bottom of the screen. Where the
+       number asked for cannot be made to fit - twelve readable cards need
+       six across, and six across on a short wide window is a card taller
+       than the space - the fit wins and the page holds more, smaller ones.
+       Cards you cannot see are not on the page in any sense that matters. */
+    const fit=fitLayout(want||CARD_TARGET_N);
     if(fit){c=fit.c;r=fit.r;}
   }
   if(c===LAYOUT.c&&r===LAYOUT.r)return false;
@@ -4364,7 +4433,12 @@ function paintDash(){
      Guarded, because paintDash is called from renderBinder. */
   if(!FITTING)requestAnimationFrame(()=>{
     FITTING=true;
-    try{ if(autoLayout(true))renderBinder(); } finally { FITTING=false; }
+    try{
+      if(autoLayout(true))renderBinder();
+      /* and then against what actually landed, which is the only measurement
+         that cannot be wrong about itself */
+      for(let i=0;i<4&&fitVerify();i++)renderBinder();
+    } finally { FITTING=false; }
   });}
 let FITTING=false;
 /* The sidebar folds away so the cards get the full width. Remembered in the
