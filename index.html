@@ -107,6 +107,13 @@
   --bpad-x:12px;
   --bpad-t:10px;
   --bpad-b:12px;
+  /* How wide the app is allowed to get. 1680 was set when the sheet was six
+     across and a wider one only stretched whitespace. At eight across the
+     row is the card size: capping the shell at 1680 on a 1900px window
+     throws away 220px and takes 27px off every card with it. 2040 lets a
+     wide screen be wide, and still stops short of a line of text nobody
+     can track across. */
+  --shell-max:2040px;
   --cols:6;
   --rows:2;
   --page-h:calc(100dvh - 176px);
@@ -147,7 +154,7 @@ button{cursor:pointer;background:none;border:none}
 .top{position:sticky;top:0;z-index:40;backdrop-filter:blur(8px);
   background:linear-gradient(180deg,var(--top-a),var(--top-b));
   border-bottom:1px solid var(--line);padding:0 var(--sp-4);box-shadow:var(--sh-1)}
-.top-in{max-width:1680px;margin:0 auto;height:54px;display:flex;align-items:center;gap:16px}
+.top-in{max-width:var(--shell-max);margin:0 auto;height:54px;display:flex;align-items:center;gap:16px}
 .hdr-sep{width:1px;height:22px;background:var(--line);flex:none}
 /* The region switch sits where the wordmark's subtitle used to, because that
    is the one place on the page that never scrolls away.                   */
@@ -197,7 +204,7 @@ button{cursor:pointer;background:none;border:none}
 /* ---------- layout ---------- */
 /* The column itself is animated, so the binder widens into the space as the
    sidebar gives it up rather than both snapping to their new size.        */
-.shell{max-width:1680px;margin:0 auto;padding:var(--sp-4) var(--sp-4) var(--sp-5);display:grid;
+.shell{max-width:var(--shell-max);margin:0 auto;padding:var(--sp-4) var(--sp-4) var(--sp-5);display:grid;
   grid-template-columns:210px minmax(0,1fr);gap:16px;align-items:start;
   transition:grid-template-columns .26s ease}
 /* folded sidebar: the binder takes the whole width and the cards grow into it */
@@ -3079,15 +3086,12 @@ function applyLayout(c,r,keepFirst,cardW){
     .getPropertyValue('--gap'))||12;
   document.documentElement.style.setProperty('--sheet-w',
     cardW?Math.round(c*cardW+gapv*(c-1))+'px':'none');
-  /* How much the caption under each card is allowed to say. Measured off the
-     card the layout actually produced rather than a breakpoint, because the
-     same window gives different card widths depending on how tall the
-     dashboard has grown. */
+  /* The caption's density is not decided here. It depends on how wide the
+     numbers in THIS collection are, which only the rendered captions know;
+     capDensity settles it after paintSlots. Starting at the fullest tier
+     means the measurement never has to widen anything, only narrow it. */
   const g=document.getElementById('page');
-  if(g){
-    const w=cardW||0;
-    g.setAttribute('data-cap',!w?'full':w>=182?'full':w>=150?'tight':'bare');
-  }
+  if(g&&!g.getAttribute('data-cap'))g.setAttribute('data-cap','full');
   page=Math.floor(firstCard/PER);
 }
 /* The sheet follows the window now, instead of a manual 6x2 / 4x3 / 3x3 switch.
@@ -3938,15 +3942,51 @@ function warmNext(list,page,per){
   if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:2000});
   else setTimeout(run,600);
 }
-/* applyLayout guesses this from the width it asked for; this settles it from
-   the card that actually arrived, which is the only number that can be wrong
-   in a way the caption will show. */
+/* ---- how much the caption says, decided by measuring it ----
+   This used to be a pair of widths - 182 and 150 - picked by eye from one
+   card's caption. They were wrong in both directions. "ROTA P3,171 ea
+   P9,514" needs 159px and "SUDA P13,627 ea P40,880" needs 173, because a
+   collection with bigger numbers needs a wider line to say the same things;
+   and 150 was low enough to clip the second while high enough to throw away
+   the total on a card that could have shown it. Nobody can eyeball that, and
+   the currency, the font and the browser's zoom all move it.
+
+   So it asks. Set the fullest tier, see whether any caption on the page wants
+   more room than it has, and step down only if one does. Three passes at the
+   very worst, over the sixteen captions actually on screen. */
 function capDensity(grid){
-  const p=grid&&grid.querySelector('.pocket');
-  if(!p)return;
-  const w=p.getBoundingClientRect().width;
-  if(!w)return;
-  grid.setAttribute('data-cap',w>=182?'full':w>=150?'tight':'bare');
+  if(!grid||!grid.querySelector('.cap-row'))return;
+  const caps=[...grid.querySelectorAll('.slot>.cap-row')];
+  if(!caps.length)return;
+  /* What the row would need if nothing were squeezed. Neither the row's
+     scrollWidth nor its children's can answer that: the prices are aligned to
+     the RIGHT, so when they overflow they overflow leftwards, and scrollWidth
+     has never been able to see that - it reported 83 for a line needing 114
+     and every caption was declared to fit while being quietly cut off.
+
+     So it is measured on a copy with no width to be squeezed into. The copy
+     lives inside the grid, so the same data-cap rules hide the same parts of
+     it, and it is the longest caption on the page because that is the one
+     that decides. */
+  let probe=grid.querySelector('.cap-probe');
+  if(!probe){
+    probe=el('div','cap-row cap-probe');
+    probe.setAttribute('aria-hidden','true');
+    probe.style.cssText='position:absolute;left:-9999px;top:0;width:auto;'+
+      'white-space:nowrap;visibility:hidden;pointer-events:none';
+    grid.appendChild(probe);
+  }
+  let longest=caps[0],most=-1;
+  for(const c of caps){
+    const n=c.textContent.length;
+    if(n>most){most=n;longest=c;}
+  }
+  probe.innerHTML=longest.innerHTML;
+  const room=longest.clientWidth;
+  for(const tier of ['full','tight','bare']){
+    grid.setAttribute('data-cap',tier);
+    if(probe.getBoundingClientRect().width<=room)break;
+  }
 }
 function renderBinder(dir){
   /* Settle the grid before measuring anything. autoLayout only sets the CSS
