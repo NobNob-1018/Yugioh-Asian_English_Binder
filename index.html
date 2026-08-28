@@ -758,6 +758,7 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
   grid-template-columns:repeat(var(--cols),minmax(0,1fr));
   grid-auto-rows:max-content;
   gap:var(--gap);
+  column-gap:var(--gap-x,var(--gap));
   width:100%;
   /* Set by applyLayout when the window's HEIGHT is what limits the card, so
      the columns cannot then stretch it back to a size that does not fit. It
@@ -3073,19 +3074,44 @@ let VIEW='binder';
 let MODE='grid';   /* grid = card images, list = rows. A display choice, not a view. */
 let LAYOUT={c:6,r:2};
 let PER=LAYOUT.c*LAYOUT.r;
-function applyLayout(c,r,keepFirst,cardW){
+function applyLayout(c,r,keepFirst,cardW,widen){
   const firstCard=keepFirst?page*PER:0;
   LAYOUT={c,r};PER=c*r;
-  document.documentElement.style.setProperty('--cols',c);
-  document.documentElement.style.setProperty('--rows',r);
-  /* How wide the sheet is allowed to be, so a card limited by the window's
-     HEIGHT is not then stretched by its column back to a size that does not
-     fit. Unset means "take the room you are given", which is what every
-     layout wants until the height is the binding constraint. */
-  const gapv=parseFloat(getComputedStyle(document.documentElement)
-    .getPropertyValue('--gap'))||12;
-  document.documentElement.style.setProperty('--sheet-w',
-    cardW?Math.round(c*cardW+gapv*(c-1))+'px':'none');
+  const de=document.documentElement;
+  de.style.setProperty('--cols',c);
+  de.style.setProperty('--rows',r);
+  const gapv=parseFloat(getComputedStyle(de).getPropertyValue('--gap'))||12;
+  /* Two ways to hold a card below the width its column would give it.
+
+     Cap the sheet and centre it - right when the card would otherwise come
+     out bigger than a card should ever be, where the alternative is a 561px
+     monster and a margin is the lesser evil.
+
+     Or keep the sheet edge to edge and put the difference between the cards.
+     That is right when the card is being trimmed to buy a second row: the
+     sheet still reaches both sides, and eight cards five pixels narrower
+     become seven gaps a little wider, which is what a binder page looks like
+     anyway. */
+  const par=document.getElementById('page');
+  const room=par?par.parentElement.clientWidth
+    -(parseFloat(getComputedStyle(par.parentElement).paddingLeft)||0)
+    -(parseFloat(getComputedStyle(par.parentElement).paddingRight)||0):0;
+  if(cardW&&widen&&room>0&&c>1){
+    /* The gap absorbs the difference, up to three times its normal size.
+       Past that the pockets stop reading as a page and start reading as
+       eight separate cards, so whatever is left over becomes a margin -
+       which by then is a few dozen pixels rather than the hundred that
+       started this. */
+    const need=(room-c*cardW)/(c-1);
+    const gx=Math.min(Math.max(gapv,need),gapv*3);
+    de.style.setProperty('--gap-x',gx.toFixed(2)+'px');
+    de.style.setProperty('--sheet-w',
+      need>gx+0.5?Math.round(c*cardW+gx*(c-1))+'px':'none');
+  }else{
+    de.style.setProperty('--gap-x','');
+    de.style.setProperty('--sheet-w',
+      cardW?Math.round(c*cardW+gapv*(c-1))+'px':'none');
+  }
   /* The caption's density is not decided here. It depends on how wide the
      numbers in THIS collection are, which only the rendered captions know;
      capDensity settles it after paintSlots. Starting at the fullest tier
@@ -3256,6 +3282,25 @@ function fitLayout(target){
       cols=readable(CARD_COLS_DESKTOP);
       const per=cardAt(cols)*CARD_ASPECT+capH+gap;
       rows=Math.min(CARD_ROWS_DESKTOP,Math.max(1,Math.floor((avail+gap)/per)));
+      /* ---- a row is worth a few pixels off the card ----
+         A binder page is two rows. When the window is thirty pixels short of
+         two rows of the full-width card, dropping to one leaves three hundred
+         pixels of nothing under eight cards, which is the worst answer
+         available and the one this was giving.
+
+         So the card gives up what the second row costs - and the width it
+         gives up goes into the GAPS rather than into a margin, so the sheet
+         still reaches both edges. Eight cards five pixels narrower spreads
+         forty pixels across seven gaps: a binder page with a little more air
+         between its pockets, which is what a binder page looks like anyway.
+
+         Capped at a seventh. Past that the card really is smaller and the row
+         is not worth it. */
+      if(rows<CARD_ROWS_DESKTOP&&avail>240){
+        const wide=cardAt(cols);
+        const tall=((avail-gap)/2-capH)/CARD_ASPECT;
+        if(tall>=CARD_MIN_W&&tall>=wide*0.75)return {c:cols,r:CARD_ROWS_DESKTOP,w:tall,spread:true};
+      }
     }
     /* The sheet fills the row - a margin down each side is the thing that
        reads as "the binder got smaller", whatever the cards measure. The one
@@ -3334,7 +3379,7 @@ function autoLayout(keepFirst){
   /* a chosen page size keeps the column count the window asked for and just
      stacks however many rows it takes to hold that many cards               */
   const want=+DB.per||0;
-  let c=g.c,r=want?Math.max(1,Math.ceil(want/g.c)):g.r,cw=0;
+  let c=g.c,r=want?Math.max(1,Math.ceil(want/g.c)):g.r,cw=0,sp=false;
   if(MODE!=='list'){
     /* This used to run only on Auto, on the reasoning that choosing a page
        size by hand is an instruction and an instruction outranks a fit. That
@@ -3349,11 +3394,11 @@ function autoLayout(keepFirst){
        many out across a sheet that still fills the row. Auto means the
        binder's own eight across. */
     const fit=fitLayout(want||0);
-    if(fit){c=fit.c;r=fit.r;cw=fit.w;}
+    if(fit){c=fit.c;r=fit.r;cw=fit.w;sp=!!fit.spread;}
   }
-  if(c===LAYOUT.c&&r===LAYOUT.r&&cw===LAYOUT.w)return false;
-  applyLayout(c,r,keepFirst,cw);
-  LAYOUT.w=cw;
+  if(c===LAYOUT.c&&r===LAYOUT.r&&cw===LAYOUT.w&&sp===LAYOUT.sp)return false;
+  applyLayout(c,r,keepFirst,cw,sp);
+  LAYOUT.w=cw;LAYOUT.sp=sp;
   return true;
 }
 const $=s=>document.querySelector(s);
