@@ -101,6 +101,41 @@ read `Asian-English Binder — OCG Collection` with a real em-dash.
 To hardwire a list by hand instead, use the browser scraper in step 1 and
 paste its `rows` over the `BAKED_PRICES` array between the markers.
 
+### Refusing a bad harvest
+
+```bash
+perl Tools/verify-harvest.pl            # the JSON the harvests wrote
+perl Tools/verify-harvest.pl --baked    # what is already in index.html
+```
+
+Exits non-zero on failure, so nothing downstream runs. It checks four things:
+
+- **Floors** — 6,000 TCG Corner rows, 3,000 Players Club, 18,000 Yuyu-tei.
+  Set below the known-good counts (7,022 / 3,699 / 22,164) with room for a
+  real week of stock movement. Raise them when the catalogues genuinely grow;
+  a floor that never moves stops meaning anything.
+- **A drop of more than 15%** against what is currently baked.
+- **Rarity spread** — if every row carries the same tag, the parser stopped
+  reading titles and is returning a default.
+- **A stamp from the future**, which means a clock or a cache problem.
+
+The half-failure is the case worth guarding: a shop changes a page, the parser
+matches less, and a smaller but perfectly well-formed file lands in the binder.
+Nothing looks wrong until a number is quoted at a table.
+
+### Running it on a schedule
+
+`.github/workflows/prices.yml` does the Asian-English harvest weekly (Sunday
+19:00 UTC, so Monday morning in Manila) and can be run by hand from the
+Actions tab. It verifies before baking *and* after, and only commits when
+`index.html` actually changed. A failure changes nothing and says so — stale
+prices you know about beat stale prices you do not.
+
+Nothing to install: Perl, curl and JSON::PP are all on `ubuntu-latest`.
+
+The OCG-JP side is not wired in yet. Its four scripts write to `/tmp` and
+assume a working directory; they want a tidy-up before a robot runs them.
+
 ## 3. Test the matching
 
 Open the app, press F12, and run the snippet in section 21 in the Console. It

@@ -1,0 +1,98 @@
+# Refresh the baked prices, weekly.
+#
+# Prices go stale because refreshing them meant running Perl on one particular
+# machine. This does it without that machine. It will not commit anything that
+# fails Tools/verify-harvest.pl, because the app's first rule is that no price
+# beats a wrong price, and a half-failed harvest is the quiet way that rule
+# gets broken - a smaller but perfectly well-formed file lands in the binder
+# and nothing looks wrong until a number is quoted at a table.
+#
+# Run it by hand from the Actions tab any time; the schedule is only so that
+# nobody has to remember.
+
+name: Refresh prices
+
+on:
+  schedule:
+    # 19:00 UTC Sunday = 03:00 Monday in Manila, when the shops are quiet
+    - cron: '0 19 * * 0'
+  workflow_dispatch:
+    inputs:
+      region:
+        description: Which prices to refresh
+        type: choice
+        default: ae
+        options: [ae, jp, both]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: prices
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Perl and curl are already on ubuntu-latest; JSON::PP ships with core
+      # Perl. Nothing to install, which is one less thing to break.
+      - name: Check the toolchain
+        run: |
+          perl -v | head -2
+          perl -MJSON::PP -e 'print "JSON::PP ", JSON::PP->VERSION, "\n"'
+
+      - name: Record what is baked now
+        run: perl Tools/verify-harvest.pl --baked
+
+      - name: Harvest Asian-English
+        if: ${{ github.event.inputs.region != 'jp' }}
+        run: |
+          perl Tools/ae-prices-tcgcorner.pl
+          perl Tools/pc-prices-playersclub.pl
+
+      # The gate. Runs before anything is written to index.html, so a bad
+      # harvest stops here rather than being discovered in the diff.
+      - name: Verify the harvest
+        if: ${{ github.event.inputs.region != 'jp' }}
+        run: perl Tools/verify-harvest.pl
+
+      - name: Bake Asian-English
+        if: ${{ github.event.inputs.region != 'jp' }}
+        run: perl Tools/ae-bake.pl
+
+      # Belt and braces: the same floors, now against what was actually
+      # written. A bake that succeeds on good input can still write a bad
+      # file if a marker moved.
+      - name: Verify the result
+        run: perl Tools/verify-harvest.pl --baked
+
+      - name: Commit if anything changed
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "prices unchanged - nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          STAMP=$(grep -o "const BAKED_STAMP='[^']*'" index.html | head -1 | cut -d"'" -f2)
+          git add index.html
+          git commit -m "Prices refreshed ${STAMP}" \
+                     -m "Harvested and verified by .github/workflows/prices.yml."
+          git push
+
+      # Only reached when a step above failed, and the point of it is that a
+      # silent failure is worse than no automation: stale prices you know
+      # about beat stale prices you do not.
+      - name: Say what broke
+        if: failure()
+        run: |
+          echo "::error::Price refresh failed - index.html was NOT changed."
+          echo "Most likely a shop changed its page shape. Run the harvest by hand:"
+          echo "  perl Tools/ae-prices-tcgcorner.pl"
+          echo "  perl Tools/pc-prices-playersclub.pl"
+          echo "  perl Tools/verify-harvest.pl"

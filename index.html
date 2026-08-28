@@ -1471,8 +1471,13 @@ body.selmode .filt-fab{display:none}
    thing with colour or contrast left on screen. Card art is the loudest
    thing in this app, and greying it is what makes the panel read as the
    single live object rather than a box floating over a busy grid. */
+/* The panel and its scrim are siblings of <header>, not children of it. The
+   header carries its own backdrop-filter, and an ancestor with a
+   backdrop-filter becomes the containing block for position:fixed
+   descendants - so the scrim was being clipped to the 54px header rather
+   than covering the viewport, which is why the page behind never blurred. */
 .sp-veil{position:fixed;inset:0;z-index:80;cursor:pointer;
-  background:rgba(20,20,20,.62);backdrop-filter:saturate(.25) blur(2px)}
+  background:rgba(20,20,20,.55);backdrop-filter:saturate(.18) blur(7px)}
 :root[data-theme="dark"] .sp-veil{background:rgba(0,0,0,.66)}
 .sp-veil[hidden]{display:none}
 .sp-veil::after{content:'Click anywhere to close';position:absolute;
@@ -1828,28 +1833,6 @@ provenance
       <kbd class="hdr-kbd" aria-hidden="true">/</kbd>
       <div class="rec" id="f-recent" hidden role="listbox" aria-label="Recent searches"></div>
     </div>
-    <!-- ---- the search panel ----
-         Typing used to re-render the page underneath the box, so the grid
-         reflowed under your hand and the thing you were reading jumped. The
-         panel puts results in one place that opens over the page and closes
-         when you are done, and the page beneath it does not move until you
-         pick something. The refinements live here too, beside the query
-         they refine, rather than in a sidebar behind the results. -->
-    <div class="sp-veil" id="sp-veil" hidden></div>
-    <div class="sp" id="sp" hidden role="dialog" aria-modal="true" aria-label="Search">
-      <div class="sp-top">
-        <svg viewBox="0 0 16 16" aria-hidden="true" class="mag"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        <input class="inp" id="sp-q" placeholder="Card name, text, or set code" aria-label="Search cards and sets" autocomplete="off">
-        <button type="button" class="btn btn-sm sp-x" id="sp-close" aria-label="Close search"><span aria-hidden="true">&times;</span> Close <kbd>Esc</kbd></button>
-      </div>
-      <div class="sp-ref" id="sp-ref">
-        <select class="inp" id="sp-cat" aria-label="Category"><option value="">Any type</option><option>Monster</option><option>Spell</option><option>Trap</option></select>
-        <select class="inp" id="sp-rar" aria-label="Rarity"></select>
-        <label class="sp-chk"><input type="checkbox" id="sp-owned"> Only cards I own</label>
-        <button type="button" class="btn btn-sm act-quiet" id="sp-reset">Reset</button>
-      </div>
-      <div class="sp-body" id="sp-body"></div>
-    </div>
     <div class="acts">
       <span class="fxbox" id="hdr-fx"></span>
       <span id="hdr-px"></span>
@@ -1861,6 +1844,29 @@ provenance
     </div>
   </div>
 </header>
+
+<!-- ---- the search panel ----
+     Typing used to re-render the page underneath the box, so the grid
+     reflowed under your hand and the thing you were reading jumped. The
+     panel puts results in one place that opens over the page and closes
+     when you are done, and the page beneath it does not move until you
+     pick something. The refinements live here too, beside the query
+     they refine, rather than in a sidebar behind the results. -->
+<div class="sp-veil" id="sp-veil" hidden></div>
+<div class="sp" id="sp" hidden role="dialog" aria-modal="true" aria-label="Search">
+  <div class="sp-top">
+    <svg viewBox="0 0 16 16" aria-hidden="true" class="mag"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <input class="inp" id="sp-q" placeholder="Card name, text, or set code" aria-label="Search cards and sets" autocomplete="off">
+    <button type="button" class="btn btn-sm sp-x" id="sp-close" aria-label="Close search"><span aria-hidden="true">&times;</span> Close <kbd>Esc</kbd></button>
+  </div>
+  <div class="sp-ref" id="sp-ref">
+    <select class="inp" id="sp-cat" aria-label="Category"><option value="">Any type</option><option>Monster</option><option>Spell</option><option>Trap</option></select>
+    <select class="inp" id="sp-rar" aria-label="Rarity"></select>
+    <label class="sp-chk"><input type="checkbox" id="sp-owned"> Only cards I own</label>
+    <button type="button" class="btn btn-sm act-quiet" id="sp-reset">Reset</button>
+  </div>
+  <div class="sp-body" id="sp-body"></div>
+</div>
 
 <div class="shell">
   <!-- The bulk bar. Listing twenty cards for sale used to be twenty separate
@@ -2918,7 +2924,16 @@ async function setRegion(r){
     paintRegion();
     paintRarityKey();
     $('#t-rar').innerHTML=opts(RARITIES.map(r2=>r2.n),'Any rarity');
-    const sb=$('#search'); if(sb)sb.value='';
+    /* #search has not existed for some time - this was clearing nothing. The
+       query lives in two places now: the header box that opens the panel, and
+       the panel's own field. A set code from one region means nothing in the
+       other, so both are cleared along with F.text. */
+    F.text='';
+    const hs=$('#f-text'); if(hs)hs.value='';
+    const ps=$('#sp-q');   if(ps)ps.value='';
+    paintClearBtn();
+    /* the panel's rarity menu is built per region, so let it rebuild */
+    const pr=$('#sp-rar'); if(pr)pr.dataset.done='';
     paintViewTabs();paintBinders();
     applyTheme();applyDensity();
     renderBinder();
