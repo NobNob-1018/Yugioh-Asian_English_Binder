@@ -348,21 +348,31 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 [hidden]{display:none!important}
 .switch{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none}
 .switch input{position:absolute;opacity:0;width:0;height:0}
-/* the knob eases across and swells very slightly, so the switch feels thrown
-   rather than repainted                                                    */
-.track{width:34px;height:19px;border-radius:19px;background:var(--track);position:relative;flex:none;
-  transition:background .22s cubic-bezier(.4,0,.2,1);border:1px solid transparent}
-.track::after{content:"";position:absolute;top:2.5px;left:2.5px;width:13px;height:13px;border-radius:50%;
-  background:var(--muted);
-  transition:transform .26s var(--ease),background .22s ease,box-shadow .22s ease}
-.switch:hover .track::after{box-shadow:0 0 0 4px var(--hi)}
+/* ---- the switch is boxy, like everything else here ----
+   It was the one pill in an interface with no rounded corners anywhere: a
+   19px-radius track with a circular knob, sitting under square buttons,
+   square tabs and square selects. It reads as borrowed from another app.
+
+   So it takes the shape the rest of the world has - a rectangle at the same
+   radius token, with a real border rather than a transparent one, because a
+   control with no edge was the other thing that made this rail look unfinished.
+   The knob eases across and swells very slightly on press, so the switch
+   still feels thrown rather than repainted. */
+.track{width:38px;height:21px;border-radius:var(--r-xs);background:var(--surface-2);
+  position:relative;flex:none;border:1px solid var(--line-strong);
+  transition:background .22s cubic-bezier(.4,0,.2,1),border-color .22s ease}
+.track::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;
+  border-radius:var(--r-xs);background:var(--muted);
+  transition:transform .26s var(--ease),background .22s ease,box-shadow .22s ease,width .12s ease}
+.switch:hover .track{border-color:var(--text)}
+.switch:hover .track::after{background:var(--text)}
 /* Left over from the gold palette: a hardcoded amber glow that survived the
    world change because nothing named it. A switch is on or off, and this
    world says on by inverting, not by lighting up. */
 .switch input:checked + .track{background:var(--text);border-color:var(--text)}
-.switch input:checked + .track::after{transform:translateX(15px);background:var(--on-accent);
+.switch input:checked + .track::after{transform:translateX(17px);background:var(--on-accent);
   box-shadow:none}
-.switch:active .track::after{width:16px}
+.switch:active .track::after{width:19px}
 .switch input:focus-visible + .track{outline:1.5px solid var(--accent);outline-offset:2px}
 .switch .lbl{font-size:var(--fs-sm)}
 .hint{font-size:var(--fs-2xs);color:var(--faint);line-height:1.45;margin:6px 0 0}
@@ -1662,6 +1672,13 @@ html.sp-on{overflow:hidden}
   background:transparent;border:none;border-radius:0}
 .sp-top .inp:focus{outline:none}
 .sp-top .inp::placeholder{color:var(--faint);font-weight:400;letter-spacing:0}
+/* Quiet until pointed at: it sits inside the query, so it must not compete
+   with the query for attention. Square, like everything else. */
+.sp-clr{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border:1px solid transparent;background:none;
+  color:var(--faint);transition:color var(--fast) var(--ease),border-color var(--fast) var(--ease)}
+.sp-clr:hover{color:var(--text);border-color:var(--line-strong)}
+.sp-clr[hidden]{display:none}
 /* refinements read as a quiet strip, not a second toolbar */
 .sp-ref{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;
   padding:0 var(--sp-4) var(--sp-3);border-bottom:1px solid var(--line)}
@@ -1946,8 +1963,12 @@ html.sp-on{overflow:hidden}
    instead of pushing the pager onto a second line. It still shrinks by the
    same amount in every view, because the basis does not depend on the text,
    so it cannot reintroduce the shifting this rule exists to stop. */
+/* 180 was three pixels short of the line it exists to hold - "5,055 cards ·
+   120 copies" measures 169 and the slot gave it 166, so the count you look
+   at every day ended "120 copi". The earlier note above had it right at 210;
+   the number drifted down and nothing re-measured it. */
 @media (min-width:920px){
-  .bar>.bar-left{flex:0 1 180px;min-width:104px;max-width:180px;overflow:hidden}
+  .bar>.bar-left{flex:0 1 210px;min-width:104px;max-width:210px;overflow:hidden}
 }
 /* The count is wider than its slot when you are inside a core ("1 / 1 cards
    · 100% · 2 copies"), and the SLOT was doing the clipping - so the text was
@@ -2066,7 +2087,6 @@ provenance
       <span class="fxbox" id="hdr-fx"></span>
       <span id="hdr-px"></span>
       <span class="hdr-sep"></span>
-      <button class="btn ico" id="open-manual" disabled title="Temporarily off — a hand-added card is in neither baked catalogue, so it skews the set and core counts and cannot be rebuilt"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="7" y="2" width="2" height="12" rx="1"/><rect x="2" y="7" width="12" height="2" rx="1"/></svg><span class="tl">Add by hand</span></button>
       <button class="btn ico" id="do-sale" hidden title="Save your selling binder as a view-only page you can send to a buyer"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="1.5" width="9" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="5.4" y="4.6" width="4.2" height="1.5" rx=".7"/><rect x="5.4" y="7.4" width="4.2" height="1.5" rx=".7"/></svg><span class="tl">Sale list</span></button>
       <button class="btn ico" id="do-transfer" title="Move this binder to another device"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5h9M9 3l2.6 2.5L9 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 10.5h-9M7 8l-2.6 2.5L7 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tl">Transfer</span></button>
       <input type="file" id="file-in" accept="application/json" hidden>
@@ -2086,6 +2106,13 @@ provenance
   <div class="sp-top">
     <svg viewBox="0 0 16 16" aria-hidden="true" class="mag"><circle cx="7" cy="7" r="4.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     <input class="inp" id="sp-q" placeholder="Card name, text, or set code" aria-label="Search cards and sets" autocomplete="off">
+    <!-- Clearing meant selecting the whole query and deleting it, or closing
+         the panel and reopening it - which threw away the refinements too.
+         This empties the box and leaves everything else standing. It is only
+         here while there is something to clear. -->
+    <button type="button" class="sp-clr" id="sp-clr" aria-label="Clear search" hidden>
+      <svg viewBox="0 0 16 16" aria-hidden="true" width="13" height="13"><path d="M3.5 3.5 12.5 12.5M12.5 3.5 3.5 12.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
     <button type="button" class="btn btn-sm sp-x" id="sp-close" aria-label="Close search"><span aria-hidden="true">&times;</span> Close <kbd>Esc</kbd></button>
   </div>
   <div class="sp-ref" id="sp-ref">
@@ -3010,7 +3037,11 @@ const BM_MIN=900;
 const bmAllowed=()=>window.innerWidth>=BM_MIN;
 const spreadOn=()=>!!DB.spread&&window.innerWidth>=760;
 function gridFor(w){
-  const g=w<500?{c:3,r:4}:w<1040?{c:4,r:3}:w<1360?{c:5,r:2}:{c:6,r:2};
+  /* Twelve at every width, in whichever shape that width can carry. This is
+     the fallback for when the sheet cannot be measured; it should not
+     disagree with fitLayout about how many cards a page holds, and the
+     5x2 that used to sit in the middle was the one width that said ten. */
+  const g=w<500?{c:3,r:4}:w<1040?{c:4,r:3}:{c:6,r:2};
   /* Compact buys one more column at every width. The rows stay put, so a
      page holds more without the cards being asked to shrink twice.     */
   if(DB.density==='compact')g.c+=1;
@@ -3031,15 +3062,23 @@ function gridFor(w){
    window empty underneath. Keeping the cards huge and throwing away a row is
    backwards: the cards should shrink so the row survives.
 
-   So the row count leads and the columns follow. A binder page is two rows;
-   given the height that leaves per card, the column count is whatever makes
-   a card that size - the MINIMUM columns whose cards are small enough, which
-   is a ceiling, not a floor. Getting that the wrong way round is what capped
-   it at six.                                                            */
+   The third version fixed that and still asked the wrong question. It fixed
+   the sheet at two rows and chose the columns, which means the only way to
+   show twelve cards was six across - and six across needs a card under
+   110px on anything narrower than a wide desktop, which is under the width
+   at which the art is still recognisable. So it showed ten, and the twelfth
+   card was below the fold.
+
+   Rows and columns are one decision, not two. The target is a number of
+   CARDS on screen; every shape that could hold it is tried, and the one
+   with the biggest readable card wins. At 707px of grid that is 4x3 with a
+   168px card rather than 6x2 with a 108px one - same twelve cards, half
+   again the picture.                                                    */
 const CARD_ASPECT=1.458;        /* measured off a rendered pocket */
 const CARD_MIN_W=108;           /* below this the art stops being readable */
 const CARD_MAX_W=250;           /* above this a page holds too little to scan */
-const CARD_TARGET_COLS=8;       /* what a sheet reads best at; a preference, not a rule */
+const CARD_TARGET_N=12;         /* cards in the window at once, without scrolling */
+const CARD_MAX_ROWS=4;          /* past four the captions outweigh the pictures */
 function fitLayout(){
   const g=document.getElementById('page');
   if(!g)return null;
@@ -3055,34 +3094,43 @@ function fitLayout(){
   const capH=(cap&&!overlaid)?cap.getBoundingClientRect().height+3:0;
   const avail=window.innerHeight-(gr.top+(window.scrollY||0))-16;
   if(avail<120)return null;
-  /* Two rows, which is the binder's own shape and the thing being asked for,
-     falling to one only when two would make the cards unreadable. Not three:
-     it fills the window but at 129px a card stops being something you can
-     recognise across a table, and recognising it is the point. A very tall
-     window adds columns rather than growing the cards, via CARD_MAX_W. */
-  for(const rows of [2,1]){
-    const slotBudget=(avail-gap*(rows-1))/rows;
-    const maxCardH=slotBudget-capH;
-    const maxCardW=maxCardH/CARD_ASPECT;
-    if(maxCardW<CARD_MIN_W)continue;              /* no readable card at this many rows */
-    /* The fewest columns whose cards still fit the height - the biggest the
-       cards can be - and the most columns before they stop being readable. */
-    const minCols=Math.max(1,Math.ceil((W+gap)/(maxCardW+gap)));
-    const maxCols=Math.max(minCols,Math.floor((W+gap)/(CARD_MIN_W+gap)));
-    /* Between those two, aim for the target. Deriving the count purely from
-       the height gave the biggest cards that fit, which on a wide screen is
-       six enormous ones; a sheet is easier to scan at eight. */
-    let cols=Math.min(maxCols,Math.max(minCols,CARD_TARGET_COLS));
-    /* do not let a very tall window blow the cards up to poster size */
-    while(cols>1&&(W-gap*(cols-1))/cols>CARD_MAX_W)cols++;
-    /* Facing pages draws a spine down the middle of the sheet, so the two
-       leaves have to hold the same number of cards. An odd column count puts
-       that spine through a card rather than between two. gridFor had this
-       rule; deriving the columns from height here lost it. */
-    if(spreadOn()&&cols%2)cols++;
-    return {c:cols,r:rows};
+  /* The card's width comes from the COLUMN COUNT alone - the grid divides
+     the row into equal tracks and the card fills its track. The height
+     budget does not shrink it; a card too tall for its row is simply cut off
+     at the bottom of the window. Taking the smaller of the two, which is the
+     obvious thing to write, silently accepted shapes that overflowed by the
+     difference: 6x2 at 1280x800 modelled a 146px card, rendered a 155px one,
+     and ran 9px past the fold.
+
+     So width is width, and height is a test the shape either passes or
+     fails. */
+  const maxCols=Math.max(1,Math.floor((W+gap)/(CARD_MIN_W+gap)));
+  /* reaching the target matters more than card size; failing that, more
+     cards; and between two equals, the bigger picture */
+  const better=(n,w,b)=>{
+    const hit=n>=CARD_TARGET_N, bhit=b.n>=CARD_TARGET_N;
+    if(hit!==bhit)return hit;
+    if(hit)return w>b.w;
+    return n>b.n||(n===b.n&&w>b.w);
+  };
+  let best=null;
+  for(let rows=1;rows<=CARD_MAX_ROWS;rows++){
+    const byH=((avail-gap*(rows-1))/rows-capH)/CARD_ASPECT;
+    if(byH<CARD_MIN_W)break;             /* more rows only makes this worse */
+    for(let cols=1;cols<=maxCols;cols++){
+      /* Facing pages draws a spine down the middle of the sheet, so the two
+         leaves have to hold the same number of cards. An odd column count
+         puts that spine through a card rather than between two. */
+      if(spreadOn()&&cols%2)continue;
+      const w=(W-gap*(cols-1))/cols;
+      if(Math.round(w)<CARD_MIN_W)break;  /* more columns only get narrower */
+      if(w>byH+0.5)continue;              /* too tall for this many rows */
+      if(w>CARD_MAX_W)continue;           /* poster-size; more columns fix it */
+      const n=rows*cols;
+      if(!best||better(n,w,best))best={c:cols,r:rows,n,w};
+    }
   }
-  return null;
+  return best?{c:best.c,r:best.r}:null;
 }
 function autoLayout(keepFirst){
   const g=gridFor(document.documentElement.clientWidth);
@@ -3262,7 +3310,7 @@ async function setRegion(r){
        other, so both are cleared along with F.text. */
     F.text='';
     const hs=$('#f-text'); if(hs)hs.value='';
-    const ps=$('#sp-q');   if(ps)ps.value='';
+    const ps=$('#sp-q');   if(ps){ps.value='';paintSpClear();}
     paintClearBtn();
     /* the panel's rarity menu is built per region, so let it rebuild */
     const pr=$('#sp-rar'); if(pr)pr.dataset.done='';
@@ -3803,10 +3851,13 @@ function renderBinder(dir){
   }else{
     const copies=list.reduce((s,c)=>s+totalCopies(c.id),0);
     if(F.set||F.arch){
-      /* inside a set or core the useful number is how far along you are */
+      /* inside a set or core the useful number is how far along you are.
+         The percentage used to sit between the fraction and the copies, and
+         it is the one part of the line that says nothing the fraction beside
+         it has not already said - so it was three facts wide, ran past the
+         slot, and lost the copies count off the end. */
       const have=list.filter(c=>copiesIn(c.id).length).length;
-      const pct=list.length?Math.round(have/list.length*100):0;
-      $('#count').textContent=have+' / '+list.length+' cards \u00b7 '+pct+'%'+(copies?' \u00b7 '+copies+' copies':'');
+      $('#count').textContent=have+' / '+list.length+' cards'+(copies?' \u00b7 '+copies+' copies':'');
     }else{
       const cw=list.length===1?' card':' cards';
       const pw=copies===1?' copy':' copies';
@@ -4167,6 +4218,19 @@ function rollTo(node,key,value,fmt){
   };
   requestAnimationFrame(step);
 }
+/* The line under the headline said "P72,206 kept - P1,312 listed" while the
+   headline directly above it said P72,206. Half the line repeated the number
+   it sat under, and the half that did not - the other pile - was the half
+   that ran out of room and got clipped to "P1,312 liste". So it carries only
+   what the headline is not already saying: the pile you are not looking at,
+   and a pending deal when there is one. */
+function dashSub(selling,keep,sell,rsv){
+  const bits=[];
+  if(selling){ if(keep>0)bits.push(peso(keep)+' kept'); }
+  else       { if(sell>0)bits.push(peso(sell)+' listed'); }
+  if(rsv>0)bits.push(peso(rsv)+' reserved');
+  return bits.join(' · ');
+}
 function paintDash(){
 
   const d=$('#dash');if(!d)return;
@@ -4215,7 +4279,7 @@ function paintDash(){
       <div class="cap">${selling?'Selling value':'Collection value'}</div>
       <div class="big">${esc(peso(val))}</div>
       <div class="delta ${cls}">${esc(arrow)}</div>
-      <div class="sub2">${esc(peso(keep))} kept \u00b7 ${esc(peso(sell))} listed${rsv>0?' \u00b7 '+esc(peso(rsv))+' reserved':''}</div>
+      <div class="sub2">${esc(dashSub(selling,keep,sell,rsv))}</div>
     </div>
     <div class="dash-moves">
       <div class="cap">Since last session${movers().length?` <span class="mv-more">${movers().length} moved</span>`:''}</div>
@@ -15854,13 +15918,23 @@ function linkSetRarity(setSel,rarSel,card,o){
        added and the grid repainted - and what one printing is worth against
        another is the whole reason there is a choice to make. Cheapest shop
        that carries it, the same way every other figure in the app is asked. */
-    const rarPx=k=>{
-      const m=card?bestMatch({set:wantSet||'',rarity:k,qty:1},card):null;
-      return m&&isFinite(m.peso)?'  ·  '+peso(m.peso):'';
+    /* "Quarter Century Secret Rare  ·  P126,849" is 38 characters in a menu
+       that shows about 28, and the half that fell off the end was the price
+       - the thing just added. So the name gives way, not the number: past
+       the budget the option falls back to the chip abbreviation, which is
+       the same short form printed on the card in the grid and listed in the
+       Key. Only the long ones lose their name; "Ultra Rare  ·  P317" fits
+       and keeps it. */
+    const RAR_LABEL_MAX=28;
+    const rarLabel=r=>{
+      const m=card?bestMatch({set:wantSet||'',rarity:r.k,qty:1},card):null;
+      if(!m||!isFinite(m.peso))return r.n;
+      const px='  ·  '+peso(m.peso);
+      return (r.n+px).length<=RAR_LABEL_MAX?r.n+px:r.k+px;
     };
     rarSel.innerHTML=(anyRar?'<option value="">'+esc(anyRar)+'</option>':'')
       +RARITIES.filter(r=>rars.includes(r.k))
-        .map(r=>'<option value="'+esc(r.k)+'">'+esc(r.n+rarPx(r.k))+'</option>').join('');
+        .map(r=>'<option value="'+esc(r.k)+'" title="'+esc(r.n)+'">'+esc(rarLabel(r))+'</option>').join('');
     /* put the choices back, falling to the first still-valid one */
     setSel.value = sets.includes(wantSet) ? wantSet : (anySet?'':(sets[0]||''));
     rarSel.value = rars.includes(wantRar) ? wantRar : (anyRar?'':(rars[0]||''));
@@ -16834,6 +16908,47 @@ function aeEra(){
   });
 }
 const showLegacy=()=>!!DB.legacy;
+/* ---- a stub can borrow the real card's picture ----
+   Forty-six cards came out blank. Eleven are tokens, which have no art in
+   the feed and already say so. Twenty-four are newer than the card database
+   and there is nothing to borrow. The remaining eleven are the same card
+   under a shorter name: the shop writes "Megalosmasher" where the database
+   has "Megalosmasher X", "Recette de Poisson" against "Recette de Poisson
+   (Fish Recipe)", "Sky Striker Ace {{=}} Zero" against "Sky Striker Ace =
+   Zero".
+
+   So a stub looks for a real card whose name BEGINS with its own and takes
+   that card's art and details, keeping its own name and id - the id is what
+   the shop's price is keyed to, so it cannot change.
+
+   The match has to be unique and at least eight characters. That is what
+   stops "Giant-Soldier" picking between "Giant Soldier of Stone" and "Giant
+   Soldier of Steel": both are real cards, the shop means one of them, and
+   nothing in the row says which, so it stays blank rather than guess. A
+   wrong picture is worse than none - you would buy the wrong card. */
+let TWIN_KEYS=null,TWIN_BY_KEY=null;
+function twinIndex(){
+  TWIN_BY_KEY=new Map();
+  POOL.forEach(c=>{ if(c.stub||!c.img)return;
+    const lk=looseKey(c.name);
+    if(lk&&!TWIN_BY_KEY.has(lk))TWIN_BY_KEY.set(lk,c); });
+  TWIN_KEYS=[...TWIN_BY_KEY.keys()].sort();
+}
+function artTwin(name){
+  if(!TWIN_KEYS)return null;
+  const p=looseKey(name);
+  if(p.length<8)return null;
+  /* the keys are sorted, so everything sharing a prefix is contiguous:
+     find where the prefix would start, then take it only if exactly one
+     entry there begins with it */
+  let lo=0,hi=TWIN_KEYS.length;
+  while(lo<hi){const m=(lo+hi)>>1; if(TWIN_KEYS[m]<p)lo=m+1;else hi=m;}
+  const a=TWIN_KEYS[lo];
+  if(!a||!a.startsWith(p))return null;
+  const b=TWIN_KEYS[lo+1];
+  if(b&&b.startsWith(p))return null;          /* more than one - ambiguous */
+  return TWIN_BY_KEY.get(a)||null;
+}
 function refilterPool(){
 
   aeEra();
@@ -16851,17 +16966,23 @@ function refilterPool(){
      owning one at all, so stand in a minimal card, the name and the set, which
      is all the catalogue knows. No art and no text.                       */
   const known=new Set(POOL.map(c=>nameKey(c.name)));
+  twinIndex();
   cat.forEach(k=>{
     if(known.has(k))return;
     const nm=AE_NAME_BY_KEY.get(k); if(!nm)return;
     const x=extraFor(nm);
+    /* the harvest's own image first, then the fuller-named twin */
+    const tw=x&&xImg(x[1])?null:artTwin(nm);
     const src=x?xImg(x[1]):'';
     POOL.push({id:(ocgOn()?'jp-':'ae-')+k,name:nm,
-      type:x?(x[3]||x[2]||''):'',
-      desc:x?(x[8]||''):'',
-      archetype:'',img:src,imgFull:src,usd:0,ocg:'',stub:true,
+      type:x?(x[3]||x[2]||''):(tw?tw.type:''),
+      desc:x?(x[8]||''):(tw?tw.desc:''),
+      archetype:tw?tw.archetype:'',
+      img:src||(tw?tw.img:''),imgFull:src||(tw?tw.imgFull:''),
+      usd:0,ocg:'',stub:true,
       mon:x?{attribute:x[4]||'',level:x[5]===''?null:+x[5],race:'',
-             atk:x[6]===''?null:+x[6],def:x[7]===''?null:+x[7]}:{}});
+             atk:x[6]===''?null:+x[6],def:x[7]===''?null:+x[7]}
+           :(tw?tw.mon:{})});
   });
   /* And the ones only the shop knows about. The loop above stands in a card
      for anything the catalogue lists but the card database lacks; these are a
@@ -16883,8 +17004,11 @@ function refilterPool(){
       const lk=looseKey(row.name);
       if(haveLoose.has(lk))return;
       have.add(k); haveLoose.add(lk);
-      POOL.push({id:'ae-'+k,name:row.name,type:'',desc:'',archetype:'',
-        img:'',imgFull:'',usd:0,ocg:'',stub:true,mon:{}});
+      const tw=artTwin(row.name);
+      POOL.push({id:'ae-'+k,name:row.name,
+        type:tw?tw.type:'',desc:tw?tw.desc:'',archetype:tw?tw.archetype:'',
+        img:tw?tw.img:'',imgFull:tw?tw.imgFull:'',
+        usd:0,ocg:'',stub:true,mon:tw?tw.mon:{}});
     });
   }
   POOL.sort((a,b)=>a.name.localeCompare(b.name));
@@ -17073,33 +17197,17 @@ async function loadCachedNames(){
 
 /* --- preprocess: upscale, grey out, harden contrast; the name bar alone reads best --- */
 
-/* ============ manual ============ */
-const MANUAL_OFF=true;   /* see the note on the Add by hand button */
-function openManual(){
-  if(MANUAL_OFF){toast('Adding cards by hand is off for now');return;}
-  const box=el('div');
-  box.innerHTML=`
-    <div class="fld"><label>Card name</label><input class="inp" id="m-name" placeholder="e.g. Blue-Eyes White Dragon"></div>
-    <div class="fld"><label>Card type</label>
-      <select class="inp" id="m-type"><option>Effect Monster</option><option>Normal Monster</option><option>Fusion Monster</option><option>Synchro Monster</option><option>XYZ Monster</option><option>Link Monster</option><option>Ritual Monster</option><option>Pendulum Effect Monster</option><option>Spell Card</option><option>Trap Card</option></select></div>
-    <div class="fld"><label>Image link (optional)</label><input class="inp" id="m-img" placeholder="https://…"></div>
-    <div class="fld"><label>Card text (optional)</label><textarea class="inp" id="m-desc" rows="3"></textarea></div>
-    <div class="fld"><div class="pair">
-      <div><label>Rarity</label><select class="inp" id="m-rar">${RARITIES.map(r=>`<option value="${r.k}">${r.n}</option>`).join('')}</select></div>
-      <div><label>Copies</label><input class="inp" id="m-qty" type="number" min="1" value="1"></div>
-    </div></div>
-    <button class="btn btn-a" id="m-save" style="width:100%;margin-top:10px">Slot into binder</button>
-    <p class="hint">For brand-new Asian-English releases the database has not indexed yet.</p>`;
-  modal('Add a card by hand',box);
-  box.querySelector('#m-save').onclick=()=>{
-    const name=box.querySelector('#m-name').value.trim();
-    if(!name){toast('Give the card a name first');return;}
-    const id='manual-'+(++DB.seq),img=box.querySelector('#m-img').value.trim();
-    DB.manual[id]={id,name,type:box.querySelector('#m-type').value,desc:box.querySelector('#m-desc').value.trim(),img,imgFull:img,mon:{},archetype:''};
-    DB.own[id]={n:(DB.manual[id]&&DB.manual[id].name)||'',copies:[{rarity:box.querySelector('#m-rar').value,set:'',qty:Math.max(1,+box.querySelector('#m-qty').value||1),b:F.binder||DB.binders[0].id}],added:Date.now()};
-    save();closeModal();renderBinder();toast(name+' added');
-  };
-}
+/* ---- adding a card by hand: removed ----
+   It existed for Asian-English releases the card database had not indexed
+   yet. Both regions are now baked from a harvest of the full catalogue, so
+   a card you can hold is a card the app already knows, and a hand-made
+   entry was in neither baked list - which skewed the set and core counts
+   and could not be rebuilt by a sync. The button had been disabled for that
+   reason for a while; this removes it rather than leaving a dead control on
+   the header.
+
+   DB.manual is still read, exported and imported, so entries made before
+   this stay exactly where they are. Nothing new is written to it. */
 
 /* ============ decks ============ */
 
@@ -17652,6 +17760,7 @@ function spOpen(on){
   if(want){
     const q=$('#sp-q');
     q.value=F.text||'';
+    paintSpClear();
     /* Deliberately NOT inherited from the page. The binder defaults to
        showing only what you own, which is right for browsing and exactly
        wrong for searching: you look a card up precisely because you are
@@ -17765,7 +17874,7 @@ function spRender(){
 function bindSp(){
   $('#sp-body').querySelectorAll('.sp-row').forEach(b=>{
     b.onclick=()=>{
-      if(b.dataset.q){$('#sp-q').value=b.dataset.q;spRender();return;}
+      if(b.dataset.q){$('#sp-q').value=b.dataset.q;paintSpClear();spRender();return;}
       pushRecent($('#sp-q').value);
       if(b.dataset.set){
         keepBoard();VIEW='sets';F.set=b.dataset.set;F.arch='';page=0;
@@ -17812,7 +17921,17 @@ $('#f-text').onfocus=()=>spOpen(true);
 $('#f-text').onclick=()=>spOpen(true);
 
 let spT=null;
-$('#sp-q').oninput=e=>{clearTimeout(spT);spT=setTimeout(spRender,120);};
+/* The clear button follows the box rather than being toggled from each of
+   the four places that write to it - typing, a recent search, a suggestion,
+   opening the panel with a query already in the header. */
+function paintSpClear(){
+  const b=$('#sp-clr'),q=$('#sp-q');
+  if(b&&q)b.hidden=!q.value;
+}
+$('#sp-clr').onclick=()=>{
+  const q=$('#sp-q');q.value='';paintSpClear();spRender();q.focus();
+};
+$('#sp-q').oninput=e=>{paintSpClear();clearTimeout(spT);spT=setTimeout(spRender,120);};
 $('#sp-q').onkeydown=e=>{
   if(e.key==='Escape'){spOpen(false);return;}
   if(e.key==='Enter'){
@@ -17957,7 +18076,6 @@ document.addEventListener('fullscreenchange',()=>{
 $('#bm-hot').addEventListener('click',()=>bmPeek(2600));
 $('#bm-hot').addEventListener('touchstart',()=>bmPeek(2600),{passive:true});
 $('#jump').onchange=e=>{const n=parseInt(e.target.value,10);if(n>0)page=n-1;renderBinder();};
-$('#open-manual').onclick=openManual;
 /* Picking a pile. The wishlist is not a binder - nothing in it is owned - so
    it rides on VIEW rather than on F.binder, and the segment stands in for
    the view the same way the other two stand in for the binder.        */
