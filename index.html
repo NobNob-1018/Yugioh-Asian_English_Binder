@@ -927,6 +927,11 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
   clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:120;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-xs);padding:8px 14px;font-size:var(--fs-sm);animation:rise .22s ease}
 @keyframes rise{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+/* The one toast that does not go away by itself: it is an offer, not a
+   report, and it is worthless if it expires before it is read. */
+.toast-up{display:flex;align-items:center;gap:var(--sp-3);
+  border-color:var(--text);box-shadow:var(--sh-2);padding:8px 8px 8px 14px}
+.toast-up .btn{flex:none}
 
 /* ---- binder mode ----
    A reading room for the collection: the app furniture goes away and the
@@ -1797,6 +1802,14 @@ html.sp-on{overflow:hidden}
   font-size:var(--fs-3xs);color:var(--muted)}
 .mv-more{font-family:var(--mono);color:var(--faint);letter-spacing:0;text-transform:none}
 .mv-empty{margin:0;font-size:var(--fs-xs);color:var(--faint)}
+/* The wishlist line is the one thing here you might act on, so it reads at
+   the weight of a fact rather than of an aside - and when something has
+   actually reached its price it inverts, which is how this world says yes. */
+.mv-want{margin:0;font-size:var(--fs-xs);color:var(--muted)}
+.mv-want b{font-family:var(--mono);font-weight:700;color:var(--text)}
+.mv-want.ok{color:var(--text)}
+.mv-want.ok b{background:var(--text);color:var(--on-accent);padding:0 5px}
+.mv-foot .mv-want{font-size:var(--fs-3xs)}
 .mv-foot{font-size:var(--fs-3xs);color:var(--muted);font-family:var(--mono);
   flex:0 0 auto;margin-left:auto;white-space:nowrap}
 /* what is current and what is not, in one place, because two of the three
@@ -3092,7 +3105,26 @@ function fitLayout(){
   const cap=g.querySelector('.cap-row');
   const overlaid=cap?getComputedStyle(cap).position==='absolute':false;
   const capH=(cap&&!overlaid)?cap.getBoundingClientRect().height+3:0;
-  const avail=window.innerHeight-(gr.top+(window.scrollY||0))-16;
+  /* Everything the page puts BELOW the sheet - the binder's padding, the
+     shell's padding, the empty-state slot - measured in one go rather than
+     listed. A flat 16 was guessed here against a real 37, so the cards fitted
+     the window and the document still ran 13px past it: enough to raise a
+     scrollbar, which narrows the grid, which changes the answer that raised
+     it. None of those numbers can drift out of step with the stylesheet if
+     nothing names them.
+
+     Measured off the shell's own bottom edge, NOT off scrollHeight, which
+     never reports less than the viewport: on a page shorter than the window
+     it answered 386 where the truth was 37, and that error fed itself -
+     a smaller sheet makes a shorter page, which inflates the gap, which
+     shrinks the sheet again. Both rectangles are viewport-relative, so the
+     scroll position cancels and nothing has to be added back.
+
+     What sits below the sheet does not depend on how tall the sheet is, so
+     this stays true while the layout it feeds is still being decided. */
+  const host=g.closest('.shell')||g.parentElement;
+  const below=host?Math.max(8,host.getBoundingClientRect().bottom-gr.bottom):16;
+  const avail=window.innerHeight-(gr.top+(window.scrollY||0))-below;
   if(avail<120)return null;
   /* The card's width comes from the COLUMN COUNT alone - the grid divides
      the row into equal tracks and the card fills its track. The height
@@ -4264,15 +4296,47 @@ function paintDash(){
      is the one figure worth a headline; the other three tiles become the
      list of what actually changed, which is what you open the app to see. */
   const M2=movers(4);
+  /* ---- this panel should say what to DO, not only what happened ----
+     It carried a list of movers, a margin line and the sync status. On a
+     quiet day the movers were the sentence "Nothing moved since your last
+     session" - a whole row to say nothing, under a heading already reading
+     SINCE LAST SESSION, beside a headline reading "+P11,351 since last
+     session", which looks like a flat contradiction. It is not one: the
+     headline compares two snapshots of the whole collection and the list
+     compares individual card prices. But nobody should have to know that to
+     read their own dashboard.
+
+     And the margin line said "Asking P1,312 against P1,312 - 0%" whenever an
+     asking price was taken from the shop, which is most of the time. Zero
+     percent is not news.
+
+     So both stand down when they have nothing to report, and the room goes
+     to the wishlist: the only thing on this screen that tells you what to do
+     next rather than what already happened. You are holding a phone in a
+     shop; "three of the seven you want are at or under your price" is worth
+     more than any of the numbers it replaced. */
+  const W=wantTotals();
+  const wantLine=!W.lines?''
+    : W.met
+      ? `<p class="mv-want ok"><b>${W.met}</b> of ${W.lines} wanted ${W.lines===1?'card is':'cards are'} at or under target</p>`
+    : W.quoted
+      ? `<p class="mv-want">Nothing wanted has hit its target \u00b7 ${esc(peso(W.now))} to clear the list</p>`
+      : `<p class="mv-want">${W.lines} on the wishlist, none priced yet</p>`;
   const moveRows=M2.length
     ? M2.map(m=>`<button class="mv-row" data-id="${esc(m.id)}" title="Open ${esc(m.name)}">
         <span class="mv-n">${esc(m.name)}</span>
         <span class="mv-d ${m.d>0?'up':'down'}">${m.d>0?'\u25b2':'\u25bc'} ${esc(peso(Math.abs(m.d)))}</span>
       </button>`).join('')
-    : `<p class="mv-empty">${h.length>1
+    : (wantLine || `<p class="mv-empty">${h.length>1
         ? 'Nothing moved since your last session.'
-        : 'No earlier prices yet. Sync prices twice and changes show up here.'}</p>`;
+        : 'No earlier prices yet. Sync prices twice and changes show up here.'}</p>`);
   const more=movers().length-M2.length;
+  /* The margin earns the line only when there is a margin to report; failing
+     that the wishlist takes it, if the list above has not already used it. */
+  const mgPc=M.n&&M.srp>0?(M.ask-M.srp)/M.srp*100:null;
+  const footer=(mgPc!=null&&Math.abs(mgPc)>=0.5)
+    ? `<div class="mv-foot">Asking ${esc(peso(M.ask))} against ${esc(peso(M.srp))} ${esc(shopName())} \u2014 <b class="${mgPc<0?'up':'down'}">${mgPc>0?'+':''}${Math.round(mgPc)}%</b></div>`
+    : (M2.length&&wantLine?`<div class="mv-foot">${wantLine}</div>`:'');
 
   d.innerHTML=`
     <div class="dash-head">
@@ -4284,7 +4348,7 @@ function paintDash(){
     <div class="dash-moves">
       <div class="cap">Since last session${movers().length?` <span class="mv-more">${movers().length} moved</span>`:''}</div>
       <div class="mv-list">${moveRows}</div>
-      ${M.n&&M.srp>0?`<div class="mv-foot">Asking ${esc(peso(M.ask))} against ${esc(peso(M.srp))} ${esc(shopName())} \u2014 <b class="${(M.ask-M.srp)/M.srp*100<-0.5?'up':((M.ask-M.srp)/M.srp*100>0.5?'down':'flat')}">${((M.ask-M.srp)/M.srp*100)>0?'+':''}${Math.round((M.ask-M.srp)/M.srp*100)}%</b></div>`:''}
+      ${footer}
       <div class="sync-line" title="Everything that comes over the network">${esc(syncStatus())}</div>
     </div>
 `;
@@ -18133,9 +18197,40 @@ async function askPersist(){
     return STORAGE_PERSISTED;
   }catch(e){ return null; }
 }
+/* ---- a new build lands on the first reload, not the second ----
+   The shell is served cache-first and refreshed in the background, which is
+   what makes the app open instantly and work with no signal - both worth
+   more here than being current. The cost is that a reload paints the copy
+   already on the device and only fetches the new one for NEXT time, so every
+   change needed two reloads and the first one looked like nothing happened.
+
+   Rather than give up cache-first, the page now says when the new version
+   has finished downloading and is one tap from being shown. The service
+   worker calls skipWaiting and claim, so by the time this fires the new code
+   is already installed and controlling - only this document is still the old
+   one. */
+function updateReady(){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=el('div','toast toast-up');
+  t.innerHTML='<span>A newer version is ready.</span>';
+  const b=el('button','btn btn-sm','Reload');
+  b.type='button'; b.onclick=()=>location.reload();
+  t.appendChild(b);
+  document.body.appendChild(t);
+  say('A newer version of the binder is ready. Reload to use it.');
+}
 if('serviceWorker' in navigator&&location.protocol.startsWith('http')){
   window.addEventListener('load',()=>{
+    /* Whether a worker was already in charge when this page loaded. A first
+       ever visit also fires controllerchange, from claim(), and that is not
+       an update - there is nothing older to replace. */
+    const had=!!navigator.serviceWorker.controller;
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    if(had)navigator.serviceWorker.addEventListener('controllerchange',()=>{
+      /* reload() here instead would throw away whatever is half-typed or
+         half-scrolled, so it asks */
+      updateReady();
+    },{once:true});
     askPersist();
   });
 }
