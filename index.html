@@ -1755,6 +1755,35 @@ html.sp-on{overflow:hidden}
 /* the caption is now the code and the price, so it gets the room */
 .cap-row .cap-id{flex:0 1 auto;min-width:0}
 .cap-row .cap-v{flex:1 1 auto;justify-content:flex-end;min-width:0}
+/* ---- a price is one word ----
+   The row is nowrap but its CHILDREN were not, so a squeezed "P3,181 ea"
+   broke between the number and the "ea" and the caption became three lines
+   tall - above a card the fit had measured as having a one-line caption. The
+   sheet then had eight columns of cards with captions taller than the space
+   left for them. A price never breaks. */
+.cap-row .cap-ea,.cap-row .cap-p,.cap-row .cap-d,
+.cap-row .cap-g,.cap-row .cap-srp{white-space:nowrap}
+.cap-row{overflow:hidden}
+/* ---- and what the caption says depends on the room it has ----
+   Four things want that line: the set code, what one copy is worth, what the
+   stack is worth, and what it moved since last session. At 190px they all
+   fit. At 150 they do not, and the answer is not a smaller font - it is to
+   stop saying the least useful one.
+
+   The change goes first: the dashboard lists the movers by name directly
+   above, so this is the only figure here repeating something already on the
+   screen. The stack total goes next, because it is the per-card price times
+   the count in the corner of the card. What survives at any width is the
+   code and the price of one copy, which are the two things you say out loud
+   across a table. */
+.page[data-cap="tight"] .cap-d,
+.page[data-cap="tight"] .cap-g,
+.page[data-cap="tight"] .cap-srp,
+.page[data-cap="bare"] .cap-d,
+.page[data-cap="bare"] .cap-g,
+.page[data-cap="bare"] .cap-srp{display:none}
+.page[data-cap="bare"] .cap-v.stacked .cap-p{display:none}
+.page[data-cap="bare"] .cap-v.stacked .cap-ea{font-weight:600;color:var(--text)}
 .cap-row .cap-s{font-size:var(--fs-2xs)}
 /* an empty pocket has no rarity to show */
 .pocket-empty .pk-r{display:none}
@@ -3050,6 +3079,15 @@ function applyLayout(c,r,keepFirst,cardW){
     .getPropertyValue('--gap'))||12;
   document.documentElement.style.setProperty('--sheet-w',
     cardW?Math.round(c*cardW+gapv*(c-1))+'px':'none');
+  /* How much the caption under each card is allowed to say. Measured off the
+     card the layout actually produced rather than a breakpoint, because the
+     same window gives different card widths depending on how tall the
+     dashboard has grown. */
+  const g=document.getElementById('page');
+  if(g){
+    const w=cardW||0;
+    g.setAttribute('data-cap',!w?'full':w>=182?'full':w>=150?'tight':'bare');
+  }
   page=Math.floor(firstCard/PER);
 }
 /* The sheet follows the window now, instead of a manual 6x2 / 4x3 / 3x3 switch.
@@ -3922,6 +3960,16 @@ function warmNext(list,page,per){
   if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:2000});
   else setTimeout(run,600);
 }
+/* applyLayout guesses this from the width it asked for; this settles it from
+   the card that actually arrived, which is the only number that can be wrong
+   in a way the caption will show. */
+function capDensity(grid){
+  const p=grid&&grid.querySelector('.pocket');
+  if(!p)return;
+  const w=p.getBoundingClientRect().width;
+  if(!w)return;
+  grid.setAttribute('data-cap',w>=182?'full':w>=150?'tight':'bare');
+}
 function renderBinder(dir){
   /* Settle the grid before measuring anything. autoLayout only sets the CSS
      variables and PER, so this cannot recurse, and it means the sheet is right
@@ -3965,6 +4013,7 @@ function renderBinder(dir){
   paintEmptyState(list,bn,dk);
 
   paintSlots(grid,slice,bn,selling);
+  capDensity(grid);
 
   paintPager(page,pages);
   warmNext(list,page,PER);
