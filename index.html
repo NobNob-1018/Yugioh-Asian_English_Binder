@@ -3426,6 +3426,7 @@ async function setRegion(r){
         binders:BINDERS.map(b=>Object.assign({},b)),seq:0};
     const saved=await Store.get();
     if(saved)DB=migrate(saved);
+    LAST_SNAP=null;     /* a different binder: nothing here changed, it was replaced */
     applyPrefs();       /* theme, card size and rates survive the swap */
     DB.fx=DB.fx||58;
     DB.fxHkd=DB.fxHkd||7.88;
@@ -3663,6 +3664,7 @@ async function undoLast(){
   const snap=UNDO; UNDO=null;
   try{
     DB=JSON.parse(snap.json);
+    LAST_SNAP=null;
     DATA_V++;
     await save();
     renderBinder();
@@ -5936,6 +5938,7 @@ let SAVE_FAILED=false;
 async function save(){
   DATA_V++;
   savePrefs();          /* device settings, kept clear of the region swap */
+  stampChanges();       /* when each copy last moved, and what has been deleted */
   const ok=await Store.set(DB);
   if(!ok&&!SAVE_FAILED){
     SAVE_FAILED=true;
@@ -17511,7 +17514,28 @@ function openTransfer(){
     'already here, so nothing on either side is lost.</p>'+
     '<textarea class="tf-code" id="tf-in" rows="3" placeholder="'+TCODE+'…"></textarea>'+
     '<div class="tf-row"><button class="btn btn-sm" id="tf-load">Load code</button>'+
-    '<button class="btn btn-sm ghost" id="tf-loadfile">Load a file instead</button></div>';
+    '<button class="btn btn-sm ghost" id="tf-loadfile">Load a file instead</button></div>'+
+    /* The codes above move a binder once. This keeps two of them level. */
+    '<h4 class="tf-h">Keep devices in step</h4>'+
+    (ghTok()
+      ? '<p class="note">Set up. Sync reads what your other devices left, merges it with '+
+        'this one, and writes the result back. A copy edited in two places keeps the '+
+        'later edit; one deleted anywhere stays deleted. Safe to press on either device, '+
+        'in any order.</p>'+
+        '<div class="tf-row"><button class="btn btn-sm btn-a" id="gh-sync">Sync now</button>'+
+        '<button class="btn btn-sm ghost" id="gh-forget">Forget this token</button></div>'+
+        '<p class="note" id="gh-msg">Token …'+esc(ghTok().slice(-4))+
+        (PREFS.gistId?' · gist '+esc(String(PREFS.gistId).slice(0,8)):' · no gist yet')+'</p>'
+      : '<p class="note">Sync through a private GitHub gist. No server of mine, nothing '+
+        'public, and the binder still works with no signal — this is a button you press, '+
+        'not something running behind you.</p>'+
+        '<p class="note">Make a token at <b>github.com/settings/tokens</b> with '+
+        '<b>gist</b> access and nothing else, then paste it here. It is kept on this '+
+        'device only and never travels with an exported binder.</p>'+
+        '<input class="inp" id="gh-tok" type="password" autocomplete="off" '+
+        'placeholder="ghp_… or github_pat_…" style="width:100%">'+
+        '<div class="tf-row"><button class="btn btn-sm" id="gh-save">Save token</button></div>'+
+        '<p class="note" id="gh-msg"></p>');
   const body=modal('Transfer between devices — '+regionLabel(),box);
   const out=body.querySelector('#tf-out');out.value=code;out.scrollTop=0;
   body.querySelector('#tf-copy').onclick=()=>{
@@ -17523,6 +17547,44 @@ function openTransfer(){
   };
   body.querySelector('#tf-file').onclick=doExport;
   body.querySelector('#tf-loadfile').onclick=()=>$('#file-in').click();
+  const msg=body.querySelector('#gh-msg');
+  const setMsg=t=>{if(msg)msg.textContent=t;};
+  const tokBox=body.querySelector('#gh-tok');
+  if(tokBox)body.querySelector('#gh-save').onclick=()=>{
+    const v=tokBox.value.trim();
+    if(!v){setMsg('Paste the token first.');return;}
+    PREFS.ghTok=v;savePrefs();
+    tokBox.value='';                       /* not left sitting in the DOM */
+    closeModal();openTransfer();
+    toast('Token saved on this device');
+  };
+  const syncBtn=body.querySelector('#gh-sync');
+  if(syncBtn)syncBtn.onclick=async()=>{
+    syncBtn.disabled=true;
+    try{
+      const r=await syncBinder(setMsg);
+      renderBinder();paintDash();
+      if(r.created)setMsg('Made a private gist and put this binder in it. Set the same token on your other device and press Sync there.');
+      else{
+        const s=r.stat||{cards:0,copies:0,dropped:0,wants:0};
+        setMsg('In step. '+s.cards+' new card'+(s.cards===1?'':'s')+', '+
+               s.copies+' cop'+(s.copies===1?'y':'ies')+' brought over, '+
+               s.dropped+' removed elsewhere.');
+      }
+      toast('Binder synced');
+    }catch(e){
+      /* Offline is the ordinary case here, not a fault. Nothing was written
+         and nothing was lost; the binder on this device is untouched. */
+      setMsg(navigator.onLine?String(e.message||e)
+        :'No connection. Nothing was sent, and nothing here has changed.');
+    }finally{ syncBtn.disabled=false; }
+  };
+  const forget=body.querySelector('#gh-forget');
+  if(forget)forget.onclick=()=>{
+    delete PREFS.ghTok;delete PREFS.gistId;savePrefs();
+    closeModal();openTransfer();
+    toast('Token removed from this device');
+  };
   body.querySelector('#tf-load').onclick=()=>{
     const v=body.querySelector('#tf-in').value;
     if(!v.trim()){toast('Paste a code first');return;}
@@ -17595,6 +17657,201 @@ function migrate(saved){
     out.own[c.id]={n:card.name||'',copies:copies||[],added:added||Date.now()};
   });
   return withBinders(out);
+}
+/* ============ sync ============
+   ---- what a merge needs that an import does not ----
+   mergeIn below takes the larger of two quantities, which is right for
+   bringing a file in once: neither side should lose a card. It is wrong for
+   two devices that keep talking. Sell three copies on the phone and the
+   desktop's older three win the next merge, every time - a count can go up
+   and never down, and a card you delete comes back.
+
+   Three things fix that, and none of them are the network.
+
+   A copy has an identity: its card, set, rarity and binder. The app already
+   treats those four as the same copy - every "find the row to add to" in the
+   file matches on exactly them - so this is not a new idea, only a written
+   down one.
+
+   A copy carries WHEN it last changed, so two versions of it can be ordered.
+
+   And a deletion is a fact that has to travel. Without a record of it, the
+   other side simply re-sends the copy and it returns from the dead.
+
+   The stamping happens in save() by diffing against what was last written,
+   NOT at the twenty-odd places that touch a copy. Those are easy to add to
+   and easy to forget, and one forgotten stamp is a copy that silently loses
+   every merge it is ever in. */
+const syncKey=(id,cp)=>id+'|'+(cp.set||'')+'|'+(cp.rarity||'')+'|'+(cp.b||'');
+const wantKey=(id,r)=>'w:'+id+'|'+(r.set||'')+'|'+(r.rarity||'');
+/* everything about a copy that a change would alter */
+const copySig=cp=>(+cp.qty||0)+'~'+(cp.price==null?'':cp.price)+'~'+(cp.cond||'');
+const wantSig=r=>(+r.qty||1)+'~'+(r.target==null?'':r.target);
+function syncSnap(){
+  const m=new Map();
+  for(const id in DB.own)
+    for(const cp of (DB.own[id].copies||[])) m.set(syncKey(id,cp),copySig(cp));
+  for(const id in (DB.want||{}))
+    for(const r of ((DB.want[id]||{}).rows||[])) m.set(wantKey(id,r),wantSig(r));
+  return m;
+}
+let LAST_SNAP=null;
+/* Tombstones are kept for half a year. A device that has not opened in six
+   months is going to re-add the card, and that is a better failure than
+   carrying every deletion this binder has ever made for ever. */
+const GONE_TTL=182*864e5;
+function stampChanges(){
+  const now=Date.now();
+  const snap=syncSnap();
+  const each=fn=>{
+    for(const id in DB.own)
+      for(const cp of (DB.own[id].copies||[])) fn(syncKey(id,cp),cp,DB.own[id].added);
+    for(const id in (DB.want||{}))
+      for(const r of ((DB.want[id]||{}).rows||[])) fn(wantKey(id,r),r,(DB.want[id]||{}).added);
+  };
+  if(!LAST_SNAP){
+    /* first save of the session: nothing changed, but anything written before
+       this existed needs a time, and the moment the card was added is the
+       only honest one available */
+    each((k,o,added)=>{if(o.u==null)o.u=added||0;});
+    LAST_SNAP=snap;return;
+  }
+  DB.gone=DB.gone||{};
+  each((k,o,added)=>{
+    if(LAST_SNAP.get(k)!==snap.get(k))o.u=now;
+    else if(o.u==null)o.u=added||0;
+    if(DB.gone[k])delete DB.gone[k];        /* it is back; the mark is wrong */
+  });
+  for(const k of LAST_SNAP.keys())if(!snap.has(k))DB.gone[k]=now;
+  for(const k in DB.gone)if(now-DB.gone[k]>GONE_TTL)delete DB.gone[k];
+  LAST_SNAP=snap;
+}
+/* ---- the merge itself ----
+   Commutative and idempotent: which device runs it first cannot change the
+   answer, and running it twice is the same as running it once. Both matter,
+   because two phones can sync in either order and a flaky connection means
+   the same payload arrives more than once. */
+function mergeSync(inc){
+  const stat={cards:0,copies:0,dropped:0,wants:0};
+  if(!inc||typeof inc!=='object')return stat;
+  const theirGone=inc.gone||{};
+  DB.gone=DB.gone||{};
+  for(const k in theirGone)
+    if(!(DB.gone[k]>=theirGone[k]))DB.gone[k]=theirGone[k];
+
+  /* the parts that only ever grow, matched on their own ids */
+  (inc.binders||[]).forEach(b=>{if(!DB.binders.some(x=>x.id===b.id))DB.binders.push(b);});
+  Object.assign(DB.manual,inc.manual||{});
+  DB.deals2=DB.deals2||[];
+  (inc.deals2||[]).forEach(d=>{if(!DB.deals2.some(x=>x.id===d.id))DB.deals2.push(d);});
+  DB.seq=Math.max(DB.seq||0,inc.seq||0);
+
+  /* theirs -> mine */
+  for(const id in (inc.own||{})){
+    const ro=inc.own[id]||{};
+    let mine=DB.own[id];
+    if(!mine){mine=DB.own[id]={n:ro.n||'',copies:[],added:ro.added||Date.now()};stat.cards++;}
+    if(ro.added&&(!mine.added||ro.added<mine.added))mine.added=ro.added;
+    for(const cp of (ro.copies||[])){
+      const k=syncKey(id,cp),ru=+cp.u||0;
+      if((DB.gone[k]||0)>ru){stat.dropped++;continue;}   /* deleted here, later */
+      const hit=(mine.copies||[]).find(x=>syncKey(id,x)===k);
+      if(!hit){(mine.copies=mine.copies||[]).push(Object.assign({},cp));stat.copies++;}
+      else if(ru>(+hit.u||0)){Object.assign(hit,cp);stat.copies++;}
+    }
+  }
+  DB.want=DB.want||{};
+  for(const id in (inc.want||{})){
+    for(const r of ((inc.want[id]||{}).rows||[])){
+      const k=wantKey(id,r),ru=+r.u||0;
+      if((DB.gone[k]||0)>ru){stat.dropped++;continue;}
+      const rows=wantRows(id);
+      const hit=rows.find(x=>(x.set||'')===(r.set||'')&&(x.rarity||'')===(r.rarity||''));
+      if(!hit){addWantRow(id,r);stat.wants++;}
+      else if(ru>(+hit.u||0)){Object.assign(hit,r);stat.wants++;}
+    }
+  }
+  /* mine -> theirs: anything they deleted after I last touched it goes */
+  for(const id in DB.own){
+    const o=DB.own[id];
+    o.copies=(o.copies||[]).filter(cp=>{
+      const drop=(theirGone[syncKey(id,cp)]||0)>(+cp.u||0);
+      if(drop)stat.dropped++;
+      return !drop;
+    });
+    if(!o.copies.length&&!wantRows(id).length)delete DB.own[id];
+  }
+  for(const id in DB.want){
+    const e=DB.want[id];
+    e.rows=(e.rows||[]).filter(r=>!((theirGone[wantKey(id,r)]||0)>(+r.u||0)));
+    if(!e.rows.length)delete DB.want[id];
+  }
+  return stat;
+}
+/* What travels. Device settings never do - a phone's theme is not a desktop's
+   business, and the sync credentials least of all. */
+function syncPayload(){
+  return {v:2,region:REGION,t:Date.now(),
+    own:DB.own,want:DB.want,manual:DB.manual,
+    binders:DB.binders,deals2:DB.deals2,seq:DB.seq,gone:DB.gone||{}};
+}
+/* ---- where the merged binder is kept ----
+   A private GitHub gist, because it is the only free store that needs no
+   server of mine, no account you do not already have, and no build step -
+   the three things this app cannot have. The binder stays local-first and
+   fully offline; this is a button you press, not a thing running behind you.
+
+   The token lives in device prefs, which never leave the device and are never
+   part of an export. It is asked for with gist scope only, so the worst a
+   leaked one can do is read and write gists. It is never put in a URL, never
+   logged, and shown back only as its last four characters. */
+const GH_API='https://api.github.com';
+const gistFile=()=>'ygo-binder-'+REGION+'.json';
+const ghTok=()=>PREFS.ghTok||'';
+function ghHeaders(){
+  return {'Authorization':'Bearer '+ghTok(),
+          'Accept':'application/vnd.github+json',
+          'X-GitHub-Api-Version':'2022-11-28'};
+}
+async function ghCall(path,opts){
+  const r=await fetch(GH_API+path,Object.assign({headers:ghHeaders()},opts||{}));
+  if(r.status===401)throw new Error('That token was refused. Make a new one with gist access.');
+  if(r.status===404)throw new Error('That gist is gone. Clear the id in Sync and it will make a new one.');
+  if(!r.ok)throw new Error('GitHub said '+r.status+'.');
+  return r.json();
+}
+/* One gist holds both regions as two files, so a phone set up once carries
+   the Asian-English and the Japanese binder without being told twice. */
+async function syncBinder(onLog){
+  const say=onLog||(()=>{});
+  if(!ghTok())throw new Error('No token yet.');
+  const body=()=>{const f={};f[gistFile()]=({content:JSON.stringify(syncPayload())});
+    return JSON.stringify({description:'Yu-Gi-Oh Binder — collection sync',public:false,files:f});};
+  let id=PREFS.gistId||'';
+  if(!id){
+    say('Making a private gist…');
+    const made=await ghCall('/gists',{method:'POST',body:body()});
+    PREFS.gistId=id=made.id;savePrefs();
+    return {created:true,stat:null};
+  }
+  say('Reading…');
+  const g=await ghCall('/gists/'+encodeURIComponent(id));
+  const f=(g.files||{})[gistFile()];
+  let stat=null;
+  if(f){
+    /* a gist over a megabyte comes back truncated, with a raw_url to the rest */
+    const text=f.truncated&&f.raw_url?await (await fetch(f.raw_url)).text():f.content;
+    let inc=null;
+    try{inc=JSON.parse(text);}catch(e){throw new Error('The stored binder is not readable JSON.');}
+    if(inc&&inc.region&&inc.region!==REGION)
+      throw new Error('That file holds the other region. Switch binders and sync again.');
+    say('Merging…');
+    stat=mergeSync(inc);
+    await save();
+  }
+  say('Writing back…');
+  await ghCall('/gists/'+encodeURIComponent(id),{method:'PATCH',body:body()});
+  return {created:false,stat};
 }
 /* Copies are merged, never replaced: bringing a phone's binder onto a desktop
    that already holds cards must not lose either side. A copy is the same copy
@@ -18341,6 +18598,7 @@ paintRarityKey();
 (async()=>{
   const saved=await Store.get();
   if(saved)DB=migrate(saved);
+  LAST_SNAP=null;
   applyPrefs();
   MODE=defaultMode();
   RARITIES = ocgOn()?RARITIES_JP:RARITIES_AE;
