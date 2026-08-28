@@ -750,6 +750,11 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
   grid-auto-rows:max-content;
   gap:var(--gap);
   width:100%;
+  /* Set by applyLayout when the window's HEIGHT is what limits the card, so
+     the columns cannot then stretch it back to a size that does not fit. It
+     is 'none' the rest of the time, which is every layout where the width is
+     the binding constraint - so on most screens this does nothing at all. */
+  max-width:var(--sheet-w,none);
   margin:0 auto;
 }
 /* Binder, Sets and Cores are three views of one thing, so moving between
@@ -3054,11 +3059,19 @@ let VIEW='binder';
 let MODE='grid';   /* grid = card images, list = rows. A display choice, not a view. */
 let LAYOUT={c:6,r:2};
 let PER=LAYOUT.c*LAYOUT.r;
-function applyLayout(c,r,keepFirst){
+function applyLayout(c,r,keepFirst,cardW){
   const firstCard=keepFirst?page*PER:0;
   LAYOUT={c,r};PER=c*r;
   document.documentElement.style.setProperty('--cols',c);
   document.documentElement.style.setProperty('--rows',r);
+  /* How wide the sheet is allowed to be, so a card limited by the window's
+     HEIGHT is not then stretched by its column back to a size that does not
+     fit. Unset means "take the room you are given", which is what every
+     layout wants until the height is the binding constraint. */
+  const gapv=parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--gap'))||12;
+  document.documentElement.style.setProperty('--sheet-w',
+    cardW?Math.round(c*cardW+gapv*(c-1))+'px':'none');
   page=Math.floor(firstCard/PER);
 }
 /* The sheet follows the window now, instead of a manual 6x2 / 4x3 / 3x3 switch.
@@ -3118,7 +3131,19 @@ function fitLayout(target){
   const g=document.getElementById('page');
   if(!g)return null;
   const gr=g.getBoundingClientRect();
-  const W=gr.width;
+  /* The room the sheet is ALLOWED, not the room it currently takes. Since
+     applyLayout can cap the sheet's width, measuring the sheet itself means
+     reading back your own last answer as if it were the space available -
+     and then narrowing again from there. It ratcheted 212 - 152 - ... - 119
+     over successive passes, each one perfectly reasonable given the last.
+     The parent's content box is the constraint that does not move. */
+  const par=g.parentElement;
+  let W=gr.width;
+  if(par){
+    const ps=getComputedStyle(par);
+    const inner=par.clientWidth-(parseFloat(ps.paddingLeft)||0)-(parseFloat(ps.paddingRight)||0);
+    if(inner>40)W=inner;
+  }
   if(W<40)return null;
   const cs=getComputedStyle(g);
   const gap=parseFloat(cs.rowGap||cs.gap)||12;
@@ -3148,43 +3173,88 @@ function fitLayout(target){
   const below=host?Math.max(8,host.getBoundingClientRect().bottom-gr.bottom):16;
   const avail=window.innerHeight-(gr.top+(window.scrollY||0))-below;
   if(avail<120)return null;
-  /* The card's width comes from the COLUMN COUNT alone - the grid divides
-     the row into equal tracks and the card fills its track. The height
-     budget does not shrink it; a card too tall for its row is simply cut off
-     at the bottom of the window. Taking the smaller of the two, which is the
-     obvious thing to write, silently accepted shapes that overflowed by the
-     difference: 6x2 at 1280x800 modelled a 146px card, rendered a 155px one,
-     and ran 9px past the fold.
+  /* ---- the count is the count; the SHEET gives way, not the card count ----
+     The previous version treated the number as a floor and spent any spare
+     room on extra columns. On a short wide window that turned a page of
+     twelve into twenty cards at 135px, with the set code clipped to "RO..."
+     and the price wrapped onto a second line. It fitted, and it was worse
+     than the problem: nobody asked for more cards, they asked for the ones
+     they had chosen to be visible.
 
-     So width is width, and height is a test the shape either passes or
-     fails. */
-  const maxCols=Math.max(1,Math.floor((W+gap)/(CARD_MIN_W+gap)));
-  /* reaching the target matters more than card size; failing that, more
-     cards; and between two equals, the bigger picture */
-  const better=(n,w,b)=>{
-    const hit=n>=want, bhit=b.n>=want;
-    if(hit!==bhit)return hit;
-    if(hit)return w>b.w;
-    return n>b.n||(n===b.n&&w>b.w);
-  };
+     So the count is held exactly and the sheet is what gives. A card has to
+     satisfy both budgets - the height left in the window and the width of
+     its column - and it takes the smaller of the two. Where the height is
+     the binding one, the sheet is narrower than the space it sits in and
+     centres, which is the one option the earlier versions never considered:
+     twelve cards at 152px in a 972px sheet, rather than twenty at 135px
+     filling every pixel of 1308. A binder page has margins. */
+  /* There is exactly one readability test - whether the card that comes out
+     rounds to CARD_MIN_W or better - and it is applied per shape below. An
+     earlier column cap computed the same idea a second way, with a floor
+     instead of a rounding, and the two disagreed on the boundary: at 1000x980
+     a six-column card measures 107.8, which rounds to 108 and passes, while
+     the cap said five columns and threw the shape away unseen. Twelve cards
+     then fell to the overflow branch on a window that could hold them. */
   let best=null;
   for(let rows=1;rows<=CARD_MAX_ROWS;rows++){
+    let cols=Math.ceil(want/rows);
+    /* Facing pages draws a spine down the middle of the sheet, so the two
+       leaves have to hold the same number of cards. An odd column count puts
+       that spine through a card rather than between two. */
+    if(spreadOn()&&cols%2)cols++;
     const byH=((avail-gap*(rows-1))/rows-capH)/CARD_ASPECT;
-    if(byH<CARD_MIN_W)break;             /* more rows only makes this worse */
-    for(let cols=1;cols<=maxCols;cols++){
-      /* Facing pages draws a spine down the middle of the sheet, so the two
-         leaves have to hold the same number of cards. An odd column count
-         puts that spine through a card rather than between two. */
-      if(spreadOn()&&cols%2)continue;
-      const w=(W-gap*(cols-1))/cols;
-      if(Math.round(w)<CARD_MIN_W)break;  /* more columns only get narrower */
-      if(w>byH+0.5)continue;              /* too tall for this many rows */
-      if(w>CARD_MAX_W)continue;           /* poster-size; more columns fix it */
-      const n=rows*cols;
-      if(!best||better(n,w,best))best={c:cols,r:rows,n,w};
-    }
+    const byW=(W-gap*(cols-1))/cols;
+    const w=Math.min(byH,byW,CARD_MAX_W);
+    if(Math.round(w)<CARD_MIN_W)continue; /* no readable card in this shape */
+    if(!best||w>best.w)best={c:cols,r:rows,w};
   }
-  return best?{c:best.c,r:best.r}:null;
+  /* Nothing holds the count at a readable size - a very short or very narrow
+     window. Rather than quietly change the number, take the shape that comes
+     closest and let it run over: the setting said twelve, and a page of
+     twelve that needs a nudge of scrolling is a truer answer than a page of
+     twenty that does not. */
+  /* On a phone the count gives way instead. The request was for twelve on
+     screen ON A DESKTOP, and below 920px this layout has already diverged -
+     the caption sits on the artwork, the rail is a sheet. Holding twelve
+     there means 3x4 and 1.35 screens of scrolling where six fitted outright,
+     which is a change nobody asked for on the surface nobody complained
+     about. So the phone keeps the most cards that actually fit. */
+  if(!best&&overlaid){
+    for(let rows=1;rows<=CARD_MAX_ROWS;rows++){
+      const byH=((avail-gap*(rows-1))/rows-capH)/CARD_ASPECT;
+      for(let cols=1;;cols++){
+        if(spreadOn()&&cols%2)continue;
+        const byW=(W-gap*(cols-1))/cols;
+        if(Math.round(byW)<CARD_MIN_W)break;
+        const w=Math.min(byH,byW,CARD_MAX_W);
+        if(Math.round(w)<CARD_MIN_W)break;
+        if(byW>byH+0.5)continue;            /* too tall for this many rows */
+        const n=rows*cols;
+        if(n>want)break;                    /* never more than was asked for */
+        if(!best||n>best.n)best={c:cols,r:rows,n,w};
+      }
+    }
+    if(best)return {c:best.c,r:best.r,w:best.w};
+  }
+  if(!best)for(let rows=1;rows<=CARD_MAX_ROWS;rows++){
+    let cols=Math.ceil(want/rows);
+    if(spreadOn()&&cols%2)cols++;
+    const byW=(W-gap*(cols-1))/cols;
+    if(Math.round(byW)<CARD_MIN_W)continue;
+    /* Closest to the number asked for, and between two shapes holding the
+       same number, the one that runs over LEAST. Taking the first shape that
+       merely worked turned "30 a page" into 32, which is neither the setting
+       nor a fit; preferring the biggest card turned "24 a page" into 6x4 at
+       208px, three screens of scrolling, where 8x3 at 153px is one. Nothing
+       here fits by definition, so the card size is not the thing to
+       maximise - the amount you have to scroll is the thing to minimise. */
+    const n=rows*cols,w=Math.min(byW,CARD_MAX_W);
+    const over=rows*(w*CARD_ASPECT+capH)+gap*(rows-1)-avail;
+    if(!best||Math.abs(n-want)<Math.abs(best.n-want)
+            ||(Math.abs(n-want)===Math.abs(best.n-want)&&over<best.over))
+      best={c:cols,r:rows,n,w,over};
+  }
+  return best?{c:best.c,r:best.r,w:best.w}:null;
 }
 /* ---- the sheet checks its own work ----
    Everything above works out what SHOULD fit from measurements taken before
@@ -3198,26 +3268,27 @@ function fitLayout(target){
    landing late.
 
    Rather than model each of those, the sheet looks at where its own last row
-   actually landed and gives ground until it is inside the window. Columns
-   first, because more columns means smaller cards and the row survives; only
-   when the cards are as small as they are allowed to get does it drop a row.
-   It runs at all only when something overflowed, and it is bounded. */
+   actually landed and narrows itself until it is inside the window. It
+   narrows rather than reshapes: the card count is what was asked for, so the
+   sheet is the thing allowed to give. Bounded, and it does nothing at all
+   unless something already overflowed. */
 function fitVerify(){
   if(MODE==='list'||BM)return false;
   const g=document.getElementById('page');
   if(!g||!g.children.length)return false;
   const last=g.children[g.children.length-1].getBoundingClientRect();
-  if(last.bottom<=window.innerHeight+1)return false;
+  const over=last.bottom-window.innerHeight;
+  if(over<=1)return false;
   const gr=g.getBoundingClientRect();
   const cs=getComputedStyle(g);
   const gap=parseFloat(cs.rowGap||cs.gap)||12;
-  const step=spreadOn()?2:1;                 /* facing pages stay even */
-  const maxCols=Math.max(1,Math.floor((gr.width+gap)/(CARD_MIN_W+gap)));
-  let c=LAYOUT.c,r=LAYOUT.r;
-  if(c+step<=maxCols)c+=step;
-  else if(r>1)r--;
-  else return false;                          /* nothing left to give */
-  applyLayout(c,r,true);
+  const cols=LAYOUT.c;
+  const now=(gr.width-gap*(cols-1))/cols;
+  /* take off exactly the overspill, shared across the rows that caused it */
+  const w=now-(over/LAYOUT.r)/CARD_ASPECT-1;
+  if(Math.round(w)<CARD_MIN_W)return false;   /* nothing left to give */
+  applyLayout(cols,LAYOUT.r,true,w);
+  LAYOUT.w=w;
   return true;
 }
 function autoLayout(keepFirst){
@@ -3225,7 +3296,7 @@ function autoLayout(keepFirst){
   /* a chosen page size keeps the column count the window asked for and just
      stacks however many rows it takes to hold that many cards               */
   const want=+DB.per||0;
-  let c=g.c,r=want?Math.max(1,Math.ceil(want/g.c)):g.r;
+  let c=g.c,r=want?Math.max(1,Math.ceil(want/g.c)):g.r,cw=0;
   if(MODE!=='list'){
     /* This used to run only on Auto, on the reasoning that choosing a page
        size by hand is an instruction and an instruction outranks a fit. That
@@ -3236,17 +3307,15 @@ function autoLayout(keepFirst){
        rather than a fit, no improvement to the fit could ever reach it.
 
        A page size says how many cards, not what shape, and the shape still
-       has to fit the window. So it becomes the target the fit aims at: at
-       least this many, and never off the bottom of the screen. Where the
-       number asked for cannot be made to fit - twelve readable cards need
-       six across, and six across on a short wide window is a card taller
-       than the space - the fit wins and the page holds more, smaller ones.
-       Cards you cannot see are not on the page in any sense that matters. */
+       has to fit the window. So it becomes the count the fit lays out -
+       exactly that many, arranged so they are all on screen. What gives is
+       the width of the sheet, never the number of cards. */
     const fit=fitLayout(want||CARD_TARGET_N);
-    if(fit){c=fit.c;r=fit.r;}
+    if(fit){c=fit.c;r=fit.r;cw=fit.w;}
   }
-  if(c===LAYOUT.c&&r===LAYOUT.r)return false;
-  applyLayout(c,r,keepFirst);
+  if(c===LAYOUT.c&&r===LAYOUT.r&&cw===LAYOUT.w)return false;
+  applyLayout(c,r,keepFirst,cw);
+  LAYOUT.w=cw;
   return true;
 }
 const $=s=>document.querySelector(s);
