@@ -16210,6 +16210,26 @@ function isOCG(c){
   if(/Skill|Token/i.test(c.type||''))return false;
   return true;
 }
+/* ---- the shop is evidence too ----
+   isOCG asks the card database for an OCG release date, which is the right
+   question and the wrong single source: the database fills that field in
+   late. Witness of the Ancient has art, a type and full text there, an
+   Asian-English printing on TCG Corner's shelf, and ocg_date null - so it
+   was dropped from the pool and the app could only stand in a nameless stub
+   for a card it could have shown properly.
+
+   A shop selling an Asian-English printing is proof the printing exists.
+   Twenty-four cards were in this position, all from the newest sets. Tokens
+   and Skills stay out either way; they are not printings you collect.    */
+function shopSells(c){
+  if(/Skill|Token/i.test(c.type||''))return false;
+  const n=c.name;
+  if(!n)return false;
+  const k=nameKey(n);
+  if(PX_NAME[k]&&PX_NAME[k].length)return true;
+  const lk=looseKey(n);
+  return !!(PX_LOOSE[lk]&&PX_LOOSE[lk].length);
+}
 function normalise(c){
   const im=(c.card_images&&c.card_images[0])||{};
   const mi=(c.misc_info&&c.misc_info[0])||{};
@@ -16373,7 +16393,9 @@ async function loadPool(){
     const r=await fetch(API+'?misc=yes');
     if(!r.ok)throw 0;
     const j=await r.json();
-    const raw=(j.data||[]).filter(isOCG);
+    /* Prices load before the pool, so the shop's list is already available to
+       vouch for a printing the card database has not dated yet. */
+    const raw=(j.data||[]).filter(c=>isOCG(c)||shopSells(c));
     buildSetCatalogue(raw);
     /* This binder only tracks Asian-English printings, so a card TCG Corner has
        never listed is dropped from the pool. Anything you already own or added
