@@ -3140,17 +3140,18 @@ function gridFor(w){
 const CARD_ASPECT=1.458;        /* measured off a rendered pocket */
 const CARD_MIN_W=108;           /* below this the art stops being readable */
 const CARD_MAX_W=250;           /* above this a page holds too little to scan */
-const CARD_TARGET_N=12;         /* cards in the window at once, without scrolling */
-/* How much of the row the sheet has to cover.
-   Nine tenths was too generous. It let a shape win on card size while leaving
-   156px of the row empty - a 201px card in a 1266px sheet inside 1422px of
-   space - and a binder page with a margin down each side reads as though the
-   window is the wrong size, whatever the cards measure. Nineteen twentieths
-   still allows the sliver that decides between eight columns and nine, and
-   refuses the gap you can see: the same window now answers seven across at
-   189px filling the row end to end. Cards give up a few pixels; the page
-   stops looking like it shrank. */
-const SHEET_FILL_MIN=0.95;
+const CARD_TARGET_N=12;         /* the phone's ceiling; the desktop uses columns */
+/* A binder page has a fixed number of pockets. Eight across and two down,
+   chosen and then left alone, so the sheet looks the same tomorrow as it
+   does today - which every earlier version of this got wrong by deriving the
+   shape from whatever space happened to be free that day.
+
+   Two rows and not three: a third row is only ever available by shrinking
+   the card, and at 1908x930 it would trade sixteen cards at 164px for
+   twenty-four at 125px. More cards were never the ask; a sheet you can read
+   across a table was. The window decides how BIG the pockets are. */
+const CARD_COLS_DESKTOP=8;
+const CARD_ROWS_DESKTOP=2;         /* cards in the window at once, without scrolling */
 const CARD_MAX_ROWS=4;          /* past four the captions outweigh the pictures */
 function fitLayout(target){
   const want=Math.max(1,target||CARD_TARGET_N);
@@ -3178,121 +3179,93 @@ function fitLayout(target){
   const cap=g.querySelector('.cap-row');
   const overlaid=cap?getComputedStyle(cap).position==='absolute':false;
   const capH=(cap&&!overlaid)?cap.getBoundingClientRect().height+3:0;
-  /* Everything the page puts BELOW the sheet - the binder's padding, the
-     shell's padding, the empty-state slot - measured in one go rather than
-     listed. A flat 16 was guessed here against a real 37, so the cards fitted
-     the window and the document still ran 13px past it: enough to raise a
-     scrollbar, which narrows the grid, which changes the answer that raised
-     it. None of those numbers can drift out of step with the stylesheet if
-     nothing names them.
+  /* ---- what sits below the sheet ----
+     The binder's own padding plus the shell's, measured rather than listed,
+     and measured down the sheet's OWN column.
 
-     Measured off the shell's own bottom edge, NOT off scrollHeight, which
-     never reports less than the viewport: on a page shorter than the window
-     it answered 386 where the truth was 37, and that error fed itself -
-     a smaller sheet makes a shorter page, which inflates the gap, which
-     shrinks the sheet again. Both rectangles are viewport-relative, so the
-     scroll position cancels and nothing has to be added back.
+     Two earlier versions of this line were wrong in the same shape, and both
+     fed themselves. scrollHeight never reports less than the viewport, so on
+     a short page it answered 386 where the truth was 37. Then the shell's
+     bottom edge: the shell is a two-column grid and the left one holds the
+     rail - Deals, the calculator, Paste a list, Settings, the key - which is
+     tall. When the sheet is short the RAIL decides the shell's height, so
+     shell.bottom minus grid.bottom counted all the leftover rail as space
+     the cards had used: 133px against a real 36. A shorter sheet leaves more
+     rail sticking out, which reports less room, which shortens the sheet -
+     and 1600x790 settled on a single row with half the window empty.
 
-     What sits below the sheet does not depend on how tall the sheet is, so
-     this stays true while the layout it feeds is still being decided. */
-  const host=g.closest('.shell')||g.parentElement;
-  const below=host?Math.max(8,host.getBoundingClientRect().bottom-gr.bottom):16;
+     The binder column holds the sheet and nothing tall, so its bottom edge
+     is the sheet's bottom edge plus padding, whatever the rail is doing. */
+  const col=g.closest('.binder')||g.parentElement;
+  const shell=g.closest('.shell');
+  const padB=shell?parseFloat(getComputedStyle(shell).paddingBottom)||0:0;
+  const below=Math.max(8,(col.getBoundingClientRect().bottom-gr.bottom)+padB);
   const avail=window.innerHeight-(gr.top+(window.scrollY||0))-below;
   if(avail<120)return null;
-  /* ---- three things at once: full width, no scrolling, big cards ----
-     Two earlier rules each got one of these and lost another. Treating the
-     number as a floor and spending spare room on columns filled the width and
-     shrank the cards to 135px with the set code clipped to "RO..."; holding
-     the number exactly gave 152px cards in a 972px sheet inside 1308px of
-     space, a quarter of the row empty. Neither is what a binder page looks
-     like.
 
-     All three are available at once, and the thing that was missing is that
-     the answer can sit ONE COLUMN either side of what each rule picked. At
-     1600x790 eight columns want a 153px card and the height allows 152 - a
-     single pixel short, so the width-filling rule stepped to nine columns and
-     135px. Let the sheet give up that one pixel and eight columns fit at
-     152px across 1300px of a 1308px row: bigger cards AND a full row.
+  /* ---- on a desktop the sheet is eight across, and stays eight ----
+     Every version before this one worked out the column count from the space
+     available, and every one of them was defensible: fill the row, or hold a
+     card size, or hold a card count. They all shared a fault that no amount
+     of arithmetic fixes - the answer moved. The dashboard grows a row of
+     movers after a sync, the grid loses fifty pixels, the fit answers with a
+     different number of columns, and the binder you opened yesterday is laid
+     out differently today for reasons that are invisible from the outside.
 
-     So: the card is as large as both budgets allow, the sheet must still
-     cover most of the row it is given, and the page holds at least the number
-     asked for. Among everything satisfying those, the biggest card wins. */
-  /* There is exactly one readability test - whether the card that comes out
-     rounds to CARD_MIN_W or better - and it is applied per shape below. An
-     earlier column cap computed the same idea a second way, with a floor
-     instead of a rounding, and the two disagreed on the boundary: at 1000x980
-     a six-column card measures 107.8, which rounds to 108 and passes, while
-     the cap said five columns and threw the shape away unseen. Twelve cards
-     then fell to the overflow branch on a window that could hold them. */
+     A binder page has a fixed number of pockets. This one has eight across,
+     and the window decides how big they are and how many rows fit - never
+     how many go in a row. A window that cannot give eight readable cards
+     drops to what it can, because a 90px card is not a card; that is the
+     only thing that moves it. */
+  if(!overlaid){
+    let cols=CARD_COLS_DESKTOP;
+    while(cols>1&&Math.round((W-gap*(cols-1))/cols)<CARD_MIN_W)cols--;
+    if(spreadOn()&&cols%2)cols--;          /* the spine falls between cards */
+    cols=Math.max(1,cols);
+    const full=Math.min((W-gap*(cols-1))/cols,CARD_MAX_W);
+    /* How many rows clear the fold - and a card will give up a sliver of its
+       width to gain a whole row, because a row is worth far more than the
+       pixel it costs. At 1600x790 a full-width card is 153.0 and two rows
+       need 152.0: one pixel between a sheet that uses the screen and a sheet
+       with half of it empty. It will not give up more than a twentieth,
+       which is the line between shaving and shrinking. */
+    let rows=1,w=full;
+    for(let r=1;r<=CARD_ROWS_DESKTOP;r++){
+      const byH=((avail-gap*(r-1))/r-capH)/CARD_ASPECT;
+      const cand=Math.min(full,byH);
+      if(Math.round(cand)<CARD_MIN_W)break;   /* unreadable at this many rows */
+      if(cand<full*0.85)break;                /* too much to pay for a row */
+      rows=r;w=cand;
+    }
+    return {c:cols,r:rows,w};
+  }
+
+  /* ---- a phone is not a sheet ----
+     Below 920px the caption sits on the artwork and the rail is a sheet; the
+     grid is three across because that is what 375px holds. It keeps taking
+     the most cards that actually fit rather than a fixed count. */
   let best=null;
   for(let rows=1;rows<=CARD_MAX_ROWS;rows++){
     const byH=((avail-gap*(rows-1))/rows-capH)/CARD_ASPECT;
-    if(byH<CARD_MIN_W)break;              /* more rows only makes this worse */
-    for(let cols=1;cols<=64;cols++){
-      /* Facing pages draws a spine down the middle of the sheet, so the two
-         leaves have to hold the same number of cards. An odd column count
-         puts that spine through a card rather than between two. */
+    for(let cols=1;;cols++){
       if(spreadOn()&&cols%2)continue;
       const byW=(W-gap*(cols-1))/cols;
-      if(Math.round(byW)<CARD_MIN_W)break; /* more columns only get narrower */
+      if(Math.round(byW)<CARD_MIN_W)break;
       const w=Math.min(byH,byW,CARD_MAX_W);
       if(Math.round(w)<CARD_MIN_W)break;
+      if(byW>byH+0.5)continue;              /* too tall for this many rows */
       const n=rows*cols;
-      if(n<want)continue;                  /* fewer than was asked for */
-      /* How much of the row the sheet covers. Below this it stops reading as
-         a page and starts reading as a page with a chunk missing. */
-      const fill=(cols*w+gap*(cols-1))/W;
-      if(fill<SHEET_FILL_MIN)continue;
-      if(!best||w>best.w||(w===best.w&&n>best.n))best={c:cols,r:rows,n,w};
+      if(n>want)break;                      /* never more than was asked for */
+      if(!best||n>best.n)best={c:cols,r:rows,n,w};
     }
   }
-  /* Nothing holds the count at a readable size - a very short or very narrow
-     window. Rather than quietly change the number, take the shape that comes
-     closest and let it run over: the setting said twelve, and a page of
-     twelve that needs a nudge of scrolling is a truer answer than a page of
-     twenty that does not. */
-  /* On a phone the count gives way instead. The request was for twelve on
-     screen ON A DESKTOP, and below 920px this layout has already diverged -
-     the caption sits on the artwork, the rail is a sheet. Holding twelve
-     there means 3x4 and 1.35 screens of scrolling where six fitted outright,
-     which is a change nobody asked for on the surface nobody complained
-     about. So the phone keeps the most cards that actually fit. */
-  if(!best&&overlaid){
-    for(let rows=1;rows<=CARD_MAX_ROWS;rows++){
-      const byH=((avail-gap*(rows-1))/rows-capH)/CARD_ASPECT;
-      for(let cols=1;;cols++){
-        if(spreadOn()&&cols%2)continue;
-        const byW=(W-gap*(cols-1))/cols;
-        if(Math.round(byW)<CARD_MIN_W)break;
-        const w=Math.min(byH,byW,CARD_MAX_W);
-        if(Math.round(w)<CARD_MIN_W)break;
-        if(byW>byH+0.5)continue;            /* too tall for this many rows */
-        const n=rows*cols;
-        if(n>want)break;                    /* never more than was asked for */
-        if(!best||n>best.n)best={c:cols,r:rows,n,w};
-      }
-    }
-    if(best)return {c:best.c,r:best.r,w:best.w};
-  }
-  if(!best)for(let rows=1;rows<=CARD_MAX_ROWS;rows++){
-    let cols=Math.ceil(want/rows);
-    if(spreadOn()&&cols%2)cols++;
-    const byW=(W-gap*(cols-1))/cols;
-    if(Math.round(byW)<CARD_MIN_W)continue;
-    /* Closest to the number asked for, and between two shapes holding the
-       same number, the one that runs over LEAST. Taking the first shape that
-       merely worked turned "30 a page" into 32, which is neither the setting
-       nor a fit; preferring the biggest card turned "24 a page" into 6x4 at
-       208px, three screens of scrolling, where 8x3 at 153px is one. Nothing
-       here fits by definition, so the card size is not the thing to
-       maximise - the amount you have to scroll is the thing to minimise. */
-    const n=rows*cols,w=Math.min(byW,CARD_MAX_W);
-    const over=rows*(w*CARD_ASPECT+capH)+gap*(rows-1)-avail;
-    if(!best||Math.abs(n-want)<Math.abs(best.n-want)
-            ||(Math.abs(n-want)===Math.abs(best.n-want)&&over<best.over))
-      best={c:cols,r:rows,n,w,over};
-  }
-  return best?{c:best.c,r:best.r,w:best.w}:null;
+  if(best)return {c:best.c,r:best.r,w:best.w};
+  /* nothing fits even at one row - take the widest readable row there is */
+  let cols=1;
+  while(Math.round((W-gap*cols)/(cols+1))>=CARD_MIN_W)cols++;
+  if(spreadOn()&&cols%2)cols--;
+  cols=Math.max(1,cols);
+  return {c:cols,r:1,w:Math.min((W-gap*(cols-1))/cols,CARD_MAX_W)};
 }
 /* ---- the sheet checks its own work ----
    Everything above works out what SHOULD fit from measurements taken before
