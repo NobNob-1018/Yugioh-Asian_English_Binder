@@ -237,6 +237,10 @@ button{cursor:pointer;background:none;border:none}
 }
 .toolset{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:28px}
 .toolset .gone{visibility:hidden;pointer-events:none}
+/* Only the phone sheet stacks these into a list that needs naming; on the
+   bar the controls sit in a row where a label above each one would be four
+   more things to read. */
+.sheet-lbl{display:none}
 /* The left group is a fixed column so the view tabs start at the same place
    whatever the heading and counts happen to say.                          */
 .bar-left{display:flex;align-items:center;gap:10px 14px;flex:none;width:330px;min-width:0;flex-wrap:wrap}
@@ -1335,19 +1339,40 @@ body{font-variant-numeric:tabular-nums}
   /* row 1: where am I */
   .bar>#view-tabs{flex:1 1 100%;width:100%;order:0;display:flex}
   .bar>#view-tabs button{flex:1 1 0;justify-content:center}
-  /* row 2: which pile */
+  /* row 2: which pile. The three tabs sat at the left of a full-width frame
+     with a third of the row empty beside them, which read as a box that had
+     lost something. They divide the row instead, so the frame and the tabs
+     are the same object and each target is a third of the screen wide. */
   .bar>#pilebar{flex:1 1 100%;order:1;margin:0}
+  .bar>#pilebar #binder-tabs{flex:1 1 100%;width:100%}
+  .bar>#pilebar #binder-tabs button{flex:1 1 0;min-width:0;text-align:center;
+    padding:5px 4px;white-space:nowrap}
   /* ---- the filters become a sheet ----
      Five controls wrapping across two lines above the cards is most of what
      made this screen feel cluttered. They go behind one button, in the same
      shape as the menu sheet, so the row above the cards is a button, a count
      and the pager. */
-  .filt-btn{display:inline-flex;align-items:center;gap:7px;order:2;flex:0 0 auto;
-    min-height:40px;padding:0 14px;border:1px solid var(--line-strong);
-    background:var(--surface-2);color:var(--text);font-size:var(--fs-sm)}
-  .filt-btn[aria-expanded="true"]{background:var(--text);color:var(--on-accent);
-    border-color:var(--text)}
-  .filt-btn .badge{margin-left:2px}
+  /* The pair to the Menu button, in the opposite bottom corner: filters on
+     the left, actions on the right, both reachable by a thumb. In the bar it
+     was one more thing on a crowded row. */
+  .filt-btn{position:fixed;left:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));
+    z-index:55;display:inline-flex;align-items:center;gap:7px;
+    min-height:48px;padding:0 18px;border:none;
+    background:var(--text);color:var(--on-accent);
+    font-size:var(--fs-sm);font-weight:500;letter-spacing:.04em;
+    box-shadow:0 2px 12px rgba(0,0,0,.22)}
+  :root[data-theme="dark"] .filt-btn{box-shadow:0 2px 12px rgba(0,0,0,.6)}
+  .filt-btn[aria-expanded="true"]{background:var(--surface);color:var(--text);
+    box-shadow:0 0 0 2px var(--text)}
+  .filt-btn .badge{background:var(--on-accent);color:var(--text);margin-left:2px}
+  /* both buttons step aside for the bulk bar */
+  body.selmode .filt-btn{display:none}
+  /* An open sheet covers both corners, so they are already out of sight -
+     but not out of the tab order, which would let a keyboard walk behind a
+     modal sheet. visibility takes them out of both without moving anything. */
+  :root[data-filters="open"] .filt-btn,:root[data-filters="open"] .filt-fab,
+  :root[data-sheet="open"] .filt-btn,:root[data-sheet="open"] .filt-fab{
+    visibility:hidden}
   .bar>.toolset{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:70;
     max-height:78dvh;overflow:auto;margin:0;
     flex-direction:column;align-items:stretch;gap:var(--sp-2);
@@ -1363,17 +1388,48 @@ body{font-variant-numeric:tabular-nums}
     display:block;padding:var(--sp-4) 0 var(--sp-3);background:var(--surface);
     border-bottom:1px solid var(--line-soft);margin-bottom:var(--sp-2);
     font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
-  .toolset .mini,.toolset .seg2,.toolset .switch{width:100%;max-width:none;min-height:44px}
-  .toolset .seg2{display:flex}
-  .toolset .seg2 button{flex:1 1 0}
+  /* Two rules made the sheet unreadable, and they pull in opposite
+     directions. The toolbar gives these flex:1 1 116px so they share a row -
+     in a column that same rule grows them DOWNWARD, which is where the tall
+     boxes came from. And .toolset .mini caps them at 110px, which is where
+     the narrow ones came from. An id here so this outranks both instead of
+     scattering !important through the sheet. */
+  .bar>#toolset>*{flex:0 0 auto!important;width:100%;max-width:none;
+    min-width:0;margin:0}
+  .bar>#toolset>.mini{min-height:46px;font-size:var(--fs-md);
+    padding:0 var(--sp-3);text-align:left;
+    border:1px solid var(--line-strong);background:var(--surface-2);color:var(--text)}
+  .bar>#toolset>select.mini{height:46px;background-position:right 14px center}
+  /* Clear filters is a ghost - transparent border, faint text - which on the
+     bar reads as "minor" and in a list of solid rows reads as unfinished. */
+  .bar>#toolset>.mini.ghost{background:none;border-style:dashed;
+    border-color:var(--line-strong);color:var(--muted);text-align:center}
+  .bar>#toolset>.seg2{min-height:46px;border-color:var(--line-strong)}
+  .bar>#toolset>.seg2 button{flex:1 1 0;display:flex;align-items:center;
+    justify-content:center;padding:0}
   /* Show owned lands here from placePiles, and reads as a row like the rest */
-  .toolset .switch{display:flex;align-items:center;gap:var(--sp-2);
-    padding:4px 2px;font-size:var(--fs-sm)}
+  .bar>#toolset>.switch{display:flex;align-items:center;gap:var(--sp-3);
+    min-height:46px;padding:0 var(--sp-2);font-size:var(--fs-md);
+    border-top:1px solid var(--line-soft);margin-top:2px}
+  .bar>#toolset>.switch .lbl{font-size:var(--fs-md);letter-spacing:0}
+  /* A control that does not apply is not shown at all. On the bar .gone only
+     hides it, because the slot has to stay put or the row would shift; in a
+     stacked list there is no slot to hold and an invisible row is a gap. */
+  .bar>#toolset>.gone{display:none!important}
+  /* Each control says what it is. A bare select reading "Most valuable
+     first" does not tell you it is the sort, and the rarity menu resting on
+     "Any rarity" looks like a filter that is missing rather than one that is
+     open. */
+  .bar>#toolset>.sheet-lbl{display:block;margin:var(--sp-2) 0 0;
+    font-size:var(--fs-2xs);letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint)}
+  .bar>#toolset>.sheet-lbl:first-of-type{margin-top:0}
   :root[data-filters="open"]{overflow:hidden}
-  /* row 4: the count and the pager share a line rather than taking two.
+  /* row 3: the count and the pager share a line rather than taking two.
      The pile tabs directly above already name the pile, so the caption
-     drops the word and keeps the number. */
-  .bar>.bar-left{flex:0 1 auto;order:3;max-width:98px;min-width:0;width:auto}
+     drops the word and keeps the number. With Filters gone to the corner
+     the count is no longer squeezed to 98px and can say the whole thing. */
+  .bar>.bar-left{flex:1 1 auto;order:3;max-width:none;min-width:0;width:auto}
   .bar .tag{display:none}
   .bar .count{font-size:var(--fs-2xs);white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis;border:none;padding:0}
@@ -1385,7 +1441,9 @@ body{font-variant-numeric:tabular-nums}
    disabled - a dead control is one you can still tap by mistake. */
 @media (max-width:759px){
   #t-per,.more-row{display:none}
-  .toolset #core-mult{display:none}
+  /* openFilters drops the heading with it, or the sheet would carry a label
+     over nothing */
+  .toolset #core-mult,.bar>#toolset>#core-mult{display:none}
 }
 
 /* ---- filters as a sheet on a phone ----
@@ -2012,6 +2070,18 @@ provenance
     <svg viewBox="0 0 16 16" aria-hidden="true" width="16" height="16"><rect x="2" y="3.2" width="12" height="1.7" fill="currentColor"/><rect x="2" y="7.15" width="12" height="1.7" fill="currentColor"/><rect x="2" y="11.1" width="12" height="1.7" fill="currentColor"/></svg>
     Menu<span class="badge" id="filt-count" hidden>0</span>
   </button>
+  <!-- The other half of the pair, in the opposite bottom corner. It lived on
+       the bar above the cards, where it was one more thing on a row that was
+       already a count and a pager. Down here it sits where the thumb is, and
+       the two buttons divide the job cleanly: this one changes what you are
+       looking at, Menu does something to it. It is a sibling of the shell
+       rather than a child of the bar because a fixed element inside a
+       backdrop-filtered ancestor is clipped to it - the trap the search
+       panel fell into. -->
+  <button class="filt-btn" id="filt-btn" type="button" aria-expanded="false" aria-controls="toolset">
+    <svg viewBox="0 0 16 16" aria-hidden="true" width="15" height="15"><rect x="1.5" y="3" width="13" height="1.6" fill="currentColor"/><rect x="4" y="7.2" width="8" height="1.6" fill="currentColor"/><rect x="6.5" y="11.4" width="3" height="1.6" fill="currentColor"/></svg>
+    Filters<span class="badge" id="filt-n" hidden>0</span>
+  </button>
   <aside class="rail" id="rail">
     <section class="grp">
       <div class="switch-row">
@@ -2120,14 +2190,6 @@ provenance
         <!-- Below 920px the rail drops underneath the card grid, which strands
              the two controls reached for most. They move in here instead. -->
         <div class="pilebar" id="pilebar" hidden></div>
-        <!-- Below 920px the whole toolset becomes a sheet and this opens it.
-             Sort, rarity, Select, Clear filters and the display switch were
-             five controls wrapped across two lines above the cards; behind
-             one button they are a list you read once. -->
-        <button class="filt-btn" id="filt-btn" type="button" aria-expanded="false" aria-controls="toolset">
-          <svg viewBox="0 0 16 16" aria-hidden="true" width="14" height="14"><rect x="1.5" y="3" width="13" height="1.6" fill="currentColor"/><rect x="4" y="7.2" width="8" height="1.6" fill="currentColor"/><rect x="6.5" y="11.4" width="3" height="1.6" fill="currentColor"/></svg>
-          Filters<span class="badge" id="filt-n" hidden>0</span>
-        </button>
         <div class="toolset" id="toolset">
           <select class="mini" id="t-sort" aria-label="Order by"></select>
           <select class="mini" id="t-rar" aria-label="Rarity"></select>
@@ -17389,10 +17451,32 @@ function openFilters(on){
     if(v)v.hidden=false;
     const ts=$('#toolset');
     if(ts&&!ts.querySelector('.sheet-done')){
+      /* Built once, on first open, and left in place: they are display:none
+         everywhere except the sheet, so they cost the bar nothing and the
+         sheet does not have to be rebuilt each time it is opened. */
+      for(const [id,text] of [['t-sort','Order by'],['t-rar','Rarity'],
+                              ['core-mult','Copies of each'],['mode-tog','Display']]){
+        const t=document.getElementById(id);
+        if(t&&t.parentNode===ts) ts.insertBefore(el('div','sheet-lbl',text),t);
+      }
       const done=el('button','sheet-done','Show results');
       done.type='button'; done.onclick=()=>openFilters(false);
       ts.appendChild(done);
     }
+    /* A label for a control that is not showing is a heading with nothing
+       under it, so it follows the control it names - and it asks the browser
+       rather than checking for .gone, because a control can also be dropped
+       by a media query, which no class would tell us about. */
+    if(ts)ts.querySelectorAll('.sheet-lbl').forEach(l=>{
+      l.classList.remove('gone');
+      const n=l.nextElementSibling;
+      if(n&&getComputedStyle(n).display==='none')l.classList.add('gone');
+    });
+    /* placePiles appends Show owned whenever the layout narrows, which can
+       happen after the sheet was built - so the confirm button is put back
+       at the bottom rather than assumed to still be there. */
+    const done=ts&&ts.querySelector('.sheet-done');
+    if(done&&done!==ts.lastElementChild)ts.appendChild(done);
   }
 }
 function openSheet(on){
