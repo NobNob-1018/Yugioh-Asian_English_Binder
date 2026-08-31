@@ -3654,6 +3654,11 @@ function visible(){
     /* the wishlist ignores the owned switch: its whole point is cards you
        do not have yet */
     list=allCards().filter(c=>wantOf(c.id));
+    /* Opening the list IS looking at it, so "N more reached your price" has
+       been read and stops being news. Anywhere else in the app would be the
+       wrong place to decide that. */
+    const m=wantTotals().met;
+    if((+PREFS.wantSeen||0)!==m){PREFS.wantSeen=m;savePrefs();}
   }else if(F.ownedOnly){
     list=allCards().filter(c=>F.binder?copiesIn(c.id).length:allCopies(c.id)>0);
   }else list=allCards();
@@ -4609,13 +4614,31 @@ function paintDash(){
      next rather than what already happened. You are holding a phone in a
      shop; "three of the seven you want are at or under your price" is worth
      more than any of the numbers it replaced. */
+  /* ---- what is NEW, not just what is true ----
+     "3 of 7 at or under target" is the same sentence whether the third one
+     arrived this morning or a month ago, so a card reaching your price was
+     something you had to notice for yourself. It is also the one thing on
+     this screen worth interrupting for: a price you have been waiting for is
+     news, and it stops being news the moment you have read it.
+
+     The count you last saw is kept on the device, not in the binder - "since
+     I last looked" is about this screen, and syncing it would mean the phone
+     had already read what the desktop is about to tell you. */
   const W=wantTotals();
+  const seen=+PREFS.wantSeen||0;
+  const fresh=Math.max(0,W.met-seen);
   const wantLine=!W.lines?''
+    : fresh
+      ? `<p class="mv-want ok"><b>${fresh}</b> more reached your price` +
+        `${W.met>fresh?` \u00b7 ${W.met} of ${W.lines} in all`:''}</p>`
     : W.met
       ? `<p class="mv-want ok"><b>${W.met}</b> of ${W.lines} wanted ${W.lines===1?'card is':'cards are'} at or under target</p>`
     : W.quoted
       ? `<p class="mv-want">Nothing wanted has hit its target \u00b7 ${esc(peso(W.now))} to clear the list</p>`
       : `<p class="mv-want">${W.lines} on the wishlist, none priced yet</p>`;
+  /* A count that only ever goes up would say "2 more" for ever once two were
+     bought and removed, so it follows the number down as well. */
+  if(W.met<seen){PREFS.wantSeen=W.met;savePrefs();}
   const moveRows=M2.length
     ? M2.map(m=>`<button class="mv-row" data-id="${esc(m.id)}" title="Open ${esc(m.name)}">
         <span class="mv-n">${esc(m.name)}</span>
@@ -18058,6 +18081,27 @@ function stampChanges(){
   for(const k in DB.gone)if(now-DB.gone[k]>GONE_TTL)delete DB.gone[k];
   LAST_SNAP=snap;
 }
+/* ---- the parts both merges treat the same ----
+   Binders, hand-made cards, deals and the id counter only ever grow, and are
+   matched on ids they already carry - so there is nothing to reconcile and no
+   reason for the two callers to say it twice.
+
+   What they do NOT share is what happens to a copy, and that is deliberate
+   rather than left over. Loading a file is an edit you are making: nothing
+   should be lost, so quantities take the larger of the two and the save after
+   it stamps them, which is what carries them to your other devices. A sync is
+   a reconciliation between two devices that were both right at different
+   times: the later edit wins, deletions travel, and the save after it stamps
+   nothing at all. Running either policy in the other's place would be a bug -
+   an import that silently dropped cards, or a sync that could never delete
+   one. */
+function mergeSidecars(inc){
+  (inc.binders||[]).forEach(b=>{if(!DB.binders.some(x=>x.id===b.id))DB.binders.push(b);});
+  Object.assign(DB.manual,inc.manual||{});
+  DB.deals2=DB.deals2||[];
+  (inc.deals2||[]).forEach(d=>{if(!DB.deals2.some(x=>x.id===d.id))DB.deals2.push(d);});
+  DB.seq=Math.max(DB.seq||0,inc.seq||0);
+}
 /* ---- the merge itself ----
    Commutative and idempotent: which device runs it first cannot change the
    answer, and running it twice is the same as running it once. Both matter,
@@ -18071,12 +18115,7 @@ function mergeSync(inc){
   for(const k in theirGone)
     if(!(DB.gone[k]>=theirGone[k]))DB.gone[k]=theirGone[k];
 
-  /* the parts that only ever grow, matched on their own ids */
-  (inc.binders||[]).forEach(b=>{if(!DB.binders.some(x=>x.id===b.id))DB.binders.push(b);});
-  Object.assign(DB.manual,inc.manual||{});
-  DB.deals2=DB.deals2||[];
-  (inc.deals2||[]).forEach(d=>{if(!DB.deals2.some(x=>x.id===d.id))DB.deals2.push(d);});
-  DB.seq=Math.max(DB.seq||0,inc.seq||0);
+  mergeSidecars(inc);
 
   /* theirs -> mine */
   for(const id in (inc.own||{})){
@@ -18162,12 +18201,33 @@ function ghHeaders(){
           'Accept':'application/vnd.github+json',
           'X-GitHub-Api-Version':'2022-11-28'};
 }
+/* Every failure here happens on a phone, in a shop, to someone who cannot
+   open a console - so each one says what went wrong and what to do about it.
+   "GitHub said 403" is not a sentence anybody can act on. */
 async function ghCall(path,opts){
-  const r=await fetch(GH_API+path,Object.assign({headers:ghHeaders()},opts||{}));
-  if(r.status===401)throw new Error('That token was refused. Make a new one with gist access.');
-  if(r.status===404)throw new Error('That gist is gone. Clear the id in Sync and it will make a new one.');
-  if(!r.ok)throw new Error('GitHub said '+r.status+'.');
-  return r.json();
+  let r;
+  try{ r=await fetch(GH_API+path,Object.assign({headers:ghHeaders()},opts||{})); }
+  catch(e){ throw new Error(navigator.onLine
+    ? 'Could not reach GitHub. Nothing was sent and nothing here has changed.'
+    : 'No connection. Nothing was sent and nothing here has changed.'); }
+  if(r.status===401)throw new Error(
+    'That token was refused. It may be expired, mistyped, or missing a character '+
+    'at the end - make a new one with gist access and paste it again.');
+  if(r.status===403||r.status===429){
+    /* the rate limit is the one failure that fixes itself, so say when */
+    const at=+r.headers.get('x-ratelimit-reset')||0;
+    const mins=at?Math.max(1,Math.ceil((at*1000-Date.now())/6e4)):0;
+    throw new Error(r.headers.get('x-ratelimit-remaining')==='0'
+      ? 'GitHub is rate-limiting this token'+(mins?' for about '+mins+' more minute'+(mins===1?'':'s'):'')+'. Nothing was lost; try again after that.'
+      : 'GitHub refused that token. Check it has gist access and nothing else is needed.');
+  }
+  if(r.status===404)throw new Error(
+    'That gist is gone - deleted, or made by a different account. '+
+    'Press "Find my binder again" and sync.');
+  if(r.status>=500)throw new Error('GitHub is having trouble ('+r.status+'). Nothing was lost; try again shortly.');
+  if(!r.ok)throw new Error('GitHub said '+r.status+'. Nothing was sent.');
+  try{ return await r.json(); }
+  catch(e){ throw new Error('GitHub sent something unreadable. Nothing was changed here.'); }
 }
 /* One gist holds both regions as two files, so a phone set up once carries
    the Asian-English and the Japanese binder without being told twice. */
@@ -18329,11 +18389,7 @@ function autoSyncWire(){
 function mergeIn(inc){
   slimOwn(inc.own);
   slimWant(inc.want);
-  (inc.binders||[]).forEach(b=>{if(!DB.binders.some(x=>x.id===b.id))DB.binders.push(b);});
-  Object.assign(DB.manual,inc.manual||{});
-  /* a deal already recorded is left alone; an unseen one is taken on */
-  DB.deals2=DB.deals2||[];
-  (inc.deals2||[]).forEach(d=>{if(!DB.deals2.some(x=>x.id===d.id))DB.deals2.push(d);});
+  mergeSidecars(inc);
   /* Lines are matched on the printing they name. One you already track keeps
      the lower target - it is the one you set - and the higher count.    */
   DB.want=DB.want||{};
@@ -18357,7 +18413,6 @@ function mergeIn(inc){
       if(hit)hit.qty=Math.max(hit.qty,cp.qty);else cur.copies.push(cp);
     });
   });
-  DB.seq=Math.max(DB.seq||0,inc.seq||0);
   save();renderBinder();
   return {added,merged};
 }
