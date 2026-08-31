@@ -18118,6 +18118,20 @@ function mergeSync(inc){
     e.rows=(e.rows||[]).filter(r=>!((theirGone[wantKey(id,r)]||0)>(+r.u||0)));
     if(!e.rows.length)delete DB.want[id];
   }
+  /* ---- a merge is not an edit ----
+     save() stamps whatever changed since the last save, and everything this
+     function just brought in looks exactly like that. So a copy arriving from
+     the other device with u=100 was immediately re-stamped to now - and then
+     outranked a tombstone the other device had written at 150. A card deleted
+     on the phone came back from the desktop on the next sync, every time,
+     because the desktop had quietly claimed to have touched it more recently
+     than the phone deleted it.
+
+     Dropping the snapshot makes the next save treat this state as the
+     baseline it is: it fills in a time only where one is missing, stamps
+     nothing, and writes no tombstones. The times that arrived over the wire
+     survive, which is the whole basis on which they are compared. */
+  LAST_SNAP=null;
   return stat;
 }
 /* What travels. Device settings never do - a phone's theme is not a desktop's
@@ -18272,11 +18286,27 @@ async function autoSync(why){
     renderBinder();paintDash();
   }catch(e){
     AUTO_FAIL++;AUTO_AT=Date.now();
-  }finally{ AUTO_BUSY=false; }
+  }finally{
+    AUTO_BUSY=false;
+    /* something was edited while this was in flight, so it has not been sent */
+    if(AUTO_DIRTY){AUTO_DIRTY=false;autoSyncSoon();}
+  }
 }
-/* Called from save(), so every edit path reaches it without knowing it does */
+/* Called from save(), so every edit path reaches it without knowing it does.
+   ---- and it must not reach it from inside a sync ----
+   A sync merges and then saves, and that save called straight back in here
+   and booked another sync. Twenty-five seconds later it ran, merged nothing,
+   saved, and booked the next one - a sync every twenty-five seconds for as
+   long as the app was open, on a phone, with nothing having changed. The four
+   moments this was built around were all still correct and all beside the
+   point.
+
+   An edit that lands DURING a sync is not lost: it is remembered and booked
+   once the sync is done, which is also the only moment it could be sent. */
+let AUTO_DIRTY=false;
 function autoSyncSoon(){
   if(!autoOn())return;
+  if(AUTO_BUSY){AUTO_DIRTY=true;return;}
   clearTimeout(AUTO_T);
   AUTO_T=setTimeout(()=>autoSync('idle'),AUTO_IDLE);
 }
