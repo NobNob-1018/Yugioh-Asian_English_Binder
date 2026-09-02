@@ -15924,12 +15924,33 @@ function expandBaked(groups){
   });
   return out;
 }
+/* What a complete list looks like. Every judgement about whether a list is
+   whole is made against this rather than against whatever the device happens
+   to hold: a list already cut short would otherwise become the standard the
+   next one is measured by, and each truncation would quietly license the one
+   after it. */
+const pxFull=()=>BAKED_PRICES.reduce((t,g)=>t+((g[2]||[]).length),0);
+const pxShort=n=>{const f=pxFull();return f>0&&n<f*0.75;};
+/* Back to the list that ships in the file - complete, dated, and needing no
+   connection. The stored list is dropped rather than kept, so this is what the
+   next boot finds too. */
+async function useBakedPrices(){
+  await Store.del(KEY_PRICES);
+  indexPrices(expandBaked(BAKED_PRICES));
+  PX_PREV={};PX_DATE=BAKED_STAMP;PX_SRC='baked in';PX_CUR=BAKED_CUR;
+  AE_STAMP='';paintSetList();refilterPool();
+  snapshot();await save();
+}
 async function loadCachedPrices(){
   if(BAKED_PRICES.length){indexPrices(expandBaked(BAKED_PRICES));PX_DATE=BAKED_STAMP;PX_SRC='baked in';PX_CUR=BAKED_CUR;}
   const c=await Store.get(KEY_PRICES);
   if(c&&c.rows&&c.rows.length){
     /* a synced copy is newer than whatever was baked in, so it wins */
-    if(!BAKED_STAMP||!c.t||c.t>=BAKED_STAMP){
+    /* Newer than what was baked in, and long enough to be the whole shop.
+       Builds before this checked only the date, so a device can still be
+       holding a list an interrupted sync left behind; adopting it would price
+       a third of the binder at nothing with no sign of why. */
+    if((!BAKED_STAMP||!c.t||c.t>=BAKED_STAMP)&&!pxShort(c.rows.length)){
       indexPrices(c.rows);PX_PREV=c.prev||{};PX_DATE=c.t||'';PX_SRC='synced';
       PX_CUR=c.cur||DB.pxCur||guessCurrency(c.rows);
     }
@@ -15999,15 +16020,29 @@ async function refreshPrices(btn){
        every card it never reached lost its price outright. A binder
        quietly worth a third less looks exactly like the market moving,
        which is the worst way for this to fail: silently, and plausibly.
-       A run that ended on a dead page, or came back a fraction of the
-       size of the list already held, now changes nothing at all. */
-    const had=PX_ROWS.length;
-    if(cut||(had&&rows.length<had*0.75)){
+       A run that ended on a dead page, or that came back a fraction of a
+       whole list, is not allowed to become the list. */
+    if(cut||pxShort(rows.length)){
       say('Retry');
-      toast('Stopped partway - '+rows.length.toLocaleString()+' prices of about '+
-        had.toLocaleString()+' came back. Nothing was changed: your prices are still '+
-        'the ones from '+(PX_DATE||'before')+'. Try again.');
-      return;
+      /* ---- and it puts things right itself ----
+         Keeping what is on the device is the whole answer when what is on the
+         device is sound. When it is not - an older build could leave a short
+         list behind - the binder is sitting at a fraction of its worth, and
+         telling someone to press a second button to undo that asks them to
+         work out why their collection looks wrong before they can fix it. So
+         it falls back to the complete built-in list itself and says so once. */
+      if(pxShort(PX_ROWS.length)){
+        await useBakedPrices();
+        renderBinder();
+        toast('The shop stopped answering partway through. Put the full built-in list '+
+          'from '+(BAKED_STAMP||'the last build')+' back so nothing is left unpriced - '+
+          'sync again when the connection is steadier.');
+      }else{
+        toast('The shop stopped answering partway through - only '+rows.length.toLocaleString()+
+          ' prices came back, so yours were left alone. Still the ones from '+
+          (PX_DATE||'before')+'.');
+      }
+      return false;
     }
     const prev={};Object.assign(prev,PX_KEY);      /* keep the old prices for the change figure */
     indexPrices(rows);
@@ -16019,25 +16054,22 @@ async function refreshPrices(btn){
     refilterPool();
     toast(rows.length.toLocaleString()+' TCG Corner prices loaded');
     snapshot();save();renderBinder();
+    return true;
   }catch(e){
     say('Retry');
     toast('TCG Corner prices blocked by the browser \u2014 see the note in Prices');
     priceHelp();
+    return false;
   }
 }
 function pricePanel(){
-  const n=PX_ROWS.length;
-  /* what a complete list looks like, so a truncated one is visible rather
-     than merely felt as a fall in value */
-  const bakedN=BAKED_PRICES.reduce((t,g)=>t+((g[2]||[]).length),0);
-  const short=bakedN&&n<bakedN*0.75&&PX_SRC!=='baked in';          /* every printing, not one row per code */
+  const n=PX_ROWS.length;          /* every printing, not one row per code */
   const box=el('div');
   box.innerHTML=`
     <div style="display:flex;gap:14px;align-items:baseline;margin-bottom:14px">
       <span style="font-family:var(--mono);font-size:var(--fs-3xl)">${n.toLocaleString()}</span>
       <span class="note">prices \u00b7 ${esc(PX_SRC||'baked in')} \u00b7 ${esc(PX_CUR)} \u00b7 ${esc(PX_DATE||'no date')}</span>
     </div>
-    ${short?`<p class="hint" style="margin:-8px 0 14px;padding:8px 10px;border:1px solid var(--line)"><b>This list looks short.</b> ${n.toLocaleString()} prices against ${bakedN.toLocaleString()} built into the app. A sync that was cut off leaves every card it never reached with no price at all, which reads as a fall in value rather than as a fault. Go back to the built-in list below, then sync again.</p>`:''}
     <div class="fld"><label>Their prices are in</label>
       <div class="tabs" style="width:fit-content">
         <button id="cur-php" class="${PX_CUR==='PHP'?'on':''}">\u20B1 PHP</button>
@@ -16051,8 +16083,7 @@ function pricePanel(){
       </div>
       <p class="hint" style="margin-top:5px">${DB.fxManual?'Yours, typed by hand \u2014 the live rate is not being applied.':'Live'+(DB.fxAt?', fetched '+esc(fxAgo()):'')+'. Type a figure to fix it yourself.'}</p></div>
     <button class="btn btn-a" id="p-sync" style="width:100%">Sync prices from TCG Corner</button>
-    <button class="btn" id="p-baked" style="width:100%;margin-top:6px">Go back to the prices built into the app</button>
-    <p class="hint">The full list from ${esc(BAKED_STAMP||'the last build')} ships inside this file and needs no connection. Use it to undo a sync that was cut off.</p>
+    <p class="hint">The full list from ${esc(BAKED_STAMP||'the last build')} ships inside this file, so the binder is priced with or without a connection. A sync that cannot finish leaves it alone.</p>
     <div class="sh">Keep a copy</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn" id="p-exp" style="flex:1" disabled title="Temporarily off — see note below">Export .json</button>
@@ -16067,17 +16098,6 @@ function pricePanel(){
     throw away about a third of the list and leave the wrong rarity priced. Import and Sync are unaffected.</p>`;
   modal('Prices',box);
   const setCur=c=>{PX_CUR=c;DB.pxCur=c;save();closeModal();renderBinder();toast('Prices read as '+c);};
-  /* Drops the stored list so the baked one is what boot finds, rather than
-     leaving a short list on the device to win on its date again. */
-  const baked=box.querySelector('#p-baked');
-  if(baked)baked.onclick=async()=>{
-    await Store.del(KEY_PRICES);
-    indexPrices(expandBaked(BAKED_PRICES));
-    PX_PREV={};PX_DATE=BAKED_STAMP;PX_SRC='baked in';PX_CUR=BAKED_CUR;
-    AE_STAMP='';paintSetList();refilterPool();
-    snapshot();await save();closeModal();renderBinder();
-    toast(PX_ROWS.length.toLocaleString()+' built-in prices restored');
-  };
   box.querySelector('#cur-php').onclick=()=>setCur('PHP');
   box.querySelector('#cur-usd').onclick=()=>setCur('USD');
   const pf=box.querySelector('#pp-fx');
