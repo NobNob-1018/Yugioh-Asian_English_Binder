@@ -18231,6 +18231,23 @@ async function ghCall(path,opts){
 }
 /* One gist holds both regions as two files, so a phone set up once carries
    the Asian-English and the Japanese binder without being told twice. */
+/* ---- a sync's own save is not an edit either ----
+   save() books a sync for every edit path, which is right - but a merge
+   saves too, and that save set the "something changed while syncing" flag,
+   which booked another sync, which merged and saved and booked another. The
+   loop outlived the last fix because a flag cannot tell whose edit it was.
+   This can: it is true only while the sync is writing its own result down,
+   so a real edit landing during a sync is still caught and still sent. */
+let IN_SYNC=false;
+/* JSON with the keys in a fixed order. Two devices holding the same cards in
+   a different insertion order are the same binder, and comparing the raw
+   text would call them different forever - each rewriting the other's copy
+   of an identical file on every sync. */
+function stableStr(v){
+  if(v===null||typeof v!=='object')return JSON.stringify(v);
+  if(Array.isArray(v))return '['+v.map(stableStr).join(',')+']';
+  return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stableStr(v[k])).join(',')+'}';
+}
 async function syncBinder(onLog){
   const say=onLog||(()=>{});
   if(!ghTok())throw new Error('No token yet.');
@@ -18284,31 +18301,43 @@ async function syncBinder(onLog){
   say('Reading…');
   const g=await ghCall('/gists/'+encodeURIComponent(id));
   const f=(g.files||{})[gistFile()];
-  let stat=null;
+  let stat=null,inc=null;
   if(f){
     /* a gist over a megabyte comes back truncated, with a raw_url to the rest */
     const text=f.truncated&&f.raw_url?await (await fetch(f.raw_url)).text():f.content;
-    let inc=null;
     try{inc=JSON.parse(text);}catch(e){throw new Error('The stored binder is not readable JSON.');}
     if(inc&&inc.region&&inc.region!==REGION)
       throw new Error('That file holds the other region. Switch binders and sync again.');
     say('Merging…');
     stat=mergeSync(inc);
-    await save();
+    IN_SYNC=true;
+    try{ await save(); }finally{ IN_SYNC=false; }
+  }
+  /* ---- do not send back what is already there ----
+     The upload is the expensive half - the whole binder, every time, on a
+     phone - and most syncs change nothing: you looked at the app, it
+     checked, both sides already agreed. Sending an identical file spends
+     data to achieve exactly what not sending it achieves. The timestamp is
+     left out of the comparison because it moves on its own. */
+  if(f&&stableStr(Object.assign({},syncPayload(),{t:0}))===
+        stableStr(Object.assign({},inc||{},{t:0}))){
+    say('Already in step.');
+    return {created:false,stat,sent:false};
   }
   say('Writing back…');
   await ghCall('/gists/'+encodeURIComponent(id),{method:'PATCH',body:body()});
-  return {created:false,stat};
+  return {created:false,stat,sent:true};
 }
 /* ---- syncing without being asked ----
    The button is honest but it is a thing to remember, and the failure it
    invites is the expensive one: two devices drift for a week and the merge,
    however correct, now has a week of divergence to reconcile.
 
-   Four moments are worth spending a request on, and they are the ones where
+   Five moments are worth spending a request on, and they are the ones where
    something actually happened:
 
      opening the app, if the last sync is old enough to be worth checking
+     looking at it again, which is when you would notice it was behind
      a while after you stop editing, so a burst of adds is one request
      regaining a connection, because the last attempt is likely to have failed
      putting the phone away, which is when a shop session ends
@@ -18321,8 +18350,9 @@ const agoText=t=>{
   const m=Math.floor((Date.now()-(+t||0))/6e4);
   return m<1?'just now':m<60?m+'m ago':m<1440?Math.floor(m/60)+'h ago':Math.floor(m/1440)+'d ago';
 };
-const AUTO_IDLE=25e3;          /* quiet after the last edit before writing */
-const AUTO_STALE=10*60e3;      /* on open, only if it has been this long */
+const AUTO_IDLE=8e3;           /* quiet after the last edit before writing */
+const AUTO_STALE=90e3;         /* on open, only if it has been this long */
+const AUTO_LOOK=45e3;          /* on coming back to it, the same */
 let AUTO_T=null,AUTO_BUSY=false,AUTO_FAIL=0,AUTO_AT=+(PREFS.syncAt||0);
 const autoOn=()=>!!(PREFS.autoSync&&ghTok()&&PREFS.gistId);
 /* The same connection policy the image prefetch uses. A sync is small, but on
@@ -18365,7 +18395,7 @@ async function autoSync(why){
    once the sync is done, which is also the only moment it could be sent. */
 let AUTO_DIRTY=false;
 function autoSyncSoon(){
-  if(!autoOn())return;
+  if(!autoOn()||IN_SYNC)return;
   if(AUTO_BUSY){AUTO_DIRTY=true;return;}
   clearTimeout(AUTO_T);
   AUTO_T=setTimeout(()=>autoSync('idle'),AUTO_IDLE);
@@ -18377,11 +18407,25 @@ function autoSyncWire(){
   /* Hidden, not unloaded: a phone going into a pocket never fires unload, and
      what is pending at that moment is exactly what has not been written. */
   addEventListener('visibilitychange',()=>{
-    if(document.visibilityState!=='hidden')return;
-    clearTimeout(AUTO_T);
-    if(Date.now()-AUTO_AT>3e4)autoSync('hidden');
+    if(document.visibilityState==='hidden'){
+      clearTimeout(AUTO_T);
+      if(Date.now()-AUTO_AT>3e4)autoSync('hidden');
+      return;
+    }
+    /* ---- and picking it back up ----
+       The four moments had a hole in them, and it was the one that matters
+       most in a shop: waking the screen on an app that was already running.
+       Putting the phone away was wired and opening it cold was wired, but
+       looking at it checked nothing, so a card added on the other device sat
+       there until something unrelated happened to trigger a sync. */
+    if(Date.now()-AUTO_AT>AUTO_LOOK)autoSync('look');
   });
-  if(Date.now()-AUTO_AT>AUTO_STALE)setTimeout(()=>autoSync('open'),4000);
+  /* the same moment on a desktop, where two windows are both visible and
+     only one of them is being used */
+  addEventListener('focus',()=>{
+    if(Date.now()-AUTO_AT>AUTO_LOOK)autoSync('look');
+  });
+  if(Date.now()-AUTO_AT>AUTO_STALE)setTimeout(()=>autoSync('open'),2000);
 }
 /* Copies are merged, never replaced: bringing a phone's binder onto a desktop
    that already holds cards must not lose either side. A copy is the same copy
