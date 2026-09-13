@@ -471,10 +471,8 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .fxbox{display:flex;align-items:center;gap:6px;font-size:var(--fs-xs);color:var(--faint);white-space:nowrap}
 .fxbox input{width:56px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:3px 6px;font-family:var(--mono);font-size:var(--fs-xs);color:var(--text);text-align:right}
-.fxbox button{color:var(--up);font-size:var(--fs-sm);line-height:1;padding:5px 9px;border:1px solid var(--line);border-radius:var(--r);background:transparent;transition:border-color .15s,background .15s}
-.fxbox button.off{color:var(--faint)}          /* rate has been overridden by hand */
-.fxbox button:hover{color:var(--text);border-color:var(--line-hover);background:var(--surface-2)}
-.fxbox button:disabled{opacity:.4}
+/* The box held a refresh arrow as well; that job is the Exchange rate row in
+   the Sync sheet now, so what is left is the figure and a place to type. */
 /* Sync button carries a freshness dot: green while the list is recent, red once it ages */
 .pxpill{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 /* It was half of a pair, squared off on the side the caret sat against. On
@@ -830,7 +828,6 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
   .btn{min-height:44px}
   .nav .btn-sm{min-width:44px}          /* the ‹ › arrows are one glyph wide */
   .fxbox input{min-height:44px}
-  .fxbox button{min-width:44px;min-height:44px;font-size:var(--fs-lg)}
   .set-edit{min-height:36px;padding:0 10px}
   .mini{min-height:44px;font-size:var(--fs-sm)}
   .seg2 button{min-height:44px;min-width:44px;padding:0 14px;font-size:var(--fs-sm)}
@@ -4708,10 +4705,14 @@ function editSet(code,name,target){
    than eating two tiles of the dashboard.                                   */
 function paintTopTools(){
   const fxb=$('#hdr-fx'),pxb=$('#hdr-px');
-  if(fxb)fxb.innerHTML='\u20B1 per $ <input id="fx" value="'+fx()+'" inputmode="decimal">'+
-    '<button id="fx-auto" class="'+(DB.fxManual?'off':'')+'" aria-label="Fetch the live rate" title="'+
-    (DB.fxManual?'Your own rate \u2014 tap for the live one':'Live rate'+(DB.fxAt?' \u00b7 '+fxAgo():''))+
-    '">\u21bb</button>';
+  /* The refresh arrow beside the rate fetched exactly what the Exchange rate
+     row in the Sync sheet fetches, a thumb away from the button that opens
+     it. The box keeps the figure and keeps letting you type your own; going
+     back to the live one is Sync's job, and that is now the one place that
+     says when it last landed. */
+  if(fxb)fxb.innerHTML='\u20B1 per $ <input id="fx" value="'+fx()+'" inputmode="decimal" title="'+
+    esc(DB.fxManual?'Your own rate \u2014 Sync replaces it with the live one'
+                   :'Live rate'+(DB.fxAt?' \u00b7 '+fxAgo():''))+'">';
   /* ---- one button ----
      There were two: a pill that synced all three at once with no way to say
      otherwise, and a caret beside it that opened a panel holding a second,
@@ -4722,13 +4723,6 @@ function paintTopTools(){
     '" id="px-sync" title="'+esc(syncStatus())+'"><i class="dot"></i>Sync</button>';
   const fxi=$('#fx');
   if(fxi)fxi.onchange=()=>{DB.fx=Math.max(1,+fxi.value||58);DB.fxManual=true;save();paintTopTools();renderBinder();};
-  const fxa=$('#fx-auto');
-  if(fxa)fxa.onclick=async()=>{
-    fxa.disabled=true;DB.fxManual=false;
-    const ok=await refreshRate(true);
-    toast(ok?'Rate is now \u20B1'+DB.fx+' per $':'Could not reach the rate service');
-    paintTopTools();
-  };
   const ps=$('#px-sync');
   if(ps)ps.onclick=openSync;
 }
@@ -7337,7 +7331,11 @@ function detailCopies(id,c){
       box.appendChild(note);
     }
     const newSet=add.querySelector('#new-pre'),newRar=add.querySelector('#new-rar');
-    linkSetRarity(newSet,newRar,c,{anySet:'Any set',set:preSet,rar:pr.oneRar||''});
+    const rarNote=el('p','hint');
+    rarNote.style.cssText='margin-top:6px';
+    rarNote.hidden=true;
+    box.appendChild(rarNote);
+    linkSetRarity(newSet,newRar,c,{anySet:'Any set',set:preSet,rar:pr.oneRar||'',note:rarNote});
     const binSeg=add.querySelector('#new-bin');
     if(binSeg){
       binSeg.querySelectorAll('button').forEach(t=>t.onclick=()=>{
@@ -17110,10 +17108,25 @@ function printingsOf(card){
             oneRar:rars.length===1?rars[0]:'',
             oneCode:codes.length===1?codes[0]:''};
   }
-  const rows=(card&&card.name)?pxRowsFor(card.name):[];
-  const live=rows.filter(r=>!r.cond);
-  const sets=[...new Set(live.map(r=>r.pre).filter(Boolean))].sort();
-  const rars=[...new Set(live.map(r=>r.rar).filter(Boolean))];
+  /* ---- one source, not two ----
+     This read the price feed, while the menus beside it read the price feed
+     AND the catalogue - so the two disagreed about which printings exist,
+     and every "only one, filled in for you" decision was made from the
+     narrower of the pair. It went wrong in both directions:
+
+       595 cards the shop does not stock had no sets here and exactly one in
+       the menu, so their only printing was never filled in - Monster Gate
+       offering AST and choosing Any set;
+
+       140 cards the shop stocks in one set of several had one set here and
+       several in the menu, so a set was filled in that you had not picked -
+       Ancient Gear Golem quietly claiming CR04 when it is also in TLM.
+
+     The second is the worse of the two: a default that is merely absent
+     makes you choose, but a default that is wrong gets saved. printingPairs
+     is what the menus are built from, so it is what this is built from. */
+  const sets=[...printingPairs(card).keys()].sort();
+  const rars=printRars(card,'');
   return {sets,rars,oneSet:sets.length===1?sets[0]:'',
           oneRar:rars.length===1?rars[0]:'',oneCode:''};
 }
@@ -17228,6 +17241,22 @@ function linkSetRarity(setSel,rarSel,card,o){
     /* put the choices back, falling to the first still-valid one */
     setSel.value = sets.includes(wantSet) ? wantSet : (anySet?'':(sets[0]||''));
     rarSel.value = rars.includes(wantRar) ? wantRar : (anyRar?'':(rars[0]||''));
+    /* ---- all eleven rarities is an admission, not an offer ----
+       AE_CAT records which cards are in a set and nothing else - no
+       rarities - so for a printing the shops have never listed, the app
+       genuinely does not know. Offering none would make 719 cards
+       impossible to record, so it offers all of them; but a full ladder
+       against a card that came in two rarities reads as a claim that it
+       came in eleven. It says which it is instead. */
+    if(o.note){
+      const rs=printingPairs(card).get(setSel.value);
+      const guess=!!setSel.value&&(!rs||!rs.size);
+      o.note.textContent=guess
+        ? 'No rarity on record for '+setSel.value+' — the shops have never listed '+
+          'this printing, so every rarity is offered. Pick the one on your card.'
+        : '';
+      o.note.hidden=!guess;
+    }
   };
   setSel.addEventListener('change',()=>{paint();if(o.onChange)o.onChange();});
   rarSel.addEventListener('change',()=>{paint();if(o.onChange)o.onChange();});

@@ -544,6 +544,54 @@ handed over**. If it will not parse, nothing downloads and the reason is named.
 A stray quote in a card name used to produce a file that looked fine here and
 rendered an empty grid on the buyer's machine.
 
+## 15a. Which printings exist, and who is asked
+
+### The menus and the defaults read different books
+
+`printingsOf()` decides what to fill in for you — "this card is only in AST, so
+AST is chosen". `printSets()` / `printRars()` decide what the menus beside it
+offer. They were built from different sources: the first from the **price feed
+alone**, the second from the price feed **and** `AE_CAT`.
+
+So every "only one, filled in for you" decision was made from the narrower of
+the pair, and it went wrong in both directions:
+
+| | Cards | What you saw |
+|---|---|---|
+| Shop stocks none of it | **595** | Exactly one set in the menu, and *Any set* chosen. Monster Gate offering AST and picking nothing. |
+| Shop stocks one set of several | **140** | A set filled in that you never picked. Ancient Gear Golem quietly claiming CR04 when it is also in TLM. |
+
+The second is the worse one: a missing default makes you choose, a wrong
+default gets saved. Both are now built from `printingPairs()`, the same thing
+the menus use — 0 and 0, with correctly-filled going from 4,179 to 4,775.
+
+It is **not** an old-card problem. Accesscode Talker and Aluber the Jester of
+Despia were in the 140.
+
+### All eleven rarities is an admission, not an offer
+
+`AE_CAT` is `[setCode,[nameIdx,…]]` — which cards are in a set, and nothing
+else. No rarities. The price feed is the only Asian-English rarity source
+there is, so for a printing the shops have never listed, the app genuinely
+does not know which rarities exist.
+
+Offering none would make **719 cards impossible to record**, so it offers all
+of them — which is right, and reads as a claim that a card that came in two
+rarities came in eleven. `linkSetRarity()` takes an optional `note` element
+and says which it is: *"No rarity on record for AST — the shops have never
+listed this printing, so every rarity is offered. Pick the one on your card."*
+
+Filling this in properly means harvesting rarities per printing from Yugipedia
+into `AE_CAT`, which is a `Tools/` job, not an app one.
+
+### The rate lost its refresh arrow
+
+The `↻` beside *₱ per $* fetched exactly what the **Exchange rate** row in the
+Sync sheet fetches, sitting a thumb away from the button that opens it. The box
+keeps the figure and keeps letting you type your own; going back to the live
+one is Sync's job, and Sync is the one place that says when it last landed.
+
+
 ## 16. The wishlist holds printings, not cards
 
 One card can be worth hunting in more than one rarity — the Secret at a price
