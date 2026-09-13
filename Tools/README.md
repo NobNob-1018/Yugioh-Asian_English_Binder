@@ -785,14 +785,36 @@ file and comes back untouched.
 - `setRegion()` refuses a region this device does not carry, because a stale
   tap on a hidden switch is still a tap.
 
-### A checkbox has already toggled
+### The region switch must not move backwards
 
-Both region controls revert their checkbox and re-set it only once the swap
-lands, because switching region replaces the whole collection and can refuse.
-That needs `cb.checked` **as read in the click handler** — which is the state
-being asked for, since the browser toggles it before handlers run and
-`preventDefault()` puts it back *after* the event, not before. Written as
-`!cb.checked` it was inverted, and switching a region off did nothing at all.
+It went wrong twice, and the second way is the interesting one.
+
+First it was simply inverted. Both controls cancelled the click and re-set the
+checkbox only once the swap landed, so a refusal could never leave it lying —
+and that needs `cb.checked` **as read in the handler**, which is the state being
+asked for, since the browser toggles it before handlers run and
+`preventDefault()` puts it back *after* the event rather than undoing it now.
+Written as `!cb.checked` it did nothing at all.
+
+Fixing that exposed the real problem: **the control moved backwards before it
+moved forwards.** Cancelling the click snaps the switch back to where it was,
+and it stays there until `setRegions()` resolves — but switching region rebuilds
+a five-thousand card pool. Measured at **146ms on a warm desktop**, and far
+worse on a phone with a cold pool, with the main thread too busy for the switch
+to even animate. For that whole time it shows the opposite of what was just
+pressed, which reads as a control that does not work — and the second tap it
+invites is the one that gets refused, because by then the first has landed.
+
+There is exactly one refusal and it is knowable up front, so it is settled
+before the switch moves:
+
+```js
+if(!want && regionsOn().length<2){ cb.checked=true; toast(...); return; }
+```
+
+After that the switch stays where it was put, both are `disabled` (at half
+opacity) until the swap lands, and the note underneath says *Switching…*. A
+control that is doing something slow should look busy, not look wrong.
 
 ## 18d. The setup, one question a screen
 
