@@ -331,6 +331,27 @@ promised to two people.
 The seller's name and contact come from Settings and are baked into each
 exported binder, which is what puts the "Message the seller" button on it.
 
+### Closing a deal, and putting it back
+
+Marking a deal done is the moment stock leaves. `closeDeal()` decrements the
+copy rows it takes from and deletes any row that empties - and a copy row is
+more than a count: it carries **the asking price and the condition you graded**,
+and the entry around it carries the date you added the card.
+
+It used to record only `it.took`, the number that went out. A reopen therefore
+had nothing to rebuild the rows from: the copies came back priced at whatever
+the buyer's order code happened to say, or at nothing, always ungraded, and
+dated today. A reopen exists because the sale fell through, so *nothing* should
+have changed - and this was silent, on a selling shelf, which is the worst
+place for it.
+
+`closeDeal()` now records `it.from` - a `{n, price, cond}` slice per row it
+drew from - and `it.was` when the whole entry goes. `reopenDeal()` rebuilds from
+those, matching each slice back to a row with the same price *and* condition, so
+two rows of one printing listed at two prices stay two listings instead of
+merging into one. A deal closed before this shipped has no `it.from` and falls
+back to the old behaviour, which is the best that can be known about it.
+
 ## 11. OCG-JP, the second region
 
 The app holds two collections that share nothing but a card pool. The switch
@@ -539,6 +560,21 @@ Old entries carried a single rarity; `slimWant()` turns each into a list of
 one. Transfer codes write one line per row and gather them back by card id, so
 several rows sharing a card no longer overwrite each other.
 
+### Add to wishlist, on a selection
+
+`bulkWant()` called `addWant()`, which has never existed in this file. The call
+sat inside `if (c && typeof addWant === 'function')`, so the guard was always
+false: selecting twenty cards and pressing **Add to wishlist** added nothing,
+counted nothing, and reported "Nothing added" - which is true, and reads exactly
+like an empty selection. A guard around a name that is never defined is not a
+safety net, it is a silent no-op that nothing will ever report.
+
+It now does what the detail panel does: `addWantRow()` on the printing you would
+actually buy (`cheapestRarity()`, falling back to the only rarity or the only
+code there is), and it refuses to make a second identical line, the same way
+**Add another rarity** does. The toast distinguishes "added" from "already on
+it", so a no-op says which kind it was.
+
 ### What the shops are asking
 
 `srpRange` used to read TCG Corner's rows directly. That made it disagree with
@@ -632,6 +668,103 @@ to Binder while the wishlist is open. Both reset points — switching region and
 restoring from the address bar — go through those two painters, so the strips
 cannot drift apart.
 
+### 18a. Switching a pile off
+
+Most people do not do all three. A binder that is only ever a collection still
+carried a Selling tab, a Keep/Sell switch on every copy row, a deals board, a
+shareable sale list and a margin figure that would never say anything - and at
+375px that is a third of the chrome earning nothing, on the screen where chrome
+is the scarce thing.
+
+**Settings -> What this binder is for** switches each pile off. Three switches
+rather than an *Only Collection / Only Selling / Only Wishlist* menu, because the
+three are not exclusive: switch two off and you have the "only" the menu would
+have offered, and you can also have the pair the menu had no room for. One of
+the three has to stay on; trying to clear the last one snaps the switch back and
+says why.
+
+It is a **preference of the device**, held in `PREFS` beside the theme and the
+card size (`PREF_FIELDS` carries `piles`), so it survives a region swap and does
+not travel with a shared binder. Absent means all three, so an existing device is
+not changed by the setting arriving.
+
+Nothing is deleted. Copies filed under a hidden pile stay exactly where they are
+and come back untouched - which is why each switch counts them out loud
+(`pileCount`) before you flip it, and says "hidden, not deleted" afterwards.
+Import, merge and the shared-sale-list reader are untouched for the same reason:
+the setting hides surfaces, it never edits data.
+
+Two functions do the work:
+
+- `fitPiles()` moves where you are **standing** - out of a view or a pile that is
+  no longer switched on. Three things can strand you there, so all three call it:
+  the setting changing, a region swap (which resets `VIEW` and `F.binder`), and
+  the address bar (a link from a desktop where all three are on).
+- `applyPiles()` decides what is on the **screen**: the pile tabs (and the whole
+  switch, plus its phone host `#pilebar`, when one pile is left), Select mode and
+  the three bulk-bar buttons, Deals, the Selling list button, the Trade
+  calculator, the "At the table" group, and Show owned.
+
+The rest is read at render time from `pileOn()`, `bothPiles()`, `ownPiles()` and
+`wantsOnly()`:
+
+| Where | With the pile off |
+|---|---|
+| Detail panel | Keep/Sell segment and the new-copy segment go; the copy lands in `defaultPile()`. "Copies held" goes when neither binder pile is on; "Wishlist" goes with the wishlist. |
+| Bulk add | Three shapes. Both piles on: the Sell tick unlocks the price. Selling only: no tick, price always live, everything is a listing, and the tally drops its *keep* half. Collection only: neither column. |
+| Dashboard | `dashSub` stops naming the other pile; the margin footer and the wishlist line stand down with theirs. |
+| Settings | The seller name and contact exist so a buyer can reach you, so they go with Selling. |
+
+Two things create copies rather than reading them, and both had `b-main`
+written into them: a settled trade (`applyTrade`) and **Paste a list**. With
+Collection switched off, both filed into a pile that is not on screen, so the
+cards arrived and vanished. Both now use `defaultPile()`, and Paste a list only
+offers the Collection/Selling choice when there are two piles to choose between
+- otherwise it says where they are going. In wishlist-only neither can do
+anything useful, so both leave the rail along with the trade calculator.
+
+**Wishlist only** is the one that changes shape rather than just losing parts.
+Binder, Sets and Cores are all lenses on copies you hold and there are none, so
+the view strip goes and `VIEW` is pinned to `wants`. The headline has no value to
+total either, so it becomes the one figure that means something there - what the
+list would cost to clear, with *N of M at or under target* under it.
+
+## 18b. What belongs to the device, not the collection
+
+Switching region replaces `DB` wholesale - a different saved file, a different
+collection - so anything living in `DB` that is really a *display* setting gets
+swapped along with it. That is what `PREFS` and `PREF_FIELDS` exist to prevent,
+and four settings were simply missed when the list was written:
+
+| Field | Symptom before |
+|---|---|
+| `railHidden` | AE→JP un-folded the sidebar |
+| `per` | cards per page reset |
+| `setSort` | the Sets board reordered |
+| `coreSort` | the Cores board reordered |
+
+Switching back restored them from the other file, which is what made it look
+random rather than broken. All four are in `PREF_FIELDS` now, and the three
+controls that write them (`#rail-tog`, `#t-per`, `#t-sort`, plus Clear filters)
+call `savePrefs()` so the device file hears about it at once rather than waiting
+for the next save of something else to carry it.
+
+### Binder mode's settings are not your settings
+
+Binder mode forces facing pages **on** and hands the page size to the window,
+remembering yours to put back on the way out. But `paintDash()` calls
+`savePrefs()` on every render - for `wantSeen` - so a save landing while binder
+mode was open adopted both of them, and leaving restored `DB` and not `PREFS`.
+
+The result: open binder mode once and **Facing pages** was switched on in your
+saved settings permanently, by something you never touched. It came back at the
+next reload looking like a setting you had chosen.
+
+`savePrefs()` now writes the remembered pre-binder values for those two fields
+while `BM` is true, and `exitBinderMode()` calls `savePrefs()` once it has put
+them back. This mattered before `per` joined the list and would have got worse
+with it, which is why the two were fixed together.
+
 ## 19. Getting the newest version on a phone
 
 The saved copy is what makes the app open instantly and work with no signal,
@@ -675,6 +808,37 @@ Two things this got wrong first, both worth remembering:
   render, because not every shell delivers resize or mediaquery events; the call
   returns immediately when nothing needs moving.
 
+### 20a. The fold is a sidebar control
+
+Below 920px the rail is not a column beside the cards - it is a bottom sheet
+that slides up over them, opened by the Menu button. The fold handle (`«`)
+stayed in it, and it had CSS waiting from the older design where the rail
+merely stacked under the grid and folding collapsed it to a sticky strip.
+
+Pressing the handle from inside the open Menu therefore did three things at
+once: `.shell.no-rail>.rail` re-pointed the sheet at `position:sticky`, which
+took it out of its fixed frame and wedged it into the page above the dashboard;
+`.shell.no-rail>.rail>.grp:not(:first-of-type)` hid every panel in it; and
+`.no-rail .grp:first-of-type>*:not(.switch-row)` hid the rest of the first one.
+The Menu stayed open showing nothing but its own handle and *Show results*.
+
+The fix is to stop the class arriving at a width where it means nothing.
+`applyRail()` reads `RAIL_STACKED` - the same query `placePiles()` uses, so the
+two cannot disagree - and applies `no-rail` only where there is a column to
+fold, hiding the handle otherwise. The **saved preference is untouched**: a
+desktop that was folded is still folded when the window is wide again, and
+visiting the same binder on a phone in between changes nothing. The empty
+`.switch-row` left behind is hidden too, since on a phone the owned switch has
+already moved into the toolbar.
+
+The stale `.no-rail` rules in the `max-width:920px` block are gone rather than
+left dormant. A rule that can no longer be reached is the thing that sprang
+this trap in the first place, and the block carries a note saying so.
+
+Crossing the breakpoint has to re-decide: `railBreak()` and `reflow()` both run
+`placePiles()` then `applyRail()`, in that order, because `applyRail` reads where
+the switch ended up.
+
 ## 21. Prices checked by hand
 
 These were verified on the TCG Corner site by eye, and are the reference the
@@ -696,19 +860,56 @@ Checked 2026-08-18, in pesos:
 | Droll & Lock Bird | ES02 | UR | 630.40 |
 | Droll & Lock Bird | ES02 | ScR | 1,134.73 |
 
-To check them now, open the app and run this in the browser console — the same
-thing the old script did, without needing Node:
+**These figures are in pesos, and the peso figure is not a constant.** The
+baked list is in USD (`PX_CUR==='USD'`), so `bestMatch` returns
+`price x DB.fx` and every number in the table above moves the moment the rate
+does. The table was captured at `DB.fx = 63.04`; at the 62.67 of a later
+session all ten come out 0.59% low - the *same* 0.59%, which is the tell that
+nothing is wrong.
+
+A check that fails on every correct build is worse than no check: it teaches
+you to ignore the one test this project has for price matching. So the check
+below pins the rate it was captured at, and asserts the part that is actually
+a fact about the code - **which printing, at which shop, by which route** -
+with the peso figure as a tolerance.
 
 ```js
-[['Ash Blossom & Joyous Spring','RC04','UtR',1260.81],
- ['Ash Blossom & Joyous Spring','RC04','UR',252.16],
- ['Droll & Lock Bird','ES02','UtR',1765.13]]
-.forEach(([name,set,rar,want])=>{
-  const m = bestMatch({set,rarity:rar}, {name});
-  const got = m ? Math.round(m.peso*100)/100 : null;
-  console.log(got===want ? 'ok  ' : 'FAIL', name, rar, got, 'want', want);
-});
+(() => {
+  const FX_WHEN_CHECKED = 63.04;          // DB.fx on 2026-08-18
+  const cases = [
+    ['Ash Blossom & Joyous Spring','RC04','UtR' , 1260.81,'RC04-AE009'],
+    ['Ash Blossom & Joyous Spring','RC04','UR'  ,  252.16,'RC04-AE009'],
+    ['Ash Blossom & Joyous Spring','RC04','ScR' ,  945.61,'RC04-AE009'],
+    ['Ash Blossom & Joyous Spring','RC04','QCSR',11347.29,'RC04-AE009'],
+    ['Ash Blossom & Joyous Spring','RC04','CR'  , 1134.73,'RC04-AE009'],
+    ['Ash Blossom & Joyous Spring','RC04','ExSR', 1576.01,'RC04-AE009'],
+    ['Ash Blossom & Joyous Spring','RC04','HGR' , 8825.67,'RC04-AE009'],
+    ['Droll & Lock Bird'          ,'ES02','UtR' , 1765.13,'ES02-AE005'],
+    ['Droll & Lock Bird'          ,'ES02','UR'  ,  630.40,'ES02-AE005'],
+    ['Droll & Lock Bird'          ,'ES02','ScR' , 1134.73,'ES02-AE005'],
+  ];
+  const live = DB.fx; DB.fx = FX_WHEN_CHECKED;   // pin, so this tests matching
+  let bad = 0;
+  for (const [name,set,rar,want,code] of cases) {
+    const m = bestMatch({set,rarity:rar},{name});
+    const got = m ? Math.round(m.peso*100)/100 : null;
+    // proportional: the rate is held to 2 decimals, so the error scales with
+    // the price. A wrong printing is out by multiples, never by 0.02%.
+    const tol = Math.max(0.02, want * 0.0002);
+    const ok = m && m.code===code && m.how==='set + rarity'
+               && Math.abs(got-want) <= tol;
+    if (!ok) bad++;
+    console.log(ok?'ok  ':'FAIL', name, rar, '->', m&&m.code, m&&m.how, got, '(want', want + ')');
+  }
+  DB.fx = live;
+  console.log(bad ? bad+' of '+cases.length+' FAILED' : 'all '+cases.length+' ok');
+})();
 ```
+
+If every line fails by one identical percentage, the rate moved or the list was
+re-baked - re-pin `FX_WHEN_CHECKED` and move on. If *some* lines fail, or a
+`code` or `how` is wrong, the matching has broken and that is the real thing
+this check exists to catch.
 
 ## 22. Played stock
 

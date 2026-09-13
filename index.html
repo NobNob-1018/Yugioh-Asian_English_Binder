@@ -594,6 +594,17 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 .set-hint{font-size:var(--fs-xs);color:var(--faint);margin-top:3px;max-width:34ch}
 .set-seg{flex:none}
 .set-in{flex:none;width:220px;max-width:100%}
+/* Three switches are one decision, so they stack as one block against one
+   explanation rather than three set-rows repeating the same sentence. The
+   count sits under the name because it is the consequence of the switch,
+   not a second label for it. */
+.pile-switches{display:flex;flex-direction:column;gap:var(--sp-3);flex:none;min-width:196px}
+.pile-switches .switch{align-items:flex-start}
+.pile-switches .track{margin-top:1px}
+.pile-switches .lbl{display:flex;flex-direction:column;gap:2px;line-height:1.3}
+.pile-n{font-size:var(--fs-2xs);color:var(--faint)}
+.pile-off .pile-n{color:var(--faint)}
+@media (max-width:560px){.pile-switches{min-width:0}}
 .set-foot{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
   margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--line-soft)}
 @media (max-width:560px){
@@ -1128,16 +1139,22 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
   .mark span{display:none}
   .mark .regsw{display:inline-flex}
   .shell{grid-template-columns:1fr;padding:10px 10px 16px}
-  /* stacked layout: folding just collapses the panel, no side strip */
   .bar-left{width:100%}
   .dash{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 10px;padding:13px 14px}
   .dash>div:first-child{grid-column:1/-1}
-  .shell.no-rail{grid-template-columns:1fr}
-  /* Folded, the rail is just its handle. The sidebar normally sits below the
-     binder on a phone, which would bury that handle under a page of cards,
-     so while folded it moves to the top where it can be reached at once. */
-  .shell.no-rail>.rail{align-items:flex-end;order:0;position:sticky;top:56px;z-index:30}
-  .shell.no-rail>.rail>.grp:first-of-type{background:none}
+  /* ---- nothing folds down here ----
+     There used to be a stacked-fold state: the rail sat under the cards and
+     the handle collapsed it to a sticky strip at the top. Then the rail
+     became a bottom sheet, and those rules survived to fight it. Folding
+     from inside the open Menu re-pointed .rail at position:sticky, which
+     took the sheet out of its fixed frame, and hid every panel below the
+     first - so the Menu stayed open, wedged itself above the dashboard and
+     showed nothing but its own handle.
+
+     The fold is a sidebar control and there is no sidebar at this width, so
+     applyRail() no longer applies the class here and the handle is not
+     offered. Deliberately no .no-rail rules in this block: the class cannot
+     arrive, and a rule waiting for it is the trap that was just sprung. */
   .rail{position:static;max-height:none;order:2}
   /* A grid item defaults to min-width:auto, so anything inside with a wide
      minimum forces the whole column open and the page scrolls sideways.
@@ -2268,7 +2285,7 @@ provenance
            standing in front of you, two are housekeeping you touch once a
            month. Primary and secondary now look different, which is the
            whole job of a sidebar group. -->
-      <div class="acts-grp" role="group" aria-label="While you are dealing">
+      <div class="acts-grp" id="grp-table" role="group" aria-label="While you are dealing">
         <h3>At the table</h3>
         <button class="btn btn-sm act-primary" id="open-deals">Deals</button>
         <button class="btn btn-sm act-primary" id="open-trade">Trade calculator</button>
@@ -2416,12 +2433,26 @@ const regionLabel=()=>REGION==='ocg'?'OCG-JP':'Asian-English';
    moment they change rather than waiting for the next save, and they are
    laid back over DB every time DB is replaced.                          */
 const KEY_PREFS='ygo-binder-prefs-v1';
-const PREF_FIELDS=['theme','density','spread','mode',
+/* Four of these were missed when this list was written, and every one of them
+   is a display setting sitting in DB: the folded sidebar, the page size, and
+   the two board sort orders. So AE->JP un-folded your sidebar, reset cards
+   per page and reset the Sets and Cores ordering - and AE again put them all
+   back, which is what made it look random rather than broken.            */
+const PREF_FIELDS=['theme','density','spread','mode','piles',
+                   'railHidden','per','setSort','coreSort',
                    'fx','fxHkd','fxJpy','fxManual','fxAuto','fxAt'];
 let PREFS=(()=>{try{return JSON.parse(localStorage.getItem(KEY_PREFS)||'{}')||{};}
                 catch(e){return {};}})();
 function savePrefs(){
   for(const k of PREF_FIELDS) if(DB[k]!==undefined) PREFS[k]=DB[k];
+  /* ---- binder mode's settings are not your settings ----
+     It forces facing pages on and hands the page size to the window for as
+     long as it is open, remembering yours to put back on the way out. But
+     paintDash calls this on every render, so a save landing while it was
+     open adopted them - and leaving restored DB and not PREFS. Facing pages
+     came back on at the next reload, switched on by something you never
+     touched. The remembered values go in instead.                      */
+  if(BM){ PREFS.spread=BM_PREV_SPREAD; PREFS.per=BM_PREV_PER; }
   try{localStorage.setItem(KEY_PREFS,JSON.stringify(PREFS));}catch(e){}
 }
 function applyPrefs(){
@@ -2552,6 +2583,40 @@ let RARITIES=ocgOn()?RARITIES_JP:RARITIES_AE;
 /* Anything saved under a rarity that has since been removed keeps its own label. */
 const rarBy=k=>RARITIES.find(r=>r.k===k)||{k:k||'C',n:'Legacy rarity ('+(k||'?')+')',f:'f-common',w:0};
 const BINDERS=[{id:'b-main',name:'Collection',kind:'collection'},{id:'b-sell',name:'Selling',kind:'selling'}];
+/* ---- which of the three jobs this device does ----
+   Collection, Selling and Wishlist are three different reasons to open this
+   app, and almost nobody has all three. A binder that is only ever a
+   collection still carried a Selling tab, a Keep/Sell switch on every copy
+   row, a deals board, a shareable sale list and a margin figure that would
+   never say anything - and at 375px that is a third of the chrome earning
+   nothing, on a screen where chrome is the scarce thing.
+
+   So each one switches off. It is a preference of the device, not a fact
+   about the collection: it rides with the theme and the card size, survives
+   a region swap, and hides surfaces only. Nothing is deleted. Copies filed
+   under a pile you switch off stay exactly where they are and come back
+   untouched the moment you switch it on again - which is why the setting
+   counts them out loud before you do it.                                */
+const PILES=[
+  {id:'b-main',name:'Collection'},
+  {id:'b-sell',name:'Selling'},
+  {id:'b-want',name:'Wishlist'}
+];
+/* Absent means all three, so a device that has never touched this setting
+   is not changed by the setting arriving.                                */
+const pileOn=id=>{const s=DB.piles;return !Array.isArray(s)||s.includes(id);};
+const pilesOn=()=>PILES.filter(p=>pileOn(p.id));
+const onePile=()=>pilesOn().length<2;
+/* Both binder piles: the Keep/Sell switch is a choice between them, so with
+   one of them gone there is no choice left to offer.                     */
+const bothPiles=()=>pileOn('b-main')&&pileOn('b-sell');
+/* Either binder pile: whether "copies held" is a thing this device tracks. */
+const ownPiles=()=>pileOn('b-main')||pileOn('b-sell');
+/* Wishlist alone. The app stops being a binder: Binder, Sets and Cores are
+   all lenses on copies you hold, and there are none to look at.          */
+const wantsOnly=()=>pileOn('b-want')&&!ownPiles();
+/* Where a new copy lands when the Keep/Sell switch is not on screen. */
+const defaultPile=()=>pileOn('b-main')?'b-main':(pileOn('b-sell')?'b-sell':'b-main');
 const ATTRS=['DARK','LIGHT','EARTH','WATER','FIRE','WIND','DIVINE'];
 const MON_RACES=['Aqua','Beast','Beast-Warrior','Creator-God','Cyberse','Dinosaur','Divine-Beast','Dragon','Fairy','Fiend','Fish','Illusion','Insect','Machine','Plant','Psychic','Pyro','Reptile','Rock','Sea Serpent','Spellcaster','Thunder','Warrior','Winged Beast','Wyrm','Zombie'];
 const MON_SUBS=['Normal','Effect','Ritual','Fusion','Synchro','XYZ','Pendulum','Link','Tuner','Flip','Toon','Spirit','Union','Gemini'];
@@ -3573,6 +3638,9 @@ async function setRegion(r){
     paintClearBtn();
     /* the panel's rarity menu is built per region, so let it rebuild */
     const pr=$('#sp-rar'); if(pr)pr.dataset.done='';
+    /* the reset above put F.binder back to Collection and VIEW back to
+       Binder, either of which may be switched off on this device     */
+    applyPiles();
     paintViewTabs();paintBinders();
     applyTheme();applyDensity();
     renderBinder();
@@ -3764,6 +3832,9 @@ async function readUrl(){
     F.text=p.get('q')||'';
     page=Math.max(0,(parseInt(p.get('p'),10)||1)-1);
     const sb=$('#f-text'); if(sb)sb.value=F.text;
+    /* a link can name a pile this device has switched off - most likely a
+       link you sent yourself from the desktop where all three are on  */
+    fitPiles();
     paintViewTabs();paintBinders();
     renderBinder();
   } finally {
@@ -3820,7 +3891,7 @@ function paintEmptyState(list,bn,dk){
     else if(dk)st.appendChild(el('div','state','<b>This deck is empty</b>Nothing is tagged to it. Deck tagging is off for now, so this list stays empty.'));
     else if(VIEW==='wants')st.appendChild(el('div','state','<b>Nothing on the wishlist</b>Open any card and use Add to wishlist to start tracking it across both shops.'));
     else if(F.ownedOnly&&!Object.keys(DB.own).length)st.appendChild(el('div','state','<b>Nothing marked as owned yet</b>Turn off \u201cShow owned\u201d to page through the pool, then set copies on any card you have.'));
-    else if(bn&&!F.ownedOnly)st.appendChild(el('div','state',`<b>Nothing in ${esc(bn.name)} yet</b>Open a card and use Keep / Sell on a copy to file it here.`));
+    else if(bn&&!F.ownedOnly)st.appendChild(el('div','state',`<b>Nothing in ${esc(bn.name)} yet</b>${bothPiles()?'Open a card and use Keep / Sell on a copy to file it here.':'Open a card and add a copy to file it here.'}`));
     else st.appendChild(el('div','state','<b>No cards match these filters</b>Use Clear filters, or tap the \u00d7 beside the heading.'));
   }
 }
@@ -4174,7 +4245,7 @@ function renderBinder(dir){
      sits with the other export actions, so nothing on this bar appears or
      vanishes when you switch binders and nothing shifts sideways.          */
   const saleBtn=$('#do-sale');
-  if(saleBtn)saleBtn.hidden=!(binderValue('b-sell')>0);
+  if(saleBtn)saleBtn.hidden=!pileOn('b-sell')||!(binderValue('b-sell')>0);
 
   paintBinders();
 
@@ -4557,17 +4628,26 @@ function rollTo(node,key,value,fmt){
    and a pending deal when there is one. */
 function dashSub(selling,keep,sell,rsv){
   const bits=[];
-  if(selling){ if(keep>0)bits.push(peso(keep)+' kept'); }
-  else       { if(sell>0)bits.push(peso(sell)+' listed'); }
-  if(rsv>0)bits.push(peso(rsv)+' reserved');
+  /* the pile you are NOT looking at - so with that pile switched off the
+     line has nothing left to carry and says nothing rather than naming a
+     place that is no longer in the app */
+  if(selling){ if(keep>0&&pileOn('b-main'))bits.push(peso(keep)+' kept'); }
+  else       { if(sell>0&&pileOn('b-sell'))bits.push(peso(sell)+' listed'); }
+  if(rsv>0&&pileOn('b-sell'))bits.push(peso(rsv)+' reserved');
   return bits.join(' · ');
 }
 function paintDash(){
 
   const d=$('#dash');if(!d)return;
+  /* ---- a wishlist has no value, it has a cost ----
+     With Collection and Selling both switched off there is nothing owned to
+     total, and "Collection value P0" over an empty movers list is a broken
+     dashboard rather than a light one. The headline becomes the one figure
+     that means something here: what the list would cost to clear. */
+  const wo=wantsOnly(), wt=wo?wantTotals():null;
   const keep=binderValue('b-main'), sell=binderValue('b-sell');
   const selling=F.binder==='b-sell';
-  const val=selling?sell:keep;
+  const val=wo?wt.now:(selling?sell:keep);
   const h=DB.history||[];
   const prev=h.length>1?h[h.length-2].v:null;
   const diff=prev==null?null:totalValue()-prev;
@@ -4594,7 +4674,11 @@ function paintDash(){
      whether one card jumped or forty drifted. The value stays, because it
      is the one figure worth a headline; the other three tiles become the
      list of what actually changed, which is what you open the app to see. */
-  const M2=movers(4);
+  /* Movers are price moves on cards you hold; with no binder there are none
+     to move, and the list would be drawn from copies nothing on screen can
+     reach. */
+  const MVS=wo?[]:movers();
+  const M2=MVS.slice(0,4);
   /* ---- this panel should say what to DO, not only what happened ----
      It carried a list of movers, a margin line and the sync status. On a
      quiet day the movers were the sentence "Nothing moved since your last
@@ -4624,10 +4708,10 @@ function paintDash(){
      The count you last saw is kept on the device, not in the binder - "since
      I last looked" is about this screen, and syncing it would mean the phone
      had already read what the desktop is about to tell you. */
-  const W=wantTotals();
+  const W=wt||wantTotals();
   const seen=+PREFS.wantSeen||0;
   const fresh=Math.max(0,W.met-seen);
-  const wantLine=!W.lines?''
+  const wantLine=(!pileOn('b-want')||!W.lines)?''
     : fresh
       ? `<p class="mv-want ok"><b>${fresh}</b> more reached your price` +
         `${W.met>fresh?` \u00b7 ${W.met} of ${W.lines} in all`:''}</p>`
@@ -4644,30 +4728,32 @@ function paintDash(){
         <span class="mv-n">${esc(m.name)}</span>
         <span class="mv-d ${m.d>0?'up':'down'}">${m.d>0?'\u25b2':'\u25bc'} ${esc(peso(Math.abs(m.d)))}</span>
       </button>`).join('')
-    : (wantLine || `<p class="mv-empty">${h.length>1
+    : (wantLine || `<p class="mv-empty">${wo
+        ? 'Nothing on the wishlist yet. Open any card and use Add to wishlist.'
+        : h.length>1
         ? 'Nothing moved since your last session.'
         : 'No earlier prices yet. Sync prices twice and changes show up here.'}</p>`);
-  const more=movers().length-M2.length;
+  const more=MVS.length-M2.length;
   /* The margin earns the line only when there is a margin to report; failing
      that the wishlist takes it, if the list above has not already used it. */
-  const mgPc=M.n&&M.srp>0?(M.ask-M.srp)/M.srp*100:null;
+  const mgPc=pileOn('b-sell')&&M.n&&M.srp>0?(M.ask-M.srp)/M.srp*100:null;
   const footer=(mgPc!=null&&Math.abs(mgPc)>=0.5)
     ? `<div class="mv-foot">Asking ${esc(peso(M.ask))} against ${esc(peso(M.srp))} ${esc(shopName())} \u2014 <b class="${mgPc<0?'up':'down'}">${mgPc>0?'+':''}${Math.round(mgPc)}%</b></div>`
     : (M2.length&&wantLine?`<div class="mv-foot">${wantLine}</div>`:'');
 
   d.innerHTML=`
     <div class="dash-head">
-      <div class="cap">${selling?'Selling value':'Collection value'}</div>
+      <div class="cap">${wo?'To clear the wishlist':(selling?'Selling value':'Collection value')}</div>
       <div class="big">${esc(peso(val))}</div>
-      <div class="delta ${cls}">${esc(arrow)}</div>
-      <div class="sub2">${esc(dashSub(selling,keep,sell,rsv))}</div>
+      <div class="delta ${wo?(wt.met?'up':'flat'):cls}">${esc(wo?(wt.lines?(wt.met?wt.met+' of '+wt.lines+' at or under target':wt.lines+' on the list, none at target yet'):'nothing on the list yet'):arrow)}</div>
+      <div class="sub2">${esc(wo?'':dashSub(selling,keep,sell,rsv))}</div>
     </div>
     <div class="dash-moves">
       <!-- The heading and the freshness line are both small grey metadata
            and each had a row of its own, which cost the sheet 31px of the
            height it lays cards out in. They share one. -->
       <div class="mv-top">
-        <div class="cap">Since last session${movers().length?` <span class="mv-more">${movers().length} moved</span>`:''}</div>
+        <div class="cap">${wo?'Your list':'Since last session'}${MVS.length?` <span class="mv-more">${MVS.length} moved</span>`:''}</div>
         <div class="sync-line" title="Everything that comes over the network">${esc(syncStatus())}</div>
       </div>
       <div class="mv-list">${moveRows}</div>
@@ -4678,7 +4764,7 @@ function paintDash(){
     b.onclick=()=>openDetail(b.dataset.id);
   });
   const big=d.querySelector('.big');
-  if(big)rollTo(big,'headline:'+F.binder,val,peso);
+  if(big)rollTo(big,'headline:'+(wo?'want':F.binder),val,peso);
   paintTopTools();
   /* The re-fit that used to live here, on a frame callback, is gone: it did
      the same job as the settle at the end of renderBinder and did it less
@@ -4775,6 +4861,7 @@ function exitBinderMode(){
   const per=$('#t-per');
   if(per){per.disabled=false;per.value=DB.per?String(DB.per):'';}
   DB.spread=BM_PREV_SPREAD;
+  savePrefs();                 /* both of those are device settings now */
   autoLayout(true);renderBinder();
   if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});
 }
@@ -4889,25 +4976,34 @@ function openPaste(){
     'automatically, in whatever order they appear:</p>'+
     '<pre class="pex">3x Ash Blossom &amp; Joyous Spring\nRC04-AE009 x3\n2 Droll &amp; Lock Bird (ScR) ES02\nMaxx "C"</pre>'+
     '<textarea class="tf-code" id="p-in" rows="7" placeholder="Paste your list here"></textarea>'+
-    '<div class="set-row" style="border-bottom:none">'+
-    '<div><div class="set-lbl">File them under</div>'+
-    '<div class="set-hint">Rarity defaults to Common where a line does not say.</div></div>'+
-    '<div class="tabs set-seg" id="p-bin">'+
-    '<button data-b="b-main" class="on">Collection</button>'+
-    '<button data-b="b-sell">Selling</button></div></div>'+
+    /* Which pile to file them under is only a question where there are two
+       to choose between; with one, saying where they went is the answer. */
+    (bothPiles()
+      ? '<div class="set-row" style="border-bottom:none">'+
+        '<div><div class="set-lbl">File them under</div>'+
+        '<div class="set-hint">Rarity defaults to Common where a line does not say.</div></div>'+
+        '<div class="tabs set-seg" id="p-bin">'+
+        '<button data-b="b-main" class="on">Collection</button>'+
+        '<button data-b="b-sell">Selling</button></div></div>'
+      : '<p class="note">They go into '+
+        esc((BINDERS.find(x=>x.id===defaultPile())||{}).name||'Collection')+
+        '. Rarity defaults to Common where a line does not say.</p>')+
     '<div class="tf-row"><button class="btn btn-sm" id="p-check">Check the list</button>'+
     '<button class="btn btn-a btn-sm" id="p-add" disabled>Add them</button></div>'+
     '<div id="p-out"></div>';
   const body=modal('Paste a list',box,true);
-  let rows=[],bin=F.binder||'b-main';
+  /* the pile you are standing in, as long as this device still has it */
+  let rows=[],bin=(F.binder&&pileOn(F.binder))?F.binder:defaultPile();
   const seg=body.querySelector('#p-bin');
-  seg.querySelectorAll('button').forEach(b=>{
-    b.classList.toggle('on',b.dataset.b===bin);
-    b.onclick=()=>{bin=b.dataset.b;
-      seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
-      slideTabs(seg);};
-  });
-  requestAnimationFrame(()=>slideTabs(seg));
+  if(seg){
+    seg.querySelectorAll('button').forEach(b=>{
+      b.classList.toggle('on',b.dataset.b===bin);
+      b.onclick=()=>{bin=b.dataset.b;
+        seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+        slideTabs(seg);};
+    });
+    requestAnimationFrame(()=>slideTabs(seg));
+  }
   const out=body.querySelector('#p-out');
   const addBtn=body.querySelector('#p-add');
   body.querySelector('#p-check').onclick=()=>{
@@ -5022,14 +5118,18 @@ function applyTrade(S,done){
           if(DB.manual[r.id])delete DB.manual[r.id];
         }
       });
-      /* and in: traded-for cards are things you wanted, so they land in Collection */
+      /* and in: traded-for cards are things you wanted, so they land in
+         Collection - or, on a device that does not keep one, in the pile it
+         does have. Landing them in a hidden pile would look like the trade
+         had simply not happened.                                        */
+      const into=defaultPile();
       S.get.forEach(r=>{
         const own=ensureOwn(r.id);
         if(!own)return;
         const hit=own.copies.find(cp=>(cp.rarity||'')===(r.rar||'')&&
-          (cp.set||'')===(r.set||'')&&cp.b==='b-main');
+          (cp.set||'')===(r.set||'')&&cp.b===into);
         if(hit)hit.qty+=(+r.qty||0);
-        else own.copies.push({rarity:r.rar||'C',set:r.set||'',qty:+r.qty||1,b:'b-main'});
+        else own.copies.push({rarity:r.rar||'C',set:r.set||'',qty:+r.qty||1,b:into});
         /* got what you were hunting? then you are hunting fewer of them, and
            it is the line naming that printing that comes down - not whichever
            happened to be first                                            */
@@ -5303,17 +5403,30 @@ function closeDeal(id){
     if(it.agreed===false){it.took=0;return;}
     let want=+it.qty||0,took=0;
     const o=DB.own[it.id];
+    /* ---- record the rows, not just the count ----
+       A copy row carries an asking price and a condition, and a row that
+       empties is deleted below. Remembering only how many went out meant a
+       reopen had nothing to rebuild them from: the copies came back at the
+       order's price, or at no price at all, and always ungraded. On a selling
+       shelf that is silent data loss, and the whole point of a reopen is that
+       the sale fell through and nothing should have changed.              */
+    const from=[];
     (o?o.copies||[]:[]).forEach(cp=>{
       if(want<=0||cp.b!=='b-sell')return;
       if(copyKey(cp.rarity,cp.set)!==copyKey(it.rar,it.set))return;
       const n=Math.min(want,+cp.qty||0);
+      if(n<=0)return;
       cp.qty=(+cp.qty||0)-n; want-=n; took+=n;
+      from.push({n,price:cp.price,cond:cp.cond});
     });
     it.took=took; sold+=took;
+    if(from.length)it.from=from; else delete it.from;
     if(want>0){const c=cardById(it.id);short.push((c?c.name:it.id)+' '+(it.rar||'')+' short by '+want);}
     /* a copy row that has run out stops being a row */
     if(o){o.copies=(o.copies||[]).filter(cp=>(+cp.qty||0)>0);
-      if(!o.copies.length)delete DB.own[it.id];}
+      /* and the entry going takes its added date with it, which is what
+         "Recently added" sorts on - so that is remembered too */
+      if(!o.copies.length){it.was=o.added;delete DB.own[it.id];}}
   });
   d.status='done'; d.closed=Date.now(); d.sold=sold;
   save();
@@ -5325,12 +5438,27 @@ function reopenDeal(id){
   (d.items||[]).forEach(it=>{
     const n=+it.took||0; if(!n)return;
     const o=ensureOwn(it.id);
-    const hit=(o.copies||[]).find(cp=>cp.b==='b-sell'&&
-      copyKey(cp.rarity,cp.set)===copyKey(it.rar,it.set));
-    if(hit)hit.qty=(+hit.qty||0)+n;
-    else o.copies.push({rarity:it.rar||'C',set:it.set||'',qty:n,b:'b-sell',
-      price:it.price!=null?+it.price:undefined});
-    it.took=0;
+    /* ensureOwn stamps a fresh added date on an entry it has to recreate */
+    if(it.was)o.added=it.was;
+    /* what the close recorded. A deal closed before that was recorded has
+       only the price the order carried, which is what it used to use. */
+    const back=(it.from&&it.from.length)?it.from
+      :[{n,price:it.price!=null?+it.price:undefined}];
+    back.forEach(part=>{
+      const q=+part.n||0; if(q<=0)return;
+      const px=part.price!=null?+part.price:undefined;
+      const cd=part.cond||undefined;
+      /* onto its own row: two rows of one printing at different prices are
+         two different listings, and merging them loses one of the two */
+      const hit=(o.copies||[]).find(cp=>cp.b==='b-sell'&&
+        copyKey(cp.rarity,cp.set)===copyKey(it.rar,it.set)&&
+        (cp.price==null?null:+cp.price)===(px==null?null:px)&&
+        (cp.cond||'')===(cd||''));
+      if(hit)hit.qty=(+hit.qty||0)+q;
+      else o.copies.push({rarity:it.rar||'C',set:it.set||'',qty:q,b:'b-sell',
+        price:px,cond:cd});
+    });
+    it.took=0; delete it.from; delete it.was;
   });
   d.status='pending'; delete d.closed; delete d.sold;
   save();
@@ -5373,10 +5501,26 @@ function openSettings(){
     (isPhone()?'':
       seg('set-spread','Facing pages',[['off','Off'],['on','On']],DB.spread?'on':'off',
           'Draws the sheet as two leaves with a spine. Needs a window at least 760px wide.'))+
-    '<div class="set-row"><div><div class="set-lbl">Your name on shared binders</div>'+
+    /* ---- what this binder is for ----
+       Three switches rather than an Only Collection / Only Selling / Only
+       Wishlist menu, because the three are not exclusive: most people keep
+       and hunt, some also sell. Switch two off and you have the "only" the
+       menu would have offered, and you can also have the pair the menu had
+       no room for. It sits directly above the two fields it governs.   */
+    '<div class="set-row"><div><div class="set-lbl">What this binder is for</div>'+
+    '<div class="set-hint">Switch off what you do not do and it leaves the app — tabs, '+
+    'buttons, boards and all. Nothing is deleted: cards filed under a pile you hide '+
+    'stay where they are and come back with it.</div></div>'+
+    '<div class="pile-switches" id="set-piles">'+PILES.map(p=>
+      '<label class="switch'+(pileOn(p.id)?'':' pile-off')+'"><input type="checkbox" data-p="'+esc(p.id)+'"'+
+      (pileOn(p.id)?' checked':'')+'><span class="track"></span>'+
+      '<span class="lbl">'+esc(p.name)+
+      '<span class="pile-n" data-n="'+esc(p.id)+'"></span></span></label>').join('')+
+    '</div></div>'+
+    '<div class="set-row set-sell"><div><div class="set-lbl">Your name on shared binders</div>'+
     '<div class="set-hint">Shown to anyone you send a binder to, with a way to reach you.</div></div>'+
     '<input class="inp set-in" id="set-name" placeholder="Your name"></div>'+
-    '<div class="set-row"><div><div class="set-lbl">How buyers reach you</div>'+
+    '<div class="set-row set-sell"><div><div class="set-lbl">How buyers reach you</div>'+
     '<div class="set-hint">Messenger, Discord or a mobile number.</div></div>'+
     '<input class="inp set-in" id="set-contact" placeholder="e.g. m.me/yourname"></div>'+
     '<div class="set-foot">'+
@@ -5400,6 +5544,35 @@ function openSettings(){
     '<button class="btn btn-sm" id="set-upd">Get the newest</button>';
   box.appendChild(upd);
   const body=modal('Settings',box);
+  /* The count is the whole reason this is safe to touch: "48 cards" under a
+     switch you are about to turn off says what you are hiding, before you
+     hide it. It is recounted after every flip because a hidden pile can
+     still be written to from the other side of an import.              */
+  const paintPileCounts=()=>{
+    body.querySelectorAll('.pile-n[data-n]').forEach(n=>{
+      const id=n.dataset.n,c=pileCount(id),on=pileOn(id);
+      const noun=id==='b-want'?(c===1?'card wanted':'cards wanted')
+                              :(c===1?'card filed here':'cards filed here');
+      n.textContent=c?(c.toLocaleString()+' '+noun+(on?'':' — hidden, not deleted'))
+                     :(on?'nothing here yet':'off');
+    });
+    body.querySelectorAll('.set-sell').forEach(r=>{r.hidden=!pileOn('b-sell');});
+  };
+  paintPileCounts();
+  body.querySelectorAll('#set-piles input[data-p]').forEach(cb=>{
+    cb.onchange=()=>{
+      if(!setPiles(cb.dataset.p,cb.checked)){
+        cb.checked=true;
+        toast('One of the three has to stay on');
+        return;
+      }
+      cb.closest('.switch').classList.toggle('pile-off',!cb.checked);
+      paintPileCounts();
+      /* Facing pages is measured against a sheet that may have just changed
+         shape, and the settings panel is sitting over it either way.     */
+      requestAnimationFrame(()=>body.querySelectorAll('.tabs').forEach(slideTabs));
+    };
+  });
   const ub=body.querySelector('#set-upd');
   if(ub)ub.onclick=()=>askConfirm('Get the newest',
     'This clears the copy saved on this device and reloads. Nothing you have '+
@@ -5477,16 +5650,109 @@ function openSettings(){
     bb.onclick=()=>{closeModal();enterBinderMode();};
   }
 }
+/* ---- put the app back inside what is switched on ----
+   Two jobs, kept apart. fitPiles moves where you are STANDING; applyPiles
+   decides what is on the SCREEN. Landing somewhere that no longer exists
+   happens three ways - the setting just changed, a region swap reset the
+   view, or the address bar named a pile - so the move has to be its own
+   function that all three can call.                                      */
+function fitPiles(){
+  if(VIEW==='wants'&&!pileOn('b-want'))VIEW='binder';
+  if(VIEW==='deals'&&!pileOn('b-sell'))VIEW='binder';
+  /* nothing else is a lens on a wishlist */
+  if(wantsOnly()){VIEW='wants';F.set='';F.arch='';}
+  else if(F.binder&&!pileOn(F.binder))F.binder=defaultPile();
+}
+function applyPiles(){
+  fitPiles();
+  const tabs=document.getElementById('binder-tabs');
+  if(tabs){
+    tabs.querySelectorAll('button').forEach(b=>{b.hidden=!pileOn(b.dataset.b||'');});
+    /* one pile is not a choice, so the switch itself goes as well */
+    tabs.hidden=onePile();
+    /* on a phone the tabs live in the bar, and an empty bar is still a
+       32px stripe above the cards - so the host goes with its contents */
+    const slot=document.getElementById('pilebar');
+    if(slot&&slot.contains(tabs))slot.hidden=tabs.hidden;
+  }
+  /* Binder, Sets and Cores all read copies you hold. With only a wishlist
+     there are none, and three tabs onto nothing is worse than no tabs.  */
+  const vt=document.getElementById('view-tabs');
+  if(vt)vt.hidden=wantsOnly();
+  /* "Show owned" is a filter on owned cards; the wishlist is by definition
+     the cards you do not own, and already ignores it.                   */
+  const ob=document.getElementById('owned-only');
+  const osw=ob?ob.closest('.switch'):null;
+  if(osw)osw.hidden=wantsOnly();
+  /* Selling is more than a pile. The deals board consumes from it, the
+     shareable list is made of it, and the seller name and contact only
+     exist so a buyer can reach you.                                     */
+  const sell=pileOn('b-sell');
+  const dl=document.getElementById('open-deals'); if(dl)dl.hidden=!sell;
+  const sl=document.getElementById('do-sale');    if(sl&&!sell)sl.hidden=true;
+  /* Both of these can only act on copies you hold: the trade calculator
+     prices your side from them, and Paste a list creates them. With only a
+     wishlist there are none, and nowhere for new ones to go.            */
+  const tr=document.getElementById('open-trade'); if(tr)tr.hidden=wantsOnly();
+  const pa=document.getElementById('open-paste'); if(pa)pa.hidden=wantsOnly();
+  const grp=document.getElementById('grp-table');
+  if(grp)grp.hidden=!sell&&wantsOnly();
+  /* Every bulk action moves a card from one pile to another, so with one
+     pile there is nothing for a selection to do. */
+  const sb=document.getElementById('t-select');
+  if(sb)sb.hidden=onePile();
+  if(onePile()&&typeof SELMODE!=='undefined'&&SELMODE)setSelMode(false);
+  if(typeof paintSel==='function')paintSel();
+  slideAllTabs();
+}
+/* Returns false when you tried to switch off the last one standing. An app
+   with no piles is not a lighter app, it is an empty one.                */
+function setPiles(id,on){
+  const set=new Set(pilesOn().map(p=>p.id));
+  if(on)set.add(id);else set.delete(id);
+  if(!set.size)return false;
+  DB.piles=PILES.filter(p=>set.has(p.id)).map(p=>p.id);
+  savePrefs();save();
+  applyPiles();
+  paintViewTabs();paintBinders();
+  autoLayout(true);
+  renderBinder();
+  return true;
+}
+/* Cards filed under a pile, so the setting can say what it is about to hide
+   rather than hiding it and letting you find out.                        */
+function pileCount(id){
+  if(id==='b-want')return wantTotals().lines;
+  let n=0;
+  Object.keys(DB.own||{}).forEach(k=>{
+    if(((DB.own[k]||{}).copies||[]).some(c=>(c.b||'b-main')===id))n++;
+  });
+  return n;
+}
 function applyRail(){
-  const hidden=!!DB.railHidden;
+  /* ---- fold the sidebar, where there is a sidebar to fold ----
+     Below 920px the rail is not a column beside the cards, it is a sheet
+     that slides up over them. Folding it there stripped the panels out of
+     the open Menu and dropped the sheet out of its fixed frame - so the
+     handle is not offered at this width, and the class is not applied even
+     if the saved preference says folded. The preference itself is left
+     alone: a desktop that was folded opens folded again.               */
+  const side=!RAIL_STACKED.matches;
+  const hidden=!!DB.railHidden&&side;
   const shell=document.querySelector('.shell');
   if(shell)shell.classList.toggle('no-rail',hidden);
   const b=$('#rail-tog');
   if(b){
+    b.hidden=!side;
     b.innerHTML=hidden?'&raquo;':'&laquo;';
     b.title=hidden?'Show the sidebar':'Hide the sidebar';
     b.setAttribute('aria-label',b.title);
     b.setAttribute('aria-expanded',String(!hidden));
+    /* The row exists to carry the handle and the owned switch. On a phone
+       the switch has moved up into the toolbar, so with the handle gone as
+       well the row is an empty box holding a gap open. */
+    const row=b.closest('.switch-row');
+    if(row)row.hidden=!side&&!row.querySelector('.switch');
   }
 }
 /* Measure the chosen option and hand its width and offset to the pill. Called
@@ -6306,6 +6572,13 @@ function paintSaveState(){
 function openBulk(){
   const list=visible();
   if(!list.length){toast('Nothing here to add');return;}
+  /* Three shapes, not two. With both binder piles on, the Sell tick chooses
+     between them and unlocks the price. With only Selling on there is no
+     choice to make - everything is a listing - so the tick goes and the
+     price box stays. With only Collection on, neither belongs here. */
+  const both=bothPiles(), sellsOnly=pileOn('b-sell')&&!pileOn('b-main');
+  const isSell=x=>sellsOnly||!!(x.sell&&x.sell.checked);
+  const pxOf=x=>(x.px&&x.px.value!=='')?+x.px.value:null;
   const where=F.set?('set '+F.set):(F.arch+' core');
   const box=el('div');
   const head=el('p','hint','Set a quantity on the rows you own. Everything left at zero is skipped. '+
@@ -6323,10 +6596,10 @@ function openBulk(){
       '<select class="inp k-rar">'+menu.map(x=>'<option value="'+x.k+'"'+
         (x.k===(held[0]&&held[0].rarity||pr.oneRar)?' selected':'')+'>'+esc(x.n)+'</option>').join('')+'</select>'+
       '<input class="inp k-qty" type="number" min="0" step="1" value="0" inputmode="numeric">'+
-      '<label class="k-sell"><input type="checkbox"> Sell</label>'+
-      '<input class="inp k-px" type="number" min="0" placeholder="price" disabled>';
+      (both?'<label class="k-sell"><input type="checkbox"> Sell</label>':'')+
+      ((both||sellsOnly)?'<input class="inp k-px" type="number" min="0" placeholder="price"'+(both?' disabled':'')+'>':'');
     const sell=r.querySelector('.k-sell input'),px=r.querySelector('.k-px');
-    sell.onchange=()=>{px.disabled=!sell.checked;if(sell.checked)px.focus();};
+    if(sell&&px)sell.onchange=()=>{px.disabled=!sell.checked;if(sell.checked)px.focus();};
     rows.push({c,r,rar:r.querySelector('.k-rar'),qty:r.querySelector('.k-qty'),sell,px});
     wrap.appendChild(r);
   });
@@ -6342,19 +6615,20 @@ function openBulk(){
       if(!q)return;
       cards++;copies+=q;
       const srp=srpOfCopy({set:F.set&&F.set!=='\u2014'?F.set:'',rarity:x.rar.value},x.c);
-      const each=x.sell.checked&&x.px.value!==''?+x.px.value:(srp||0);
-      if(x.sell.checked){sellVal+=each*q;sellCopies+=q;}else{keepVal+=each*q;}
+      const s2=isSell(x),p2=pxOf(x);
+      const each=s2&&p2!=null?p2:(srp||0);
+      if(s2){sellVal+=each*q;sellCopies+=q;}else{keepVal+=each*q;}
     });
     tally.innerHTML=cards
       ? `<span><b>${cards}</b> card${cards===1?'':'s'} \u00b7 <b>${copies}</b> cop${copies===1?'y':'ies'}</span>`+
-        `<span>keep ${esc(peso(keepVal))}</span>`+
+        (sellsOnly?'':`<span>keep ${esc(peso(keepVal))}</span>`)+
         (sellCopies?`<span style="color:var(--up)">selling ${sellCopies} for ${esc(peso(sellVal))}</span>`:'')
       : 'Nothing set yet \u2014 put a quantity on the rows you own.';
   };
   rows.forEach(x=>{
     x.qty.addEventListener('input',retally);
-    x.sell.addEventListener('change',retally);
-    x.px.addEventListener('input',retally);
+    if(x.sell)x.sell.addEventListener('change',retally);
+    if(x.px)x.px.addEventListener('input',retally);
     x.rar.addEventListener('change',retally);
   });
   retally();
@@ -6367,12 +6641,13 @@ function openBulk(){
       const q=Math.max(0,parseInt(x.qty.value,10)||0);
       if(!q)return;
       const own=ensureOwn(x.c.id);
-      const b=x.sell.checked?'b-sell':'b-main';
+      const b=isSell(x)?'b-sell':'b-main';
       const k=x.rar.value, set=F.set&&F.set!=='\u2014'?F.set:(printingsOf(x.c).oneSet||'');
       let hit=own.copies.find(y=>y.rarity===k&&(y.set||'')===set&&y.b===b);
       if(!hit){hit={rarity:k,set,qty:0,b};own.copies.push(hit);}
       hit.qty+=q;
-      if(x.sell.checked&&x.px.value!=='')hit.price=+x.px.value;
+      const p3=pxOf(x);
+      if(isSell(x)&&p3!=null)hit.price=p3;
       cards++;copies+=q;
     });
     if(!cards){toast('Nothing had a quantity');return;}
@@ -6422,10 +6697,8 @@ function openDetail(id){
       <dl class="sg">${stats}</dl>
       <div class="txt">${esc(c.desc||'No card text saved.')}</div>
     </details>
-    <div class="sh">Copies held</div>
-    <div id="copies"></div>
-    <div class="sh">Wishlist</div>
-    <div id="want"></div>
+    ${ownPiles()?'<div class="sh">Copies held</div><div id="copies"></div>':''}
+    ${pileOn('b-want')?'<div class="sh">Wishlist</div><div id="want"></div>':''}
     <p class="hint shoplinks" style="margin:14px 0 0">
       ${shopLinks(c)}</p>`;
   wrap.appendChild(right);
@@ -6533,7 +6806,7 @@ function cheapestRarity(c){
   return best;
 }
 function detailCopies(id,c){
-    const box=document.getElementById('copies');box.innerHTML='';
+    const box=document.getElementById('copies');if(!box)return;box.innerHTML='';
     const o=DB.own[id];
     const all=o?(o.copies||[]):[];
     /* The panel belongs to the binder you are standing in: a copy filed under
@@ -6626,16 +6899,21 @@ function detailCopies(id,c){
       const inf=setInfo(setPrefix(pre.value)||pre.value);
       setname.textContent=inf?inf.name:(pre.value?'unlisted set':'');
       line2.appendChild(pre);line2.appendChild(setname);
-      const tog=el('div','tabs');tog.style.cssText='flex:none';
-      tog.innerHTML=`<button data-b="b-main"${cp.b!=='b-sell'?' class="on"':''}>Keep</button><button data-b="b-sell"${cp.b==='b-sell'?' class="on"':''}>Sell</button>`;
-      tog.querySelectorAll('button').forEach(t=>t.onclick=()=>{
-        if(cp.b===t.dataset.b)return;
-        cp.b=t.dataset.b;save();
-        /* it has just left the binder you are looking at, so its row goes too */
-        const to=(DB.binders.find(b=>b.id===cp.b)||{}).name||'the other binder';
-        if(F.binder&&cp.b!==F.binder)toast('Moved to '+to);
-        detailCopies(id,c);renderBinder();});
-      line2.appendChild(tog);
+      /* Keep or Sell is a choice between two piles. With one of them switched
+         off there is no second place for the copy to go, and a segment whose
+         other half does not exist is a control that can only be wrong. */
+      if(bothPiles()){
+        const tog=el('div','tabs');tog.style.cssText='flex:none';
+        tog.innerHTML=`<button data-b="b-main"${cp.b!=='b-sell'?' class="on"':''}>Keep</button><button data-b="b-sell"${cp.b==='b-sell'?' class="on"':''}>Sell</button>`;
+        tog.querySelectorAll('button').forEach(t=>t.onclick=()=>{
+          if(cp.b===t.dataset.b)return;
+          cp.b=t.dataset.b;save();
+          /* it has just left the binder you are looking at, so its row goes too */
+          const to=(DB.binders.find(b=>b.id===cp.b)||{}).name||'the other binder';
+          if(F.binder&&cp.b!==F.binder)toast('Moved to '+to);
+          detailCopies(id,c);renderBinder();});
+        line2.appendChild(tog);
+      }
       /* An asking price is a selling concern, so the box only appears for copies
          in the Sell binder. One exception: if a price was set earlier and the
          copy moved back to Keep, the box stays so it can still be cleared.   */
@@ -6681,9 +6959,9 @@ function detailCopies(id,c){
        alongside a Keep one instead of just bumping its quantity.            */
     add.innerHTML=`<select class="inp" id="new-rar" style="flex:1;min-width:150px"></select>
       <select class="inp" id="new-pre" style="width:150px"></select>
-      <div class="tabs" id="new-bin" style="flex:none">
+      ${bothPiles()?`<div class="tabs" id="new-bin" style="flex:none">
         <button data-b="b-main" class="on">Keep</button><button data-b="b-sell">Sell</button>
-      </div>
+      </div>`:''}
       <button class="btn btn-a" id="new-add">Add copy</button>`;
     box.appendChild(add);
     if(pr.oneSet||pr.oneRar){
@@ -6697,15 +6975,19 @@ function detailCopies(id,c){
     const newSet=add.querySelector('#new-pre'),newRar=add.querySelector('#new-rar');
     linkSetRarity(newSet,newRar,c,{anySet:'Any set',set:preSet,rar:pr.oneRar||''});
     const binSeg=add.querySelector('#new-bin');
-    binSeg.querySelectorAll('button').forEach(t=>t.onclick=()=>{
-      binSeg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===t));
-      slideTabs(binSeg);
-    });
-    if(F.binder==='b-sell')binSeg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.b==='b-sell'));
+    if(binSeg){
+      binSeg.querySelectorAll('button').forEach(t=>t.onclick=()=>{
+        binSeg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===t));
+        slideTabs(binSeg);
+      });
+      if(F.binder==='b-sell')binSeg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.b==='b-sell'));
+    }
     requestAnimationFrame(()=>box.querySelectorAll('.tabs').forEach(slideTabs));
     add.querySelector('#new-add').onclick=()=>{
       const own=ensureOwn(id),k=add.querySelector('#new-rar').value;
-      const b=(binSeg.querySelector('button.on')||{dataset:{b:'b-main'}}).dataset.b;
+      /* with no switch on screen there is only one pile it can land in */
+      const b=binSeg?(binSeg.querySelector('button.on')||{dataset:{b:'b-main'}}).dataset.b
+                    :defaultPile();
       /* blank means you did not want to pin it to a set, so leave it blank */
       const set=(add.querySelector('#new-pre').value||'').trim().toUpperCase();
       const hit=own.copies.find(x=>x.rarity===k&&(x.set||'')===set&&x.b===b);
@@ -18575,13 +18857,13 @@ $('#t-sort').innerHTML=SORTS.map(([v,n])=>`<option value="${v}"${v===F.sort?' se
 $('#t-rar').innerHTML=opts(RARITIES.map(r=>r.n),'Any rarity');
 $('#t-per').innerHTML='<option value="">Auto</option>'+
   [6,8,12,15,18,24,30,40].map(n=>'<option value="'+n+'">'+n+' a page</option>').join('');
-$('#t-per').onchange=e=>{DB.per=+e.target.value||0;save();page=0;autoLayout(false);renderBinder();};
+$('#t-per').onchange=e=>{DB.per=+e.target.value||0;savePrefs();save();page=0;autoLayout(false);renderBinder();};
 $('#t-sort').onchange=e=>{
   const k=e.target.dataset.kind;
   if(k==='sets')DB.setSort=e.target.value;
   else if(k==='cores')DB.coreSort=e.target.value;
   else F.sort=e.target.value;
-  save();page=0;renderBinder();
+  savePrefs();save();page=0;renderBinder();
 };
 $('#t-rar').onchange=e=>{const r=RARITIES.find(x=>x.n===e.target.value);F.rar=r?r.k:'';page=0;renderBinder();};
 document.querySelectorAll('#core-mult button').forEach(b=>{
@@ -18671,6 +18953,13 @@ function paintSel(){
   bar.hidden=!SELMODE;
   const n=SEL.size;
   const lbl=$('#bb-n'); if(lbl)lbl.textContent=n?(n+' selected'):'Tap cards to select';
+  /* Move to Selling and Move to Collection are one action between two piles,
+     so they stand or fall together; the wishlist is its own. */
+  const move=bothPiles();
+  const bs=$('#bb-sell'),bk=$('#bb-keep'),bw=$('#bb-want');
+  if(bs)bs.hidden=!move;
+  if(bk)bk.hidden=!move;
+  if(bw)bw.hidden=!pileOn('b-want');
   ['#bb-sell','#bb-keep','#bb-want'].forEach(s=>{const b=$(s);if(b)b.disabled=!n;});
   document.querySelectorAll('.pocket[data-cid]').forEach(p=>
     p.classList.toggle('picked',SEL.has(p.dataset.cid)));
@@ -18697,11 +18986,31 @@ function bulkMove(target){
   toast(moved?(n+' card'+(n===1?'':'s')+' moved to '+(target==='b-sell'?'Selling':'Collection'))
              :'Those were already there');
 }
+/* ---- Add to wishlist, on a selection ----
+   This called addWant(), which has never existed in this file. The call was
+   wrapped in typeof addWant==='function', so the guard was always false: the
+   button did nothing, counted nothing, and said "Nothing added" - which is
+   true, and reads exactly like an empty selection. A guard around a name that
+   is never defined is not a safety net, it is a silent no-op.
+
+   It does what the detail panel does: open the line on the printing you would
+   actually buy, and refuse to make a second identical one.              */
 function bulkWant(){
-  let n=0;
-  SEL.forEach(id=>{const c=cardById(id);if(c&&typeof addWant==='function'){addWant(c);n++;}});
+  let n=0,already=0;
+  SEL.forEach(id=>{
+    const c=cardById(id); if(!c)return;
+    const pr=printingsOf(c);
+    const rar=cheapestRarity(c)||pr.oneRar||'';
+    const set=pr.oneCode||pr.oneSet||'';
+    if(wantRows(id).some(r=>(r.rarity||'')===rar&&(r.set||'')===set)){already++;return;}
+    addWantRow(id,{rarity:rar,set});
+    n++;
+  });
   SEL.clear();save();paintSel();renderBinder();
-  toast(n?(n+' added to the wishlist'):'Nothing added');
+  toast(n?(n+' added to the wishlist'+(already?' · '+already+' already on it':''))
+        :(already?(already===1?'That one is already on the wishlist'
+                             :'All '+already+' are already on the wishlist')
+                 :'Nothing added'));
 }
 /* The badge counted active filters, which belonged on a button called
    Filters. On a menu it would count something the menu does not hold, so it
@@ -18997,7 +19306,7 @@ $('#sp-reset').onclick=()=>{
    anything but an empty string. */
 $('#t-bulk').onclick=openBulk;
 $('#t-clear').onclick=()=>{
-  F.rar='';F.sort='price';DB.setSort='old';DB.coreSort='name';save();
+  F.rar='';F.sort='price';DB.setSort='old';DB.coreSort='name';savePrefs();save();
   $('#t-rar').value='';page=0;renderBinder();
 };
 $('#i-binders').onclick=()=>{
@@ -19044,8 +19353,12 @@ document.querySelectorAll('#view-tabs button').forEach(b=>{
    each and nothing can fall out of step.                              */
 let RAIL_HOME=null;
 const RAIL_STACKED=matchMedia('(max-width:920px)');
-if(RAIL_STACKED.addEventListener)RAIL_STACKED.addEventListener('change',()=>placePiles());
-else if(RAIL_STACKED.addListener)RAIL_STACKED.addListener(()=>placePiles());
+/* placePiles moves the switch, applyRail decides whether the handle beside it
+   is offered at all - and applyRail reads where the switch ended up, so it
+   goes second, here and in reflow().                                      */
+const railBreak=()=>{placePiles();applyRail();};
+if(RAIL_STACKED.addEventListener)RAIL_STACKED.addEventListener('change',railBreak);
+else if(RAIL_STACKED.addListener)RAIL_STACKED.addListener(railBreak);
 function placePiles(){
   const slot=document.getElementById('pilebar');
   const tabs=document.getElementById('binder-tabs');
@@ -19066,7 +19379,9 @@ function placePiles(){
     const ts=document.getElementById('toolset');
     (ts||slot).appendChild(owned);
     slot.appendChild(tabs);
-    slot.hidden=false;
+    /* an empty bar is still a stripe above the cards, so it goes with its
+       contents when the pile switch has nothing left to switch between */
+    slot.hidden=tabs.hidden;
   }else{
     RAIL_HOME.owned.insertBefore(owned,RAIL_HOME.owned.firstChild);
     RAIL_HOME.tabs.insertBefore(tabs,document.getElementById('legacy-row'));
@@ -19078,7 +19393,7 @@ function placePiles(){
    A plain resize listener misses some cases (mobile chrome collapsing, split
    screen, devtools emulation), so a ResizeObserver watches the root as well. */
 let rzT;
-function reflow(){clearTimeout(rzT);rzT=setTimeout(()=>{placePiles();slideAllTabs();if(autoLayout(true))renderBinder();},140);}
+function reflow(){clearTimeout(rzT);rzT=setTimeout(()=>{placePiles();applyRail();slideAllTabs();if(autoLayout(true))renderBinder();},140);}
 addEventListener('resize',reflow);
 addEventListener('orientationchange',reflow);
 if(window.ResizeObserver)new ResizeObserver(reflow).observe(document.documentElement);
@@ -19089,7 +19404,7 @@ if(window.ResizeObserver)new ResizeObserver(reflow).observe(document.documentEle
   if(mq.addEventListener)mq.addEventListener('change',reflow);
   else if(mq.addListener)mq.addListener(reflow);
 });
-$('#rail-tog').onclick=()=>{DB.railHidden=!DB.railHidden;save();applyRail();renderBinder();};
+$('#rail-tog').onclick=()=>{DB.railHidden=!DB.railHidden;savePrefs();save();applyRail();renderBinder();};
 $('#prev').onclick=()=>{if(page>0){page--;renderBinder('tl');bmFlip('back');}};
 $('#next').onclick=()=>{page++;renderBinder('tr');bmFlip('fwd');};
 $('#open-deals').onclick=()=>{
@@ -19118,6 +19433,7 @@ $('#jump').onchange=e=>{const n=parseInt(e.target.value,10);if(n>0)page=n-1;rend
    it rides on VIEW rather than on F.binder, and the segment stands in for
    the view the same way the other two stand in for the binder.        */
 function pickPile(v){
+  if(v&&!pileOn(v))return;           /* the tab is hidden; a stale click is not */
   if(v==='b-want'){ VIEW='wants'; }
   else { if(VIEW==='wants')VIEW='binder'; F.binder=v||''; }
   F.set='';F.arch='';page=0;
@@ -19236,6 +19552,7 @@ paintRarityKey();
   $('#t-rar').innerHTML=opts(RARITIES.map(r=>r.n),'Any rarity');
   paintRegion();
   placePiles();
+  applyPiles();
   paintOnline();
   const lg=$('#legacy-sets'); if(lg)lg.checked=!!DB.legacy;
   applyTheme();
