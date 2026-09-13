@@ -839,6 +839,48 @@ Crossing the breakpoint has to re-decide: `railBreak()` and `reflow()` both run
 `placePiles()` then `applyRail()`, in that order, because `applyRail` reads where
 the switch ended up.
 
+## 20b. Three things the phone bar got wrong
+
+**Cards per page was half-removed.** Below 760px `autoLayout` fits the sheet to
+the window and `PER` comes out the same whatever the control says - it is a dead
+control, and the stylesheet had always meant to drop it:
+
+```css
+@media (max-width:759px){ #t-per,.more-row{display:none} }
+```
+
+But `.more-row{display:flex}` is declared later and unconditionally, and a media
+query adds no specificity - so only the `<select>` went. The label stayed behind
+over an empty gap, which reads as a control that failed to load. With the row
+gone, and Bulk add and Clear filters each only applying somewhere, the overflow
+menu is empty most of the time on a phone - so `paintMore()` now owns all of it
+and takes the `...` button away when there is nothing behind it. It is called
+from `paintTools()`, not only from `openMore()`, or it could only ever be right
+after you had already pressed it.
+
+**Stacked settings rows left their segments a third full.** At 560px `.set-row`
+turns into a column and hands the control the whole width, but `.tabs button` is
+sized to its text - so Dark/Light sat in the left third of a full-width box with
+the lit pill covering a quarter of it. The options split the row now.
+
+**Show owned was seventh of seven in the filter sheet.** It is a filter, which is
+why it was put there, but not the same kind: sort and rarity narrow a list, this
+one decides whether you are looking at your cards or at every card there is -
+the same class of question as which pile. It now sits at the right of the pile
+row, labelled just **Owned** (the row is 354px and the word *Show* was doing
+nothing), as a switch in smaller type against tabs so it does not read as a
+fourth pile - which is what sent it into the sheet the first time.
+
+Two consequences worth knowing:
+
+- `paintPilebar()` hides that row only when *everything* on it is hidden. Either
+  tenant can go on its own - the tabs when one pile is left, the switch on the
+  wishlist - and the row has to survive losing one.
+- The wishlist is the cards you do **not** own, and `visible()` has always
+  ignored the switch there. Buried in a sheet that was a dead control you had to
+  go looking for; beside a lit Wishlist tab it would read as something that
+  ought to work, so `paintBinders()` takes it away while you are in there.
+
 ## 21. Prices checked by hand
 
 These were verified on the TCG Corner site by eye, and are the reference the

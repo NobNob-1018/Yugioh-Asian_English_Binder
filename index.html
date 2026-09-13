@@ -610,6 +610,13 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 @media (max-width:560px){
   .set-row{flex-direction:column;align-items:stretch;gap:var(--sp-2)}
   .set-hint{max-width:none}
+  /* Stacked, the row hands the control its whole width - but .tabs buttons
+     are sized to their text, so Dark/Light sat in the left third of a
+     full-width box and the lit pill covered a quarter of it. Nothing was
+     broken; it just read as a control that had failed to load. The options
+     split the row between them instead. */
+  .set-seg{width:100%}
+  .set-seg button{flex:1 1 0;min-width:0;text-align:center}
 }
 .grp h2{font-size:var(--fs-2xs);letter-spacing:.14em;text-transform:uppercase;
   color:var(--faint);font-weight:600;margin:0 0 var(--sp-3);
@@ -1421,10 +1428,21 @@ body{font-variant-numeric:tabular-nums}
      with a third of the row empty beside them, which read as a box that had
      lost something. They divide the row instead, so the frame and the tabs
      are the same object and each target is a third of the screen wide. */
-  .bar>#pilebar{flex:1 1 100%;order:1;margin:0}
-  .bar>#pilebar #binder-tabs{flex:1 1 100%;width:100%}
+  .bar>#pilebar{flex:1 1 100%;order:1;margin:0;flex-wrap:nowrap}
+  /* The tabs used to take the whole row. They now share it with the owned
+     switch, which is the other thing that scopes everything below: the tabs
+     take what is left after it rather than pushing it onto a line of its
+     own. It is a switch, in smaller type, against tabs - so it reads as a
+     different kind of control rather than as a fourth pile, which is what
+     sent it into the filter sheet the first time. */
+  .bar>#pilebar #binder-tabs{flex:1 1 auto;width:auto;min-width:0}
   .bar>#pilebar #binder-tabs button{flex:1 1 0;min-width:0;text-align:center;
     padding:5px 4px;white-space:nowrap}
+  /* A 21px-tall label beside 44px tabs is a control you miss with a thumb,
+     so it takes the row's height as its target even though the switch it
+     draws stays the same size. */
+  .bar>#pilebar>.switch{flex:0 0 auto;min-height:44px;padding:0 2px}
+  .bar>#pilebar>.switch .lbl{white-space:nowrap}
   /* ---- the filters become a sheet ----
      Five controls wrapping across two lines above the cards is most of what
      made this screen feel cluttered. They go behind one button, in the same
@@ -1518,7 +1536,10 @@ body{font-variant-numeric:tabular-nums}
 /* Controls that cannot do anything useful on a phone are removed, not
    disabled - a dead control is one you can still tap by mistake. */
 @media (max-width:759px){
-  #t-per,.more-row{display:none}
+  /* Cards per page used to be dropped here. It half-worked: .more-row is
+     declared display:flex later and unconditionally, and a media query adds
+     no specificity, so only the <select> went and the label stayed behind
+     over an empty gap. paintMore() owns this now - see the note there. */
   /* openFilters drops the heading with it, or the sheet would carry a label
      over nothing */
   .toolset #core-mult,.bar>#toolset>#core-mult{display:none}
@@ -4781,6 +4802,7 @@ let FITTING=false,SETTLE=0;
    The sort menu swaps to match, and rarity only shows where cards do.      */
 function paintTools(showingCards){
   paintFiltCount();
+  paintMore();
   const board=!showingCards&&(VIEW==='sets'||VIEW==='cores');
   /* Deals is its own thing: no cards to sort, no rarities to filter. */
   if(!showingCards&&VIEW==='deals'){
@@ -5670,10 +5692,6 @@ function applyPiles(){
     tabs.querySelectorAll('button').forEach(b=>{b.hidden=!pileOn(b.dataset.b||'');});
     /* one pile is not a choice, so the switch itself goes as well */
     tabs.hidden=onePile();
-    /* on a phone the tabs live in the bar, and an empty bar is still a
-       32px stripe above the cards - so the host goes with its contents */
-    const slot=document.getElementById('pilebar');
-    if(slot&&slot.contains(tabs))slot.hidden=tabs.hidden;
   }
   /* Binder, Sets and Cores all read copies you hold. With only a wishlist
      there are none, and three tabs onto nothing is worse than no tabs.  */
@@ -5683,7 +5701,9 @@ function applyPiles(){
      the cards you do not own, and already ignores it.                   */
   const ob=document.getElementById('owned-only');
   const osw=ob?ob.closest('.switch'):null;
-  if(osw)osw.hidden=wantsOnly();
+  if(osw)osw.hidden=ownedSwitchOff();
+  /* both of the pile row's tenants have just been decided, so settle it */
+  paintPilebar();
   /* Selling is more than a pile. The deals board consumes from it, the
      shareable list is made of it, and the seller name and contact only
      exist so a buyer can reach you.                                     */
@@ -5790,6 +5810,12 @@ function paintBinders(){
   paintDealsBtn();
   const on=VIEW==='wants'?'b-want':F.binder;
   document.querySelectorAll('#binder-tabs button').forEach(b=>b.classList.toggle('on',(b.dataset.b||'')===on));
+  /* the view can change without the piles changing, so this is decided on
+     every paint rather than only when the setting moves */
+  const ob=document.getElementById('owned-only');
+  const osw=ob?ob.closest('.switch'):null;
+  if(osw)osw.hidden=ownedSwitchOff();
+  paintPilebar();
   slideAllTabs();
 }
 /* Binder, Sets and Cores are ways of looking; the wishlist is not one of
@@ -18919,16 +18945,45 @@ function defaultMode(){
    nothing is readable, the controls you set once and forget move behind one
    button, which is what an overflow menu is for. The two drill-in actions
    live here too, so appearing they can no longer reflow the row.       */
+/* The width at which the sheet stops taking a hand-picked page size. Named
+   once, so the rule and the code that acts on it cannot drift apart.   */
+const PER_DEAD=matchMedia('(max-width:759px)');
+/* ---- what the overflow menu is actually holding ----
+   Below 760px autoLayout fits the sheet to the window and PER comes out the
+   same whatever Cards per page says - so it is a dead control, and a dead
+   control is one you can still tap by mistake. Dropping only the <select>
+   left its label sitting over a blank space, which is worse than either
+   keeping it or removing it: it reads as a control that failed to load.
+
+   With the row gone, and Bulk add and Clear filters each only applying
+   somewhere, the menu is empty most of the time on a phone - so the button
+   goes with its contents rather than opening an empty box. Called from
+   paintTools now, not just on open, or it could only ever be right after
+   you had already pressed it.                                          */
 function paintMore(){
   const wrap=$('#more-wrap'); if(!wrap)return;
-  const bulk=$('#m-bulk'),clr=$('#m-clear');
+  const bulk=$('#m-bulk'),clr=$('#m-clear'),per=$('#t-per');
   const drilled=!!(F.set||F.arch);
+  const showingCards=VIEW==='binder'||VIEW==='wants'||
+                     (VIEW==='cores'&&drilled)||(VIEW==='sets'&&drilled);
+  const perOn=showingCards&&MODE!=='list'&&!PER_DEAD.matches;
+  const perRow=per?per.closest('.more-row'):null;
+  if(perRow)perRow.hidden=!perOn;
   if(bulk)bulk.hidden=!drilled;
   if(clr)clr.hidden=!(F.rar||F.sort!=='price'||(DB.setSort&&DB.setSort!=='old')||(DB.coreSort&&DB.coreSort!=='name'));
+  /* the rule only earns its line when there is something on both sides */
+  const sep=wrap.querySelector('.more-sep');
+  const items=!(bulk&&bulk.hidden)||!(clr&&clr.hidden);
+  if(sep)sep.hidden=!(perOn&&items);
+  wrap.hidden=!(perOn||items);
+  if(wrap.hidden)openMore(false);
 }
 function openMore(on){
   const m=$('#more-menu'),b=$('#more-btn'); if(!m||!b)return;
-  const want=on===undefined?m.hidden:!!on;
+  /* paintMore takes the button away when there is nothing behind it, and an
+     open menu is the one state that must not survive that */
+  const wrap=$('#more-wrap');
+  const want=(wrap&&wrap.hidden)?false:(on===undefined?m.hidden:!!on);
   /* paintMore decides which of the menu's items apply where you are, and
      nothing was calling it - so "Bulk add to this set" offered itself
      outside a set and answered "Nothing here to add", and "Clear filters"
@@ -19359,6 +19414,20 @@ const RAIL_STACKED=matchMedia('(max-width:920px)');
 const railBreak=()=>{placePiles();applyRail();};
 if(RAIL_STACKED.addEventListener)RAIL_STACKED.addEventListener('change',railBreak);
 else if(RAIL_STACKED.addListener)RAIL_STACKED.addListener(railBreak);
+/* The bar's pile row carries the tabs and the owned switch, and either can be
+   switched off on its own - so the row is hidden when nothing is left on it
+   rather than when any one thing is. */
+/* ---- Show owned cannot apply to the wishlist ----
+   Nothing on it is owned; visible() has always ignored the switch there. At
+   the bottom of the filter sheet that was a dead control you had to open a
+   sheet to find. On the pile row it would sit beside the lit Wishlist tab,
+   which is close enough to read as something that ought to work. */
+const ownedSwitchOff=()=>VIEW==='wants'||wantsOnly();
+function paintPilebar(){
+  const slot=document.getElementById('pilebar');
+  if(!slot)return;
+  slot.hidden=![...slot.children].some(c=>!c.hidden);
+}
 function placePiles(){
   const slot=document.getElementById('pilebar');
   const tabs=document.getElementById('binder-tabs');
@@ -19373,16 +19442,25 @@ function placePiles(){
   const narrow=RAIL_STACKED.matches;
   const moved=tabs.parentNode===slot;
   if(narrow===moved)return;                 /* already where it should be */
+  const lbl=owned.querySelector('.lbl');
+  if(lbl&&!lbl.dataset.full)lbl.dataset.full=lbl.textContent;
   if(narrow){
-    /* Show owned is a filter, so on a phone it goes into the filter sheet
-       rather than sitting on the pile row where it read as a fourth pile. */
-    const ts=document.getElementById('toolset');
-    (ts||slot).appendChild(owned);
+    /* ---- it scopes what is below it, so it sits with the other thing that does ----
+       This was sent to the bottom of the filter sheet, on the grounds that it
+       is a filter. It is, but it is not the same kind: sort and rarity narrow
+       a list, this one decides whether you are looking at your cards or at
+       every card there is - the same class of question as which pile. Seventh
+       of seven behind a button is where a control goes to be forgotten, and
+       you have to open the sheet to find out which way it is set.
+
+       On the pile row it answers both at a glance. "Show owned" is shortened
+       because the row is 354px wide and the word Show is doing nothing.  */
     slot.appendChild(tabs);
-    /* an empty bar is still a stripe above the cards, so it goes with its
-       contents when the pile switch has nothing left to switch between */
-    slot.hidden=tabs.hidden;
+    slot.appendChild(owned);
+    if(lbl)lbl.textContent='Owned';
+    paintPilebar();
   }else{
+    if(lbl)lbl.textContent=lbl.dataset.full;
     RAIL_HOME.owned.insertBefore(owned,RAIL_HOME.owned.firstChild);
     RAIL_HOME.tabs.insertBefore(tabs,document.getElementById('legacy-row'));
     slot.hidden=true;
