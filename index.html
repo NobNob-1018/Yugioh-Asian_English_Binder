@@ -473,9 +473,8 @@ select.inp{appearance:none;background-image:linear-gradient(45deg,transparent 50
 .fxbox button:disabled{opacity:.4}
 /* Sync button carries a freshness dot: green while the list is recent, red once it ages */
 .pxpill{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.pxpill{border-top-right-radius:0;border-bottom-right-radius:0;border-right:none}
-.pxmore{border-top-left-radius:0;border-bottom-left-radius:0;padding:3px 7px;color:var(--faint)}
-.pxmore:hover{color:var(--accent)}
+/* It was half of a pair, squared off on the side the caret sat against. On
+   its own it is a whole control again. */
 .pxpill .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--faint)}
 .pxpill.fresh .dot{background:var(--up);box-shadow:0 0 0 3px rgba(79,191,139,.16)}
 .pxpill.stale .dot{background:var(--down);box-shadow:0 0 0 3px rgba(224,115,106,.16)}
@@ -603,6 +602,78 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 .pile-switches .track{margin-top:1px}
 .pile-switches .lbl{display:flex;flex-direction:column;gap:2px;line-height:1.3}
 .pile-n{font-size:var(--fs-2xs);color:var(--faint)}
+/* ---- the sync sheet ----
+   One row per thing that can be fetched: what it is, when it last landed,
+   and whether this run should touch it. */
+.sync-row{display:flex;align-items:flex-start;gap:var(--sp-3);
+  padding:var(--sp-3) 0;border-bottom:1px solid var(--line-soft)}
+.sync-row:last-of-type{border-bottom:none}
+.sync-row .switch{flex:0 0 auto;margin-top:1px}
+.sync-txt{min-width:0;flex:1}
+.sync-nm{font-size:var(--fs-md)}
+.sync-when{font-size:var(--fs-2xs);color:var(--faint);margin-top:2px}
+.sync-state{font-size:var(--fs-2xs);color:var(--muted);margin-top:3px;min-height:14px;
+  font-family:var(--mono)}
+.sync-row.busy .sync-state{color:var(--accent)}
+.sync-row.done .sync-nm::after{content:' ✓';color:var(--up)}
+.sync-row.failed .sync-state{color:var(--down)}
+/* ---- a bar, not a fraction ----
+   "Fetching 3,214" is a number with no denominator: it says something is
+   happening and nothing about how much is left. The list has a known length,
+   so the bar can be honest about the share of it that has landed. */
+.bar-wrap{margin-top:var(--sp-4)}
+.pbar{height:6px;border-radius:var(--r-xs);background:var(--surface-2);
+  border:1px solid var(--line);overflow:hidden}
+.pbar>i{display:block;height:100%;width:0;background:var(--accent);
+  transition:width .3s var(--ease)}
+/* Some of the work has no denominator at all - a rate is one request that has
+   either landed or not - so the bar says "running" rather than inventing a
+   number for it. */
+/* A finished run and a successful one are different things: the bar tracks
+   attempts, so when none of them landed it says so in colour rather than
+   sitting full and green over three failures. */
+.pbar.nowt>i{background:var(--down)}
+.pbar.indet>i{width:35%;animation:slide 1.1s linear infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
+@media (prefers-reduced-motion:reduce){.pbar.indet>i{animation:none;width:100%;opacity:.4}}
+.pbar-line{display:flex;justify-content:space-between;gap:var(--sp-3);
+  font-size:var(--fs-2xs);color:var(--faint);margin-top:6px}
+.sync-foot{display:flex;gap:6px;margin-top:var(--sp-4)}
+.sync-foot .btn{flex:1}
+/* ---- the setup, one question a screen ----
+   Settings is a list of everything, which is the wrong shape for a first
+   look: it shows the controls without ever saying what they are for. This
+   asks one thing at a time, in the order that decides how much of the app
+   is left standing. */
+.wz-dots{display:flex;align-items:center;gap:6px;margin-bottom:var(--sp-4)}
+.wz-dots i{width:22px;height:3px;border-radius:2px;background:var(--line);display:block;
+  transition:background .24s ease}
+.wz-dots i.on{background:var(--accent)}
+.wz-dots i.past{background:var(--muted)}
+.wz-dots span{margin-left:auto;font-size:var(--fs-3xs);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--faint)}
+.wz-t{font-size:var(--fs-xl);margin:0 0 6px;font-weight:500}
+.wz-l{font-size:var(--fs-sm);color:var(--muted);line-height:1.55;margin:0 0 var(--sp-4)}
+.wz-opts{display:flex;flex-direction:column;gap:var(--sp-2)}
+/* The whole card is the target, not the 38px switch inside it. */
+.wz-opt{display:flex;gap:var(--sp-3);align-items:flex-start;cursor:pointer;
+  padding:var(--sp-3);border:1px solid var(--line);border-radius:var(--r-sm);
+  background:var(--surface-2);transition:border-color .18s ease,background .18s ease}
+.wz-opt:hover{border-color:var(--muted)}
+.wz-opt.on{border-color:var(--accent);background:var(--surface)}
+.wz-opt .switch{flex:0 0 auto;margin-top:2px;pointer-events:none}
+.wz-txt{min-width:0;display:flex;flex-direction:column;gap:3px}
+.wz-txt b{font-size:var(--fs-md);font-weight:500}
+.wz-txt span{font-size:var(--fs-xs);color:var(--faint);line-height:1.5}
+.wz-seg{width:100%}
+.wz-seg button{flex:1 1 0;min-width:0;text-align:center;padding:7px 12px}
+.wz-sum{margin:0 0 var(--sp-4);padding-left:18px;display:flex;flex-direction:column;gap:5px}
+.wz-sum li{font-size:var(--fs-sm);color:var(--muted)}
+.wz-tips p{font-size:var(--fs-xs);color:var(--faint);line-height:1.6;margin:0 0 8px}
+.wz-nav{display:flex;gap:6px;margin-top:var(--sp-5);
+  padding-top:var(--sp-4);border-top:1px solid var(--line-soft)}
+.wz-nav .btn{flex:1;min-height:42px}
+.wz-nav .btn[hidden]{display:none!important}
 .pile-off .pile-n{color:var(--faint)}
 @media (max-width:560px){.pile-switches{min-width:0}}
 .set-foot{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
@@ -767,7 +838,7 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
   .inp{min-height:44px}          /* set, price and condition fields in the card panel */
   .x-btn{min-width:44px;min-height:44px}
   .step button{min-width:44px;min-height:44px}
-  .tabs button,.pxmore{min-width:44px}
+  .tabs button{min-width:44px}
   .btn.ico{min-width:44px}       /* the label hides here, leaving just the glyph */
   .bar{gap:10px}
 }
@@ -2459,7 +2530,7 @@ const KEY_PREFS='ygo-binder-prefs-v1';
    the two board sort orders. So AE->JP un-folded your sidebar, reset cards
    per page and reset the Sets and Cores ordering - and AE again put them all
    back, which is what made it look random rather than broken.            */
-const PREF_FIELDS=['theme','density','spread','mode','piles',
+const PREF_FIELDS=['theme','density','spread','mode','piles','regions',
                    'railHidden','per','setSort','coreSort',
                    'fx','fxHkd','fxJpy','fxManual','fxAuto','fxAt'];
 let PREFS=(()=>{try{return JSON.parse(localStorage.getItem(KEY_PREFS)||'{}')||{};}
@@ -2638,6 +2709,24 @@ const ownPiles=()=>pileOn('b-main')||pileOn('b-sell');
 const wantsOnly=()=>pileOn('b-want')&&!ownPiles();
 /* Where a new copy lands when the Keep/Sell switch is not on screen. */
 const defaultPile=()=>pileOn('b-main')?'b-main':(pileOn('b-sell')?'b-sell':'b-main');
+/* ---- one region or two ----
+   Two binders that share a card pool and nothing else. Plenty of people
+   collect only one of them, and for them the AE/JP switch is a control that
+   can only ever put them somewhere they did not want to be - next to the
+   wordmark, which is the one place a mis-tap is most likely.
+
+   Same shape as the piles: a preference of the device, absent means both, and
+   it hides a surface rather than touching a collection. The other region's
+   binder stays on the device exactly as it was and comes back with it.   */
+const REGIONS=[
+  {id:'ae', name:'Asian-English', short:'AE',
+   hint:'Asian-English printings, priced by TCG Corner and Players Club.'},
+  {id:'ocg',name:'OCG-JP', short:'JP',
+   hint:'Japanese printings from 2013 on, priced by Yuyu-tei.'}
+];
+const regionOn=id=>{const r=DB.regions;return !Array.isArray(r)||!r.length||r.includes(id);};
+const regionsOn=()=>REGIONS.filter(r=>regionOn(r.id));
+const bothRegions=()=>regionsOn().length>1;
 const ATTRS=['DARK','LIGHT','EARTH','WATER','FIRE','WIND','DIVINE'];
 const MON_RACES=['Aqua','Beast','Beast-Warrior','Creator-God','Cyberse','Dinosaur','Divine-Beast','Dragon','Fairy','Fiend','Fish','Illusion','Insect','Machine','Plant','Psychic','Pyro','Reptile','Rock','Sea Serpent','Spellcaster','Thunder','Warrior','Winged Beast','Wyrm','Zombie'];
 const MON_SUBS=['Normal','Effect','Ritual','Fusion','Synchro','XYZ','Pendulum','Link','Tuner','Flip','Toon','Spirit','Union','Gemini'];
@@ -3616,6 +3705,7 @@ let REGION_BUSY=false;
 async function setRegion(r){
   r = r==='ocg' ? 'ocg' : 'ae';
   if(r===REGION||REGION_BUSY)return;
+  if(!regionOn(r))return;            /* switched off on this device */
   REGION_BUSY=true;
   try{
     await save();                       /* the region we are leaving, as it stands */
@@ -3677,8 +3767,27 @@ function paintLegacySwitch(){
   const row=document.getElementById('legacy-row');
   if(row)row.hidden=ocgOn();
 }
+/* The switch is the whole surface: hide it and the region it is not on stops
+   existing as far as this device is concerned. */
+function applyRegions(){
+  const sw=document.getElementById('regsw');
+  if(sw)sw.hidden=!bothRegions();
+}
+/* Returns false when you tried to switch off the last region standing. */
+async function setRegions(id,on){
+  const set=new Set(regionsOn().map(r=>r.id));
+  if(on)set.add(id);else set.delete(id);
+  if(!set.size)return false;
+  DB.regions=REGIONS.filter(r=>set.has(r.id)).map(r=>r.id);
+  savePrefs();save();
+  applyRegions();
+  /* standing in a region this device no longer carries is not a place */
+  if(!regionOn(REGION))await setRegion(regionsOn()[0].id);
+  return true;
+}
 function paintRegion(){
   paintLegacySwitch();
+  applyRegions();
   document.title=ocgOn()?'OCG-JP Binder \u2014 Japanese Collection'
                        :'Asian-English Binder \u2014 OCG Collection';
   /* The wordmark names the region again, but it can no longer move the
@@ -4599,12 +4708,14 @@ function paintTopTools(){
     '<button id="fx-auto" class="'+(DB.fxManual?'off':'')+'" aria-label="Fetch the live rate" title="'+
     (DB.fxManual?'Your own rate \u2014 tap for the live one':'Live rate'+(DB.fxAt?' \u00b7 '+fxAgo():''))+
     '">\u21bb</button>';
-  /* The pill used to open a panel that held another Sync button. It syncs now;
-     the small caret beside it is what opens the panel.                      */
-  /* The tooltip now covers all three, because the button now syncs all three */
+  /* ---- one button ----
+     There were two: a pill that synced all three at once with no way to say
+     otherwise, and a caret beside it that opened a panel holding a second,
+     different Sync. Two controls a thumb apart, one of them a caret, both
+     about the same job - and on a phone that caret is a 24px target. This
+     one opens a sheet that asks what to fetch and then shows it arriving. */
   if(pxb)pxb.innerHTML='<button class="btn btn-sm pxpill '+(pxFresh()?'fresh':'stale')+
-    '" id="px-sync" title="'+esc(syncStatus()+' — tap to sync all three')+'"><i class="dot"></i>Sync</button>'+
-    '<button class="btn btn-sm pxmore" id="px-panel" aria-label="Price options" title="Price options">\u25be</button>';
+    '" id="px-sync" title="'+esc(syncStatus())+'"><i class="dot"></i>Sync</button>';
   const fxi=$('#fx');
   if(fxi)fxi.onchange=()=>{DB.fx=Math.max(1,+fxi.value||58);DB.fxManual=true;save();paintTopTools();renderBinder();};
   const fxa=$('#fx-auto');
@@ -4615,9 +4726,7 @@ function paintTopTools(){
     paintTopTools();
   };
   const ps=$('#px-sync');
-  if(ps)ps.onclick=e=>syncAll(e.currentTarget);
-  const pp=$('#px-panel');
-  if(pp)pp.onclick=pricePanel;
+  if(ps)ps.onclick=openSync;
 }
 /* Counts a figure up to its new value. Purely presentational: the text is set
    to the final value first, so if anything interrupts, the number is right.
@@ -5503,6 +5612,179 @@ function salesSummary(){
   const top=[...buyers.entries()].sort((a,b)=>b[1]-a[1])[0];
   return {deals:done.length,all,month,copies,top:top?{who:top[0],v:top[1]}:null};
 }
+/* ---- first run ----
+   An empty binder with no explanation is the worst possible first screen:
+   every control is live and nothing says what the app is for or which of its
+   jobs you are in. Settings used to open itself here, which showed the
+   controls without ever saying what they were for - and Settings is a list of
+   everything, which is the wrong shape for a first look.
+
+   Four questions instead, one screen each, in the order that decides how much
+   of the app is left: what you do with cards, which printings you collect,
+   and then how it should look. The first two switch whole sections off, so
+   answering them first means the rest of the app is already the size you
+   wanted by the time you see it.
+
+   Nothing here is permanent. Every question is a settings row you can come
+   back to, and the last screen says so.                                  */
+function setupSteps(){
+  return [
+  {
+    title:'What do you do with cards?',
+    lede:'Switch off what you do not do and it leaves the app — tabs, buttons, '+
+         'boards and all. You can turn any of it back on later; nothing is deleted.',
+    draw(host){
+      host.innerHTML='<div class="wz-opts">'+PILES.map(p=>{
+        const why={'b-main':'What you keep. Tracks what the collection is worth and what has moved since you last looked.',
+                   'b-sell':'What you are listing. Asking prices, conditions, a deals board, and a link you can send a buyer.',
+                   'b-want':'What you are hunting. Set a price you would pay and both shops are watched against it.'}[p.id];
+        return '<label class="wz-opt'+(pileOn(p.id)?' on':'')+'" data-p="'+esc(p.id)+'">'+
+          '<span class="switch"><input type="checkbox" data-p="'+esc(p.id)+'"'+
+            (pileOn(p.id)?' checked':'')+'><span class="track"></span></span>'+
+          '<span class="wz-txt"><b>'+esc(p.name)+'</b><span>'+esc(why)+'</span></span></label>';
+      }).join('')+'</div>'+
+      '<p class="hint" id="wz-pile-note"></p>';
+      const note=host.querySelector('#wz-pile-note');
+      const paint=()=>{
+        const on=pilesOn().map(p=>p.name);
+        note.textContent=on.length===3?'All three. Nothing is hidden.'
+          :'Only '+on.join(' and ')+'. Everything else leaves the app until you switch it back on.';
+      };
+      paint();
+      host.querySelectorAll('input[data-p]').forEach(cb=>cb.onchange=()=>{
+        if(!setPiles(cb.dataset.p,cb.checked)){
+          cb.checked=true; toast('One of the three has to stay on'); return;
+        }
+        cb.closest('.wz-opt').classList.toggle('on',cb.checked);
+        paint();
+      });
+    }
+  },
+  {
+    title:'Which printings do you collect?',
+    lede:'Two binders that share a card pool and nothing else — separate cards, '+
+         'separate prices, separate shops. Pick one and the other leaves the app, '+
+         'switch included.',
+    draw(host){
+      host.innerHTML='<div class="wz-opts">'+REGIONS.map(r=>
+        '<label class="wz-opt'+(regionOn(r.id)?' on':'')+'" data-r="'+esc(r.id)+'">'+
+          '<span class="switch"><input type="checkbox" data-r="'+esc(r.id)+'"'+
+            (regionOn(r.id)?' checked':'')+'><span class="track"></span></span>'+
+          '<span class="wz-txt"><b>'+esc(r.name)+'</b><span>'+esc(r.hint)+'</span></span></label>').join('')+
+        '</div><p class="hint" id="wz-reg-note"></p>';
+      const note=host.querySelector('#wz-reg-note');
+      const paint=()=>{
+        note.textContent=bothRegions()
+          ? 'Both. The AE / JP switch stays beside the wordmark.'
+          : 'Only '+regionsOn()[0].name+'. The switch goes; the other binder stays on the device.';
+      };
+      paint();
+      /* A checkbox has already toggled by the time a click handler runs, and
+         preventDefault puts it back afterwards rather than undoing it now -
+         so the state being asked for is what it reads, not its negation. The
+         revert is there because switching region is a whole-collection swap
+         that can refuse, and the control should not move until it lands.  */
+      host.querySelectorAll('input[data-r]').forEach(cb=>cb.onclick=async e=>{
+        const want=cb.checked;
+        e.preventDefault();
+        if(!await setRegions(cb.dataset.r,want)){
+          toast('One of the two has to stay on');return;
+        }
+        cb.checked=want;
+        cb.closest('.wz-opt').classList.toggle('on',want);
+        paint();
+      });
+    }
+  },
+  {
+    title:'Light or dark?',
+    lede:'Rarity colours are the one thing that stays the same in both — they mean '+
+         'what a card is, so they are not decoration to be restyled.',
+    draw(host){
+      host.innerHTML='<div class="tabs set-seg wz-seg" id="wz-theme">'+
+        THEMES.map(([v,n])=>'<button data-v="'+esc(v)+'"'+
+          ((DB.theme==='dark'?'dark':'light')===v?' class="on"':'')+'>'+esc(n)+'</button>').join('')+
+        '</div>'+
+        '<div class="tabs set-seg wz-seg" id="wz-density" style="margin-top:12px">'+
+        [['cosy','Comfortable'],['compact','Compact']].map(([v,n])=>'<button data-v="'+esc(v)+'"'+
+          ((DB.density==='compact'?'compact':'cosy')===v?' class="on"':'')+'>'+esc(n)+'</button>').join('')+
+        '</div>'+
+        '<p class="hint">Compact fits one more column of cards at every width.</p>';
+      const wire=(id,fn)=>{
+        const g=host.querySelector('#'+id);
+        g.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+          g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+          slideTabs(g); fn(b.dataset.v); savePrefs(); save();
+        });
+        requestAnimationFrame(()=>slideTabs(g));
+      };
+      wire('wz-theme',v=>{DB.theme=v;applyTheme();});
+      wire('wz-density',v=>{DB.density=v;applyDensity();autoLayout(true);renderBinder();});
+    }
+  },
+  {
+    title:'That is the setup',
+    lede:'Everything here is a row in Settings, so none of it is a decision you '+
+         'are stuck with.',
+    draw(host){
+      const bits=[];
+      bits.push('<b>'+esc(pilesOn().map(p=>p.name).join(', '))+'</b> — '+
+        (pilesOn().length===3?'all three':'the rest of the app is hidden'));
+      bits.push('<b>'+esc(regionsOn().map(r=>r.name).join(' and '))+'</b>');
+      bits.push('<b>'+(DB.theme==='dark'?'Dark':'Light')+'</b>, '+
+        (DB.density==='compact'?'compact':'comfortable')+' cards');
+      host.innerHTML='<ul class="wz-sum">'+bits.map(b=>'<li>'+b+'</li>').join('')+'</ul>'+
+        '<div class="wz-tips">'+
+        '<p><b>Search</b> is the box at the top, at any scroll position. It matches a '+
+        'name, the card text, or a set code off the card in your hand.</p>'+
+        '<p><b>Menu</b> holds the deals board, the trade calculator and Settings. '+
+        '<b>Filters</b> holds sorting and rarity.</p>'+
+        '<p><b>Sync</b> asks what to fetch — the card list, prices, the rate — and '+
+        'shows it arriving. The app works with no connection at all either way.</p>'+
+        '</div>';
+    }
+  }];
+}
+function openSetup(){
+  const steps=setupSteps();
+  let at=0;
+  const box=el('div','wz');
+  box.innerHTML='<div class="wz-dots" id="wz-dots"></div>'+
+    '<h4 class="wz-t" id="wz-t"></h4>'+
+    '<p class="wz-l" id="wz-l"></p>'+
+    '<div id="wz-body"></div>'+
+    '<div class="wz-nav">'+
+      '<button class="btn" id="wz-back">Back</button>'+
+      '<button class="btn btn-a" id="wz-next">Next</button>'+
+    '</div>';
+  const body=modal('Welcome',box);
+  const dots=body.querySelector('#wz-dots');
+  const back=body.querySelector('#wz-back'), next=body.querySelector('#wz-next');
+  const paint=()=>{
+    const st=steps[at];
+    dots.innerHTML=steps.map((_,i)=>'<i class="'+(i===at?'on':(i<at?'past':''))+'"></i>').join('')+
+      '<span>'+(at+1)+' of '+steps.length+'</span>';
+    body.querySelector('#wz-t').textContent=st.title;
+    body.querySelector('#wz-l').textContent=st.lede;
+    const host=body.querySelector('#wz-body');
+    host.innerHTML='';
+    st.draw(host);
+    back.hidden=at===0;
+    next.textContent=at===steps.length-1?'Start':'Next';
+    requestAnimationFrame(()=>body.querySelectorAll('.tabs').forEach(slideTabs));
+  };
+  back.onclick=()=>{if(at>0){at--;paint();}};
+  next.onclick=()=>{
+    if(at<steps.length-1){at++;paint();return;}
+    closeModal();
+    /* the answers changed how much of the app there is, so it is redrawn from
+       scratch rather than left to the next thing that happens to paint */
+    applyPiles();applyRegions();paintViewTabs();paintBinders();
+    autoLayout(true);renderBinder();
+    toast('You can change any of this in Menu → Settings');
+  };
+  paint();
+}
 function openSettings(){
   const box=el('div');
   const seg=(id,label,opts,cur,hint)=>
@@ -5539,6 +5821,17 @@ function openSettings(){
       '<span class="lbl">'+esc(p.name)+
       '<span class="pile-n" data-n="'+esc(p.id)+'"></span></span></label>').join('')+
     '</div></div>'+
+    /* The same question the setup asks, in the same shape as the piles above
+       it, because it does the same kind of thing: it takes a whole half of
+       the app away. */
+    '<div class="set-row"><div><div class="set-lbl">Which printings you collect</div>'+
+    '<div class="set-hint">Switch one off and it leaves the app, AE / JP switch included. '+
+    'The other binder stays on the device and comes back with it.</div></div>'+
+    '<div class="pile-switches" id="set-regions">'+REGIONS.map(r=>
+      '<label class="switch'+(regionOn(r.id)?'':' pile-off')+'"><input type="checkbox" data-r="'+esc(r.id)+'"'+
+      (regionOn(r.id)?' checked':'')+'><span class="track"></span>'+
+      '<span class="lbl">'+esc(r.name)+'<span class="pile-n">'+esc(r.short)+'</span></span></label>').join('')+
+    '</div></div>'+
     '<div class="set-row set-sell"><div><div class="set-lbl">Your name on shared binders</div>'+
     '<div class="set-hint">Shown to anyone you send a binder to, with a way to reach you.</div></div>'+
     '<input class="inp set-in" id="set-name" placeholder="Your name"></div>'+
@@ -5565,7 +5858,18 @@ function openSettings(){
     'Your binder, wishlist and deals are not touched.</div></div>'+
     '<button class="btn btn-sm" id="set-upd">Get the newest</button>';
   box.appendChild(upd);
+  /* The setup asks the same questions in the order that matters, with the
+     reason for each one beside it - which is worth being able to get back to
+     rather than only ever seeing once. */
+  const again=el('div','set-row');
+  again.innerHTML='<div><div class="set-lbl">Run the setup again</div>'+
+    '<div class="set-hint">The four questions from the first run: what you do with '+
+    'cards, which printings, and how it looks. Nothing is reset by opening it.</div></div>'+
+    '<button class="btn btn-sm" id="set-wiz">Open setup</button>';
+  box.appendChild(again);
   const body=modal('Settings',box);
+  const wz=body.querySelector('#set-wiz');
+  if(wz)wz.onclick=()=>{closeModal();openSetup();};
   /* The count is the whole reason this is safe to touch: "48 cards" under a
      switch you are about to turn off says what you are hiding, before you
      hide it. It is recounted after every flip because a hidden pile can
@@ -5593,6 +5897,18 @@ function openSettings(){
       /* Facing pages is measured against a sheet that may have just changed
          shape, and the settings panel is sitting over it either way.     */
       requestAnimationFrame(()=>body.querySelectorAll('.tabs').forEach(slideTabs));
+    };
+  });
+  body.querySelectorAll('#set-regions input[data-r]').forEach(cb=>{
+    cb.onclick=async e=>{
+      const want=cb.checked;          /* already toggled; preventDefault reverts after */
+      e.preventDefault();
+      if(!await setRegions(cb.dataset.r,want)){
+        toast('One of the two has to stay on'); return;
+      }
+      cb.checked=want;
+      cb.closest('.switch').classList.toggle('pile-off',!want);
+      renderBinder();
     };
   });
   const ub=body.querySelector('#set-upd');
@@ -16092,6 +16408,147 @@ function syncStatus(){
     'Rate '+(DB.fxManual?'yours':ago(DB.fxAt))
   ].join(' · ');
 }
+/* ---- what to fetch, and how far along it is ----
+   Three different things came down one button: the card list, the prices and
+   the exchange rate. They cost wildly different amounts - the card list is
+   megabytes, the rate is one small request - and you want them for different
+   reasons, but pressing the one button fetched all three or nothing.
+
+   Which ones you want is remembered on the device, because it is a fact about
+   this connection rather than about the collection.                      */
+const SYNC_JOBS=[
+  {id:'cards', name:'Card list',
+   why:()=>'Every card with an OCG release, with its art and text. The big one.',
+   when:()=>'Last fetched '+ago(POOL_AT),
+   run:rep=>{rep('Fetching the pool…',null);return loadPool(true);}},
+  {id:'prices',name:'Prices',
+   why:()=>'What '+shopName()+' is asking today, across every printing.',
+   when:()=>{const a=pxAgeDays();
+     return 'Last fetched '+(!PX_ROWS.length?'never':!isFinite(a)?'no date'
+       :a===0?'today':a===1?'yesterday':a+' days ago');},
+   run:rep=>refreshPrices(t=>rep(t),(f,n)=>rep(null,f,n))},
+  {id:'rate',  name:'Exchange rate',
+   why:()=>'Pesos per dollar, so a shop price reads in your own money.',
+   when:()=>DB.fxManual?'Set by hand — a sync replaces it'
+                       :'Last fetched '+ago(DB.fxAt),
+   run:rep=>{rep('Asking the rate service…',null);return refreshRate(true);}}
+];
+/* absent means all three, so a device that has never touched this is unchanged */
+const syncWanted=id=>{
+  const w=PREFS.syncPick;
+  return !Array.isArray(w)||!w.length||w.includes(id);
+};
+function openSync(){
+  if(SYNCING){toast('A sync is already running');return;}
+  const box=el('div');
+  box.innerHTML=SYNC_JOBS.map(j=>
+    '<div class="sync-row" data-j="'+esc(j.id)+'">'+
+      '<label class="switch"><input type="checkbox" data-s="'+esc(j.id)+'"'+
+        (syncWanted(j.id)?' checked':'')+'><span class="track"></span></label>'+
+      '<div class="sync-txt"><div class="sync-nm">'+esc(j.name)+'</div>'+
+        '<div class="set-hint">'+esc(j.why())+'</div>'+
+        '<div class="sync-when">'+esc(j.when())+'</div>'+
+        '<div class="sync-state"></div></div>'+
+    '</div>').join('')+
+    '<div class="bar-wrap" hidden id="sync-bar">'+
+      '<div class="pbar"><i></i></div>'+
+      '<div class="pbar-line"><span id="sync-phase"></span><span id="sync-pc"></span></div>'+
+    '</div>'+
+    '<div class="sync-foot">'+
+      '<button class="btn" id="sync-px">Price options</button>'+
+      '<button class="btn btn-a" id="sync-go">Sync now</button>'+
+    '</div>'+
+    '<p class="hint">Whatever cannot be reached is left exactly as it is. The binder '+
+    'is priced from the list inside this file with or without a connection.</p>';
+  const body=modal('Sync',box);
+  const picks=()=>[...body.querySelectorAll('input[data-s]')]
+    .filter(c=>c.checked).map(c=>c.dataset.s);
+  const go=body.querySelector('#sync-go');
+  body.querySelectorAll('input[data-s]').forEach(c=>c.onchange=()=>{
+    PREFS.syncPick=picks();savePrefs();
+    go.disabled=!picks().length;
+  });
+  go.disabled=!picks().length;
+  body.querySelector('#sync-px').onclick=pricePanel;
+  go.onclick=()=>runSync(picks(),body);
+}
+/* ---- one bar across the run ----
+   Each job picked takes an equal share of it, and a job that can say how far
+   along it is moves inside its own share. A job that cannot - a rate is one
+   request that has either landed or not - leaves the bar indeterminate for
+   its share rather than inventing a number.                              */
+async function runSync(ids,body){
+  if(SYNCING||!ids.length)return;
+  SYNCING=true;
+  const jobs=SYNC_JOBS.filter(j=>ids.includes(j.id));
+  const go=body.querySelector('#sync-go');
+  const wrap=body.querySelector('#sync-bar');
+  const bar=body.querySelector('.pbar'), fill=body.querySelector('.pbar>i');
+  const phase=body.querySelector('#sync-phase'), pc=body.querySelector('#sync-pc');
+  go.disabled=true; go.textContent='Syncing…';
+  body.querySelectorAll('input[data-s]').forEach(c=>c.disabled=true);
+  wrap.hidden=false;
+  const share=1/jobs.length;
+  let base=0;
+  const draw=f=>{
+    if(f==null){bar.classList.add('indet');pc.textContent='';return;}
+    bar.classList.remove('indet');
+    const w=Math.max(0,Math.min(1,base+f*share));
+    fill.style.width=(w*100).toFixed(1)+'%';
+    pc.textContent=Math.round(w*100)+'%';
+  };
+  draw(null); phase.textContent='Starting…';
+  const done=[],failed=[];
+  for(const j of jobs){
+    const row=body.querySelector('.sync-row[data-j="'+j.id+'"]');
+    const state=row?row.querySelector('.sync-state'):null;
+    if(row)row.classList.add('busy');
+    const rep=(text,frac,n)=>{
+      if(n!=null&&state)state.textContent='Fetching… '+n.toLocaleString()+' so far';
+      else if(text&&state)state.textContent=text;
+      if(text)phase.textContent=j.name+' — '+text;
+      if(frac!==undefined)draw(frac);
+    };
+    try{
+      const ok=await j.run(rep);
+      /* loadPool and refreshRate answer false when they could not; refreshPrices
+         answers false only when it decided to keep what was already here. */
+      if(ok===false){failed.push(j.name);if(row)row.classList.add('failed');
+        if(state)state.textContent='Could not be reached — kept what was here';}
+      else{done.push(j.name);if(row)row.classList.add('done');
+        if(state)state.textContent='Done';}
+    }catch(e){
+      failed.push(j.name);
+      if(row)row.classList.add('failed');
+      if(state)state.textContent='Failed — '+((e&&e.message)||'no connection');
+    }
+    if(row)row.classList.remove('busy');
+    base+=share;
+    bar.classList.remove('indet');
+    fill.style.width=(base*100).toFixed(1)+'%';
+    pc.textContent=Math.round(base*100)+'%';
+  }
+  bar.classList.remove('indet');
+  fill.style.width='100%'; pc.textContent='100%';
+  bar.classList.toggle('nowt',!done.length);
+  phase.textContent=done.length
+    ? (failed.length?'Finished — '+failed.length+' could not be reached':'Finished')
+    : 'Nothing could be reached';
+  SYNCING=false;
+  go.textContent='Sync again'; go.disabled=false;
+  body.querySelectorAll('input[data-s]').forEach(c=>c.disabled=false);
+  /* every "last fetched" line under a row is now out of date */
+  SYNC_JOBS.forEach(j=>{
+    const row=body.querySelector('.sync-row[data-j="'+j.id+'"]');
+    const w=row?row.querySelector('.sync-when'):null;
+    if(w)w.textContent=j.when();
+  });
+  paintTopTools();paintDash();renderBinder();
+  const low=a=>a.join(', ').toLowerCase();
+  toast(done.length
+    ? 'Synced '+low(done)+(failed.length?' · '+low(failed)+' could not be reached':'')
+    : 'Nothing could be reached — the app is running on what it already had');
+}
 let SYNCING=false;
 async function syncAll(btn){
   if(SYNCING)return;
@@ -16284,8 +16741,14 @@ function importPrices(file){
   };
   fr.readAsText(file);
 }
-async function refreshPrices(btn){
-  const say=t=>{if(btn)btn.textContent=t;};
+/* The first argument may be a button, whose label is rewritten as it goes, or
+   a function for a caller that draws its own bar. The fraction handed to
+   onProg is real: the baked list says what a whole catalogue comes to. */
+async function refreshPrices(btn,onProg){
+  const fn=typeof btn==='function'?btn:null;
+  const say=t=>{if(fn)fn(t);else if(btn)btn.textContent=t;};
+  const full=pxFull();
+  const at=n=>{if(onProg)onProg(full>0?Math.min(1,n/full):null,n);};
   say('Fetching\u2026');
   const rows=[];
   try{
@@ -16319,7 +16782,8 @@ async function refreshPrices(btn){
           rows.push([t.code,price,t.name,t.rar,t.cond||'']);
         });
       });
-      say('Fetching\u2026 '+rows.length);
+      say('Fetching\u2026 '+rows.length.toLocaleString());
+      at(rows.length);
     }
     if(!rows.length)throw new Error('nothing parsed');
     /* ---- a short answer is not a smaller shop ----
@@ -16366,7 +16830,14 @@ async function refreshPrices(btn){
   }catch(e){
     say('Retry');
     toast('TCG Corner prices blocked by the browser \u2014 see the note in Prices');
-    priceHelp();
+    /* ---- do not take the sheet away from the run that is using it ----
+       modal() clears the layer before drawing, so opening the explanation
+       here destroyed the sync sheet mid-run: the jobs after it wrote into
+       detached nodes, and the bar vanished at the moment it had something
+       to report. The sheet names the job that failed in its own row and
+       carries a Price options button that leads here, so while it is open
+       the toast is the whole message. */
+    if(!SYNCING)priceHelp();
     return false;
   }
 }
@@ -19662,9 +20133,7 @@ paintRarityKey();
      is written immediately so this never happens twice.                  */
   if(!seenSetup()){
     markSetup();
-    setTimeout(()=>{ openSettings();
-      toast('Welcome — set the theme, card size and rate here. This opens once.');
-    },700);
+    setTimeout(openSetup,700);
   }
   /* Last, and only if it was switched on: the binder is usable by now, and a
      sync that delayed that would have the priority backwards. */

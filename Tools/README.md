@@ -765,6 +765,93 @@ while `BM` is true, and `exitBinderMode()` calls `savePrefs()` once it has put
 them back. This mattered before `per` joined the list and would have got worse
 with it, which is why the two were fixed together.
 
+## 18c. Which printings this device carries
+
+Asian-English and OCG-JP are two binders that share a card pool and nothing
+else. Plenty of people collect one of them, and for those people the AE / JP
+switch is a control that can only ever put them somewhere they did not want to
+be — sitting next to the wordmark, which is where a mis-tap is most likely.
+
+**Settings → Which printings you collect** switches either off. Same shape as
+the piles and for the same reasons: a preference of the device (`DB.regions`,
+carried in `PREF_FIELDS`), absent means both, and it hides a surface rather
+than touching a collection. The other region's binder stays in its own saved
+file and comes back untouched.
+
+- `applyRegions()` hides `#regsw` when only one is on; `paintRegion()` calls it,
+  so it cannot drift.
+- `setRegions()` refuses the last one standing, and switches region when you
+  turn off the one you are standing in.
+- `setRegion()` refuses a region this device does not carry, because a stale
+  tap on a hidden switch is still a tap.
+
+### A checkbox has already toggled
+
+Both region controls revert their checkbox and re-set it only once the swap
+lands, because switching region replaces the whole collection and can refuse.
+That needs `cb.checked` **as read in the click handler** — which is the state
+being asked for, since the browser toggles it before handlers run and
+`preventDefault()` puts it back *after* the event, not before. Written as
+`!cb.checked` it was inverted, and switching a region off did nothing at all.
+
+## 18d. The setup, one question a screen
+
+Settings used to open itself on a first run. It showed every control without
+ever saying what any of them were for — which is the wrong shape for a first
+look, because a list of everything is what you want when you already know what
+you are looking for.
+
+`openSetup()` asks four questions instead, one screen each, in the order that
+decides how much of the app is left standing:
+
+1. **What do you do with cards?** — the three piles, each with what it actually
+   gives you, and a line underneath saying what the current answer means.
+2. **Which printings do you collect?** — AE, OCG-JP or both.
+3. **Light or dark**, and card size.
+4. **A summary**, plus where search, Menu, Filters and Sync live.
+
+The first two come first because they switch whole sections off: answer them
+and the app behind the sheet is already the size you wanted by the time you
+see it. Every change applies live rather than on a Finish button, so the app
+is visibly smaller behind the question that shrank it.
+
+Nothing in it is one-way. Each question is a Settings row, the last screen says
+so, and **Settings → Run the setup again** reopens the whole thing.
+
+## 18e. One sync button, and a bar with a denominator
+
+Three different things came down one button: the card list, the prices and the
+exchange rate. They cost wildly different amounts — the card list is megabytes,
+the rate is one small request — and you want them for different reasons, but
+pressing the button fetched all three or nothing. Beside it sat a caret opening
+a panel that held a second, different Sync. Two controls a thumb apart, one of
+them a 24px caret, both about the same job.
+
+`openSync()` is one sheet: a row per job with what it is, when it last landed,
+and a switch. The picks are remembered in `PREFS.syncPick`, because which ones
+you want is a fact about this connection rather than about the collection.
+
+`runSync()` draws one bar across the run. Each job takes an equal share; a job
+that can say how far along it is moves inside its own share. Prices can:
+`pxFull()` knows what a whole catalogue comes to, so `refreshPrices()` now takes
+an `onProg` callback and reports a real fraction. `"Fetching 3,214"` was a
+number with no denominator — it said something was happening and nothing about
+how much was left. A job that has no denominator at all leaves the bar
+indeterminate for its share rather than inventing one.
+
+Two things that had to change with it:
+
+- **A finished run and a successful one are different.** The bar tracks
+  attempts, so when none of them land it turns `--down` rather than sitting
+  full and green over three failures.
+- **A job must not take the sheet away from the run using it.** `modal()`
+  clears the layer before drawing, and `refreshPrices()` opened the
+  explanation modal on failure — which destroyed the sync sheet mid-run, so
+  the jobs after it wrote into detached nodes and the bar vanished at the
+  moment it had something to report. It now opens that only when `SYNCING` is
+  false; inside the sheet the failed row and the toast carry the message, and
+  **Price options** leads to the same explanation.
+
 ## 19. Getting the newest version on a phone
 
 The saved copy is what makes the app open instantly and work with no signal,
