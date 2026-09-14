@@ -271,14 +271,35 @@ compressor less to chew on than a repeated string does.
 
 ## 9. Players Club HK, the second shop
 
-A Shopify store whose Asian-English stock is already one collection, so the
-whole catalogue comes from a single endpoint rather than a shop-wide crawl:
+A Shopify store. **Their Asian-English stock is not one collection**, whatever
+this section said for months: `ygoae1` is the general shelf, and newer sets get
+a collection of their own that they are not always filed into as well. BPRO-AE
+and BLZD-AE were in theirs and never in `ygoae1`, so 211 priced printings were
+simply absent from the file.
+
+The failure was silent and it wore a disguise. `bestMatch()` compares the two
+shops and names the cheaper; with one side missing it returns the other with
+`only:true`. So a card Players Club sells for HK$100 was quoted at TCG Corner's
+P1,538 with nothing on screen to say a second shop had it for half. It reads
+exactly like the comparison picking wrong - and the comparison is fine. It was
+never handed the row.
+
+So the shop's own collection list decides what to read: every collection whose
+title names an AE set - their convention, `1303 BPRO-AE BURST PROTOCOL` - plus
+`ygoae1`. A set that gets its own collection next month is picked up without
+anyone having to notice.
 
 ```
-https://playersclubhk.com/en/collections/ygoae1/products.json?limit=250&page=N
+https://playersclubhk.com/en/collections.json?limit=250&page=N     -> the list
+https://playersclubhk.com/en/collections/<handle>/products.json?limit=250&page=N
 ```
 
-18 pages, 4,275 products, 3,699 usable rows. Three things to know:
+Overlap is expected and harmless: a card in both `ygoae1` and its own set
+collection is emitted twice, and `pcIndex()` already resolves a duplicate
+code+rarity the right way round - in stock beats cheaper, then cheaper wins.
+
+16 collections, 4,837 rows, 1,993 of them carrying a rarity (was 4,127 and
+1,608). Three things to know:
 
 1. **Rarity is in the title, not a field.** `25AT-AE304 (SR)Lose 1 Turn`, or
    sometimes glued on: `DUNE-AE107(UR)`. Their abbreviations differ from ours -
@@ -296,8 +317,15 @@ every currency in one call, so the HKD cross rate refreshes alongside the peso
 one. A stale file therefore cannot quietly make one shop look cheaper. With no
 rate available the shop is skipped rather than guessed at.
 
-`bestMatch()` returns whichever shop is cheaper, in pesos, naming the winner so
-a figure can be traced back to a listing.
+`bestMatch()` picks between the two: **in stock beats cheaper** (a price you
+cannot buy is not an offer), and on equal footing the cheaper wins. Checked
+across all 1,161 printings both shops list - 841 where both are in stock, 274
+where one is out, 46 where neither is - with no disagreements. It names the
+winner and carries the loser's figure, so a quote can be traced to a listing.
+
+When only one shop has the printing it returns that one with `only:true`. Worth
+remembering when a price looks wrong: the first question is whether the other
+shop was in the file at all.
 
 ## 10. Deals: cart, order codes and reservations
 
