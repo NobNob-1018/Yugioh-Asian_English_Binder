@@ -741,9 +741,41 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 .trow{display:flex;align-items:center;gap:var(--sp-2);padding:7px 0;
   border-bottom:1px solid var(--line-soft);font-size:var(--fs-sm)}
 .trow:last-child{border-bottom:none}
+/* ---- which printing a row is ----
+   Two letters, not a word: the row already carries a rarity, a name, a price
+   and a stepper, and at 375px there is nothing spare. A side the card was
+   never printed on is dead rather than absent, so the pair always reads the
+   same way and you can see that the choice was made for you. */
+.treg{display:inline-flex;flex:none;border:1px solid var(--line);
+  border-radius:var(--r-xs);overflow:hidden}
+.treg button{font-family:var(--mono);font-size:var(--fs-3xs);letter-spacing:.06em;
+  padding:3px 5px;min-width:26px;color:var(--muted);background:transparent;
+  transition:background .16s ease,color .16s ease}
+.treg button:hover:not(:disabled):not(.on){color:var(--text);background:var(--surface-2)}
+.treg button.on{background:var(--text);color:var(--on-accent)}
+.treg button:disabled{opacity:.32;cursor:not-allowed}
 .trow .trar{flex:none;width:74px;padding:3px 5px;font-size:var(--fs-2xs)}
-.trow .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.trow .tv{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text)}
+#t-rates[hidden],#t-blind[hidden]{display:none}
+.trow .tv-none{color:var(--faint)}
+/* ---- the name gets its own line, at every width ----
+   The row now runs to six things: which printing, which rarity, the name,
+   the price, the count and a way out. Two columns inside an 840px modal
+   leaves about 390px for all of it, and the name is what loses - it was
+   coming out as "As..." and "Drol...", which is the one part you actually
+   read. So the name takes the line above and the controls line up under it,
+   which also makes every row the same shape whatever is in it. */
+.trow{flex-wrap:wrap}
+.trow .tn{flex:1 1 100%;order:-1;min-width:0;white-space:normal;
+  font-size:var(--fs-sm);line-height:1.35}
+/* A fixed slot, so a row priced at a dash and one priced at four figures
+   break in the same place - otherwise the controls below them shuffle from
+   row to row and the column stops reading as a column. */
+.trow .tv{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--text);
+  margin-left:auto;min-width:62px;text-align:right}
+@media (max-width:560px){
+  .trow .trar{width:58px}
+  .trow .step{flex:none}
+}
 /* the settle button sits with the figures it is settling */
 .ttot .t-done{margin-left:auto;align-self:center;flex:none}
 .ttot .t-done[disabled]{opacity:.45;cursor:default}
@@ -2728,6 +2760,15 @@ const REGIONS=[
 const regionOn=id=>{const r=DB.regions;return !Array.isArray(r)||!r.length||r.includes(id);};
 const regionsOn=()=>REGIONS.filter(r=>regionOn(r.id));
 const bothRegions=()=>regionsOn().length>1;
+/* ---- the rarity ladder of a named region ----
+   RARITIES is a global that flips with the binder you are in, which is right
+   everywhere except a panel that holds rows from both at once. rarBy() reads
+   the global; this reads the one the row belongs to, so a Normal Rare on an
+   OCG row does not come out as "Legacy rarity (NR)" because the app happens
+   to be standing in Asian-English.                                       */
+const ladderFor=reg=>(reg==='ocg'?RARITIES_JP:RARITIES_AE);
+const rarIn=(k,reg)=>ladderFor(reg).find(r=>r.k===k)||
+  {k:k||'C',n:'Legacy rarity ('+(k||'?')+')',f:'f-common',w:0};
 const ATTRS=['DARK','LIGHT','EARTH','WATER','FIRE','WIND','DIVINE'];
 const MON_RACES=['Aqua','Beast','Beast-Warrior','Creator-God','Cyberse','Dinosaur','Divine-Beast','Dragon','Fairy','Fiend','Fish','Illusion','Insect','Machine','Plant','Psychic','Pyro','Reptile','Rock','Sea Serpent','Spellcaster','Thunder','Warrior','Winged Beast','Wyrm','Zombie'];
 const MON_SUBS=['Normal','Effect','Ritual','Fusion','Synchro','XYZ','Pendulum','Link','Tuner','Flip','Toon','Spirit','Union','Gemini'];
@@ -3716,6 +3757,11 @@ async function setRegion(r){
 
     /* every cache that was built from the other region's catalogue */
     AE_BY_SET=null;AE_ALL=null;AE_SIZE=null;AE_NAME_BY_KEY=null;AE_IDX_REGION='';
+    /* and the other way round, which was never done: leaving OCG-JP left its
+       catalogue and price index standing for the rest of the session, so one
+       visit cost 7MB until the tab closed. freeJp() is a no-op while OCG-JP
+       is the open binder, and REGION has already moved by here. */
+    freeJp();
     AE_SETS=new Map();AE_STAMP='';AE_LEGACY=null;AE_MODERN=null;AE_ERA_STAMP='';
     SET_DATE=null;SET_DATE_STAMP='';
 
@@ -5163,120 +5209,6 @@ function openPaste(){
     toast(copies+' cop'+(copies===1?'y':'ies')+' across '+added+' card'+(added===1?'':'s')+' added');
   };
 }
-/* ---- trade calculator ----
-   The sum you do in your head over Messenger, done against real prices. What
-   you put up comes from cards you actually hold, so a trade cannot be built
-   from cards you do not have; what you are asking for is priced at whichever
-   shop is cheaper, the same figure the rest of the app quotes.            */
-function tradeValue(row){
-  const c=cardById(row.id); if(!c)return 0;
-  if(row.price!=null)return (+row.price)*row.qty;
-  const b=bestMatch({set:row.set||'',rarity:row.rar||'',qty:1},c);
-  return (b?b.peso:0)*row.qty;
-}
-/* ---- settling a trade ----
-   The calculator only ever weighed two piles against each other; agreeing to
-   the trade still meant editing both sides by hand afterwards. This does that
-   edit in one go: what you gave leaves the binder, what you got arrives.
-
-   It refuses rather than improvises. If a row asks for more copies than you
-   hold the whole thing stops, because a trade half-applied is worse than one
-   not applied at all - you would have to work out yourself what had already
-   moved.                                                                  */
-function tradeShort(rows){
-  /* what the give side would overdraw, counted per printing rather than per
-     row: the same printing can be listed twice in one trade */
-  const want=new Map();
-  rows.forEach(r=>{
-    const k=r.id+'|'+(r.rar||'')+'|'+(r.set||'')+'|'+(r.b||'');
-    want.set(k,(want.get(k)||0)+(+r.qty||0));
-  });
-  const short=[];
-  want.forEach((n,k)=>{
-    const [id,rar,set,b]=k.split('|');
-    const o=DB.own[id];
-    const held=o?(o.copies||[]).filter(cp=>
-      (cp.rarity||'')===rar&&(cp.set||'')===set&&(!b||cp.b===b))
-      .reduce((s,cp)=>s+(+cp.qty||0),0):0;
-    if(held<n){
-      const c=cardById(id);
-      short.push((c?c.name:id)+' — asking '+n+', holding '+held);
-    }
-  });
-  return short;
-}
-/* Copies promised to a buyer are not yours to trade away. Not a refusal: the
-   deal might be the thing you are unwinding, but you should be told.      */
-function tradeReserved(rows){
-  const out=[];
-  rows.forEach(r=>{
-    if(r.b!=='b-sell')return;
-    const q=reservedQty(r.id,r.rar||'',r.set||'');
-    if(q>0){const c=cardById(r.id);out.push((c?c.name:r.id)+' ('+q+' reserved)');}
-  });
-  return out;
-}
-function applyTrade(S,done){
-  const short=tradeShort(S.give);
-  if(short.length){
-    toast('Not enough copies: '+short[0]+(short.length>1?' (+'+(short.length-1)+' more)':''));
-    return;
-  }
-  const gq=S.give.reduce((s,r)=>s+(+r.qty||0),0);
-  const tq=S.get.reduce((s,r)=>s+(+r.qty||0),0);
-  const res=tradeReserved(S.give);
-  const warn=res.length?'\n\nHeld for a buyer: '+res.join(', ')+'.':'';
-  askConfirm('Trade done',
-    gq+' cop'+(gq===1?'y':'ies')+' leave your binder and '+tq+' cop'+(tq===1?'y':'ies')+
-    ' arrive in Collection.'+warn,'Trade done',()=>{
-      markUndo('the trade');
-      /* out first: an overdraw was ruled out above, so nothing can go negative */
-      S.give.forEach(r=>{
-        const o=DB.own[r.id]; if(!o)return;
-        let left=+r.qty||0;
-        for(let i=o.copies.length-1;i>=0&&left>0;i--){
-          const cp=o.copies[i];
-          if((cp.rarity||'')!==(r.rar||'')||(cp.set||'')!==(r.set||''))continue;
-          if(r.b&&cp.b!==r.b)continue;
-          const take=Math.min(left,+cp.qty||0);
-          cp.qty-=take;left-=take;
-          if(cp.qty<1)o.copies.splice(i,1);
-        }
-        if(!o.copies.length){
-          delete DB.own[r.id];
-          if(DB.manual[r.id])delete DB.manual[r.id];
-        }
-      });
-      /* and in: traded-for cards are things you wanted, so they land in
-         Collection - or, on a device that does not keep one, in the pile it
-         does have. Landing them in a hidden pile would look like the trade
-         had simply not happened.                                        */
-      const into=defaultPile();
-      S.get.forEach(r=>{
-        const own=ensureOwn(r.id);
-        if(!own)return;
-        const hit=own.copies.find(cp=>(cp.rarity||'')===(r.rar||'')&&
-          (cp.set||'')===(r.set||'')&&cp.b===into);
-        if(hit)hit.qty+=(+r.qty||0);
-        else own.copies.push({rarity:r.rar||'C',set:r.set||'',qty:+r.qty||1,b:into});
-        /* got what you were hunting? then you are hunting fewer of them, and
-           it is the line naming that printing that comes down - not whichever
-           happened to be first                                            */
-        const rows=wantRows(r.id);
-        let line=rows.findIndex(x=>(x.rarity||'')===(r.rar||'')&&(x.set||'')===(r.set||''));
-        if(line<0)line=rows.findIndex(x=>(x.rarity||'')===(r.rar||''));
-        if(line<0&&rows.length===1)line=0;
-        if(line>=0){
-          const w=rows[line];
-          w.qty=(+w.qty||1)-(+r.qty||0);
-          if(w.qty<1)dropWantRow(r.id,line);
-        }
-      });
-      save();renderBinder();
-      toastUndo('Traded — '+gq+' out, '+tq+' in','the trade');
-      if(done)done();
-    });
-}
 /* ---- deals ----
    A buyer works through a shared binder, sends an order code, and it lands
    here as a pending deal. Nothing is moved or deleted: copies stay where they
@@ -5387,50 +5319,234 @@ function setDealStatus(id,status){
 function dropDeal(id){
   DB.deals2=dealsAll().filter(d=>d.id!==id);save();
 }
+/* ---- trade calculator ----
+   The sum you do in your head over Messenger, done against real prices.
+
+   It weighs, and only weighs. Settling the trade - taking the copies out of
+   one side of the binder and putting the others in - is switched off below
+   and the button says so: see the note there. With nothing being written,
+   neither side has to be restricted to cards you actually hold, which is
+   what lets a row be Asian-English or OCG-JP regardless of which binder is
+   open. Cards you hold still come first in the search, because they are
+   what you would actually put up and they carry the price you set.
+
+   Each row names its own region, so the two ladders, the two catalogues and
+   the two shops never get mixed: everything downstream of a row is asked
+   with that row's region rather than the app's.                         */
+function tradeValue(row){
+  const u=tradeUnit(row);
+  return u==null?0:u*row.qty;
+}
+/* ---- what one copy is worth, or nothing at all ----
+   A printing no shop lists has no price, which is a different answer from
+   zero. Counting it as zero made the row read as worthless and quietly
+   dragged the difference towards whichever side it sat on - and the whole
+   point of this panel is that difference. It is far more common now that a
+   row can be OCG-JP: plenty of Japanese printings are simply not on the
+   shelf. So the value is null, the row shows a dash, and the totals say how
+   many they could not price.                                           */
+function tradeUnit(row){
+  const c=cardAny(row.id); if(!c)return null;
+  if(row.price!=null)return +row.price;
+  const b=bestMatch({set:row.set||'',rarity:row.rar||'',qty:1},c,row.reg);
+  return b?b.peso:null;
+}
+/* The pool the binder shows is filtered to one region; the calculator holds
+   rows from both, so it looks in the unfiltered one as well. */
+function cardAny(id){
+  const c=cardById(id);
+  if(c)return c;
+  const k=String(id);
+  return POOL_ALL.find(x=>x.id===k);
+}
+/* The rarity worth opening a row on: the cheapest the shops of that region
+   actually list, falling back to whatever exists. */
+function cheapestIn(card,reg){
+  let best=null,bp=Infinity;
+  printRars(card,'',reg).forEach(k=>{
+    const m=bestMatch({set:'',rarity:k,qty:1},card,reg);
+    if(m&&m.peso<bp){bp=m.peso;best=k;}
+  });
+  return best;
+}
+/* ---- settling a trade, kept and switched off ----
+   The Trade done button is disabled: with rows now able to name either
+   region, settling could mean writing to the saved file that is NOT loaded,
+   and a trade half-applied is worse than one not applied at all. This is
+   left standing rather than deleted because switching it back on is meant to
+   be one line once that write is safe - the same way Export and Copy-as-code
+   wait in the Prices panel.
+   ------------------------------------------------------------------ */
+/* ---- settling a trade ----
+   The calculator only ever weighed two piles against each other; agreeing to
+   the trade still meant editing both sides by hand afterwards. This does that
+   edit in one go: what you gave leaves the binder, what you got arrives.
+
+   It refuses rather than improvises. If a row asks for more copies than you
+   hold the whole thing stops, because a trade half-applied is worse than one
+   not applied at all - you would have to work out yourself what had already
+   moved.                                                                  */
+function tradeShort(rows){
+  /* what the give side would overdraw, counted per printing rather than per
+     row: the same printing can be listed twice in one trade */
+  const want=new Map();
+  rows.forEach(r=>{
+    const k=r.id+'|'+(r.rar||'')+'|'+(r.set||'')+'|'+(r.b||'');
+    want.set(k,(want.get(k)||0)+(+r.qty||0));
+  });
+  const short=[];
+  want.forEach((n,k)=>{
+    const [id,rar,set,b]=k.split('|');
+    const o=DB.own[id];
+    const held=o?(o.copies||[]).filter(cp=>
+      (cp.rarity||'')===rar&&(cp.set||'')===set&&(!b||cp.b===b))
+      .reduce((s,cp)=>s+(+cp.qty||0),0):0;
+    if(held<n){
+      const c=cardById(id);
+      short.push((c?c.name:id)+' — asking '+n+', holding '+held);
+    }
+  });
+  return short;
+}
+/* Copies promised to a buyer are not yours to trade away. Not a refusal: the
+   deal might be the thing you are unwinding, but you should be told.      */
+function tradeReserved(rows){
+  const out=[];
+  rows.forEach(r=>{
+    if(r.b!=='b-sell')return;
+    const q=reservedQty(r.id,r.rar||'',r.set||'');
+    if(q>0){const c=cardById(r.id);out.push((c?c.name:r.id)+' ('+q+' reserved)');}
+  });
+  return out;
+}
+function applyTrade(S,done){
+  const short=tradeShort(S.give);
+  if(short.length){
+    toast('Not enough copies: '+short[0]+(short.length>1?' (+'+(short.length-1)+' more)':''));
+    return;
+  }
+  const gq=S.give.reduce((s,r)=>s+(+r.qty||0),0);
+  const tq=S.get.reduce((s,r)=>s+(+r.qty||0),0);
+  const res=tradeReserved(S.give);
+  const warn=res.length?'\n\nHeld for a buyer: '+res.join(', ')+'.':'';
+  askConfirm('Trade done',
+    gq+' cop'+(gq===1?'y':'ies')+' leave your binder and '+tq+' cop'+(tq===1?'y':'ies')+
+    ' arrive in Collection.'+warn,'Trade done',()=>{
+      markUndo('the trade');
+      /* out first: an overdraw was ruled out above, so nothing can go negative */
+      S.give.forEach(r=>{
+        const o=DB.own[r.id]; if(!o)return;
+        let left=+r.qty||0;
+        for(let i=o.copies.length-1;i>=0&&left>0;i--){
+          const cp=o.copies[i];
+          if((cp.rarity||'')!==(r.rar||'')||(cp.set||'')!==(r.set||''))continue;
+          if(r.b&&cp.b!==r.b)continue;
+          const take=Math.min(left,+cp.qty||0);
+          cp.qty-=take;left-=take;
+          if(cp.qty<1)o.copies.splice(i,1);
+        }
+        if(!o.copies.length){
+          delete DB.own[r.id];
+          if(DB.manual[r.id])delete DB.manual[r.id];
+        }
+      });
+      /* and in: traded-for cards are things you wanted, so they land in
+         Collection - or, on a device that does not keep one, in the pile it
+         does have. Landing them in a hidden pile would look like the trade
+         had simply not happened.                                        */
+      const into=defaultPile();
+      S.get.forEach(r=>{
+        const own=ensureOwn(r.id);
+        if(!own)return;
+        const hit=own.copies.find(cp=>(cp.rarity||'')===(r.rar||'')&&
+          (cp.set||'')===(r.set||'')&&cp.b===into);
+        if(hit)hit.qty+=(+r.qty||0);
+        else own.copies.push({rarity:r.rar||'C',set:r.set||'',qty:+r.qty||1,b:into});
+        /* got what you were hunting? then you are hunting fewer of them, and
+           it is the line naming that printing that comes down - not whichever
+           happened to be first                                            */
+        const rows=wantRows(r.id);
+        let line=rows.findIndex(x=>(x.rarity||'')===(r.rar||'')&&(x.set||'')===(r.set||''));
+        if(line<0)line=rows.findIndex(x=>(x.rarity||'')===(r.rar||''));
+        if(line<0&&rows.length===1)line=0;
+        if(line>=0){
+          const w=rows[line];
+          w.qty=(+w.qty||1)-(+r.qty||0);
+          if(w.qty<1)dropWantRow(r.id,line);
+        }
+      });
+      save();renderBinder();
+      toastUndo('Traded — '+gq+' out, '+tq+' in','the trade');
+      if(done)done();
+    });
+}
 function openTrade(){
   const box=el('div');
   box.innerHTML=
     '<p class="note">Value what you are putting up against what you are asking for. '+
-    'Your side is priced from the copies you hold; theirs from the cheaper shop.</p>'+
+    'Each row can be Asian-English or OCG-JP, so the two binders can be weighed '+
+    'against each other.</p>'+
     '<div class="tgrid">'+
       '<div class="tcol"><div class="sh">You give</div>'+
-        '<div class="trow-add"><input class="inp" id="t-give-q" placeholder="Search your cards" autocomplete="off"></div>'+
+        '<div class="trow-add"><input class="inp" id="t-give-q" placeholder="Search a card" autocomplete="off"></div>'+
         '<div id="t-give-hits" class="thits"></div>'+
         '<div id="t-give"></div></div>'+
       '<div class="tcol"><div class="sh">You get</div>'+
-        '<div class="trow-add"><input class="inp" id="t-get-q" placeholder="Search any card" autocomplete="off"></div>'+
+        '<div class="trow-add"><input class="inp" id="t-get-q" placeholder="Search a card" autocomplete="off"></div>'+
         '<div id="t-get-hits" class="thits"></div>'+
         '<div id="t-get"></div></div>'+
     '</div>'+
-    '<div class="ttot" id="t-tot"></div>';
+    '<div class="ttot" id="t-tot"></div>'+
+    '<p class="hint" id="t-blind" hidden></p>'+
+    '<p class="hint" id="t-rates"></p>';
   const body=modal('Trade calculator',box,true);
+  /* the OCG side is only built if a row asks for it, and given back when this
+     panel goes - so an Asian-English session never carries it */
+  ON_MODAL_CLOSE=freeJp;
   const S={give:[],get:[]};
 
   const draw=side=>{
     const host=body.querySelector('#t-'+side);
     host.innerHTML='';
     S[side].forEach((row,i)=>{
-      const c=cardById(row.id);
+      const c=cardAny(row.id);
       const r=el('div','trow');
-      const val=tradeValue(row);
-      const rars=c?printingsOf(c).rars:[];
-      /* your side is a copy you hold, so its rarity is fixed; theirs is a
-       card you have not got yet, so it has to be chosen before it prices */
-      const head = side==='get'
-        ? '<select class="inp trar">'+RARITIES.filter(x=>!rars.length||rars.includes(x.k))
-            .map(x=>'<option value="'+x.k+'"'+(row.rar===x.k?' selected':'')+'>'+esc(x.k)+'</option>').join('')+'</select>'
-        : '<span class="r '+esc(rarBy(row.rar||'C').f)+'">'+esc(row.rar||'C')+'</span>';
-      r.innerHTML=head+
-        '<span class="tn">'+esc(c?c.name:row.id)+'</span>'+
-        '<span class="tv">'+esc(peso(val))+'</span>'+
+      const unit=tradeUnit(row);
+      const rars=printRars(c,'',row.reg);
+      const lad=ladderFor(row.reg);
+      /* A card printed in only one of the two has nothing to switch to, and
+         a switch you can press to no effect is worse than one you cannot. */
+      const hasAE=inAE(c), hasJP=inJP(c);
+      const tog='<span class="treg" role="group" aria-label="Which printing">'+
+        '<button data-g="ae"'+(row.reg==='ae'?' class="on"':'')+
+          (hasAE?'':' disabled')+' title="'+(hasAE?'Asian-English printing':'No Asian-English printing')+'">AE</button>'+
+        '<button data-g="ocg"'+(row.reg==='ocg'?' class="on"':'')+
+          (hasJP?'':' disabled')+' title="'+(hasJP?'OCG-JP printing':'No OCG-JP printing')+'">JP</button></span>';
+      r.innerHTML=tog+
+        '<select class="inp trar">'+lad.filter(x=>!rars.length||rars.includes(x.k))
+          .map(x=>'<option value="'+esc(x.k)+'"'+(row.rar===x.k?' selected':'')+
+            ' title="'+esc(x.n)+'">'+esc(x.k)+'</option>').join('')+'</select>'+
+        '<span class="tn">'+esc(c?cardName(c):row.id)+'</span>'+
+        '<span class="tv'+(unit==null?' tv-none" title="No shop lists this printing"':'"')+'>'+
+          (unit==null?'—':esc(peso(unit*row.qty)))+'</span>'+
         '<div class="step"><button aria-label="One fewer">−</button>'+
         '<span>'+row.qty+'</span><button aria-label="One more">+</button></div>'+
         '<button class="x-btn" aria-label="Remove">×</button>';
+      r.querySelectorAll('.treg button').forEach(btn=>btn.onclick=()=>{
+        if(btn.disabled||btn.dataset.g===row.reg)return;
+        row.reg=btn.dataset.g;
+        /* the two regions have different ladders and different set codes, so
+           the old pair cannot simply carry over to the new one */
+        const rs=printRars(c,'',row.reg);
+        if(!rs.includes(row.rar))row.rar=cheapestIn(c,row.reg)||rs[0]||'C';
+        const only=printSets(c,row.rar,row.reg);
+        row.set=only.length===1?only[0]:'';
+        draw(side);total();
+      });
       const rs=r.querySelector('.trar');
       if(rs)rs.onchange=()=>{
         row.rar=rs.value;
-        const card=cardById(row.id);
-        const only=card?printSets(card,row.rar):[];
+        const only=printSets(c,row.rar,row.reg);
         /* keep the set only while it still prints this rarity */
         if(only.length===1)row.set=only[0];
         else if(row.set&&!only.includes(row.set))row.set='';
@@ -5444,68 +5560,103 @@ function openTrade(){
     });
     if(!S[side].length)host.appendChild(el('p','note','Nothing yet.'));
   };
+  /* ---- the rates are only worth reading when two currencies are in play ----
+     A same-region trade prices both sides off one rate, so a stale one moves
+     both and the verdict holds. Across regions one side is yen and the other
+     dollars: they are always the same age - one response carries both - but
+     they are rates against different currencies, so the gap between them is
+     real. And a dollar rate set by hand is never refreshed while the yen one
+     always is, which is the case where the two sides genuinely stop being
+     comparable. That one is said out loud.                              */
+  const rates=()=>{
+    const line=body.querySelector('#t-rates');
+    const mixed=[...S.give,...S.get].some(r=>r.reg==='ocg');
+    if(!mixed){line.hidden=true;line.textContent='';return;}
+    const age=DB.fxAt?fxAgo():'never fetched';
+    line.hidden=false;
+    line.innerHTML='Priced at ₱'+esc(String(fx()))+' per $ and ₱'+
+      esc((+DB.fxJpy||0).toFixed(4))+' per ¥ · '+esc(age)+'. '+
+      (DB.fxManual
+        ? '<b>Your dollar rate is set by hand and the yen rate is the live one, '+
+          'so the two sides are not on the same footing.</b>'
+        : 'Both come from one fetch, so they are always the same age.');
+  };
   const total=()=>{
     const g=S.give.reduce((s,r)=>s+tradeValue(r),0);
     const t=S.get.reduce((s,r)=>s+tradeValue(r),0);
+    const blind=[...S.give,...S.get].filter(r=>tradeUnit(r)==null).length;
     const d=g-t;
     const cls=Math.abs(d)<1?'flat':(d>0?'down':'up');
     const say=Math.abs(d)<1?'Even trade'
       :(d>0?'You are giving '+peso(d)+' more':'You are getting '+peso(-d)+' more');
-    const any=S.give.length||S.get.length;
+    /* ---- Trade done is switched off on purpose ----
+       It moved copies out of one binder and into the other. With rows now
+       able to name either region, settling could mean writing to the saved
+       file that is NOT loaded - two stores, one of them absent - and a trade
+       half-applied is worse than one not applied at all, which is the rule
+       this panel was built on. It stays visible and disabled rather than
+       disappearing, because it is coming back once that write is safe.  */
     body.querySelector('#t-tot').innerHTML=
       '<div><span class="cap">You give</span><b>'+esc(peso(g))+'</b></div>'+
       '<div><span class="cap">You get</span><b>'+esc(peso(t))+'</b></div>'+
       '<div class="tdiff '+cls+'"><span class="cap">Difference</span><b>'+esc(say)+'</b></div>'+
-      '<button class="btn btn-a t-done" id="t-done"'+(any?'':' disabled')+'>Trade done</button>';
-    const dn=body.querySelector('#t-done');
-    if(dn)dn.onclick=()=>applyTrade(S,closeModal);
+      '<button class="btn btn-a t-done" id="t-done" disabled '+
+      'title="Switched off for now — update your binder by hand">Trade done</button>';
+    const bl=body.querySelector('#t-blind');
+    if(bl){
+      bl.hidden=!blind;
+      bl.textContent=blind?(blind===1?'One row has no price on record, so it counts as nothing here.'
+        :blind+' rows have no price on record, so they count as nothing here.'):'';
+    }
+    rates();
   };
-  /* Your side offers only what you hold, one entry per rarity you own, priced
-     at what that copy is worth. Their side is the whole catalogue.        */
+  /* Cards you hold first - they are what you would put up, and the copy
+     carries the price you set on it - then everything else. The calculator
+     writes nothing, so a card you do not own is a fine thing to weigh. */
   const search=(side,q)=>{
     const hits=body.querySelector('#t-'+side+'-hits');
     hits.innerHTML='';
     const k=q.trim().toLowerCase();
     if(k.length<2)return;
-    let out=[];
+    const out=[],seen=new Set();
     if(side==='give'){
       Object.keys(DB.own).forEach(id=>{
         const c=cardById(id); if(!c||!(c.name||'').toLowerCase().includes(k))return;
-        /* the binder is part of the identity: the same printing can sit in
-           Collection and on the selling shelf, and settling the trade has to
-           take it out of the one you actually picked                     */
-        (DB.own[id].copies||[]).forEach(cp=>out.push({id,rar:cp.rarity,set:cp.set,b:cp.b,
-          price:cp.price!=null?+cp.price:null,label:c.name,
-          sub:rarBy(cp.rarity).n+(cp.set?' · '+cp.set:'')
-            +' · '+((DB.binders.find(x=>x.id===cp.b)||{}).name||'Collection')}));
+        (DB.own[id].copies||[]).forEach(cp=>{
+          out.push({id,rar:cp.rarity,set:cp.set,b:cp.b,reg:REGION,
+            price:cp.price!=null?+cp.price:null,label:cardName(c),
+            sub:'yours · '+rarIn(cp.rarity,REGION).n+(cp.set?' · '+cp.set:'')});
+          seen.add(String(id));
+        });
       });
-    }else{
-      out=allCards().filter(c=>(c.name||'').toLowerCase().includes(k)).slice(0,12)
-        .map(c=>({id:c.id,rar:'',set:'',price:null,label:c.name,sub:'pick a rarity after adding'}));
     }
+    const pool=POOL_ALL.length?POOL_ALL:allCards();
+    pool.forEach(c=>{
+      if(out.length>40||seen.has(String(c.id)))return;
+      if(!(c.name||'').toLowerCase().includes(k))return;
+      const tags=[inAE(c)?'AE':null,inJP(c)?'JP':null].filter(Boolean);
+      out.push({id:c.id,rar:'',set:'',price:null,label:cardName(c),
+        sub:tags.length?tags.join(' and '):'no printing on record'});
+    });
     out.slice(0,12).forEach(o=>{
       const b=el('button','thit');
       b.innerHTML='<span class="tn">'+esc(o.label)+'</span><span class="pm">'+esc(o.sub)+'</span>';
       b.onclick=()=>{
+        const card=cardAny(o.id);
+        const reg=fitRegion(card,o.reg);
         let rar=o.rar;
-        if(side==='get'&&!rar){
-          /* whichever printing is cheapest is the sensible opening guess */
-          const card=cardById(o.id);
-          const rs=card?printingsOf(card).rars:[];
-          let best=null,bp=Infinity;
-          rs.forEach(k=>{const m=bestMatch({set:'',rarity:k,qty:1},card);
-            if(m&&m.peso<bp){bp=m.peso;best=k;}});
-          rar=best||rs[0]||'C';
+        if(!rar){
+          const rs=printRars(card,'',reg);
+          rar=cheapestIn(card,reg)||rs[0]||'C';
         }
-        /* a card you are taking in prices at nothing without a set, so when
-           the rarity settles it to a single printing, fill that in too   */
+        /* a card prices at nothing without a set, so when the rarity settles
+           it to a single printing, fill that in too */
         let set=o.set;
-        if(side==='get'&&!set){
-          const card=cardById(o.id);
-          const only=card?printSets(card,rar):[];
+        if(!set){
+          const only=printSets(card,rar,reg);
           if(only.length===1)set=only[0];
         }
-        S[side].push({id:o.id,rar,set,price:o.price,qty:1,b:o.b||''});
+        S[side].push({id:o.id,rar,set,price:o.price,qty:1,b:o.b||'',reg});
         body.querySelector('#t-'+side+'-q').value='';hits.innerHTML='';
         draw(side);total();
       };
@@ -6817,7 +6968,16 @@ function modal(title,inner,wide){
   $('#layer').appendChild(veil);
   return body;
 }
-function closeModal(){$('#layer').innerHTML='';}
+/* A panel that borrowed something expensive has to be told when it is gone.
+   modal() closes whatever is open before it draws, so this fires on being
+   replaced as well as on being dismissed - which is the same thing from the
+   old panel's point of view. */
+let ON_MODAL_CLOSE=null;
+function closeModal(){
+  const f=ON_MODAL_CLOSE; ON_MODAL_CLOSE=null;
+  $('#layer').innerHTML='';
+  if(f){try{f();}catch(e){}}
+}
 /* Native prompt()/confirm() are blocked when this page runs embedded, so use our own. */
 function askConfirm(title,msg,okLabel,cb){
   const box=el('div');
@@ -17061,9 +17221,12 @@ function pcMatch(cp,card){
 /* Which shop to quote. Stock decides first: a lower price at a shop that has
    none of the card is not an offer, it is a memory of one. Only when both
    agree on availability - both stocked, or neither - does price decide.  */
-function bestMatch(cp,card){
+/* `reg` names which region's shops to ask. It defaults to the binder you are
+   standing in, which is every caller but the trade calculator - that one
+   holds rows from both at once and has to say which each one is. */
+function bestMatch(cp,card,reg){
   /* OCG-JP has one shop, so there is no cheaper-of-two to work out. */
-  if(ocgOn()){
+  if(reg?reg==='ocg':ocgOn()){
     const y=ytMatch(cp,card);
     return y?Object.assign({},y,{only:true}):null;
   }
@@ -17086,12 +17249,13 @@ function bestMatch(cp,card){
 /* What printings the feed knows for a card. When there is only one set or only
    one rarity there is nothing to choose, so the form fills it in itself.
    Clean stock only, to match how tcgcMatch prices things.                     */
-function printingsOf(card){
+function printingsOf(card,reg){
+  const R=reg||REGION;
   /* In OCG-JP the catalogue is the authority, not a shop's stock list: it
      knows every printing whether or not Yuyu-tei happens to carry it, and
      the Asian-English feed would otherwise offer sets that do not exist in
      Japanese at all.                                                     */
-  if(ocgOn()){
+  if(R==='ocg'){
     jpCat();jpPriceIndex();
     const rows=(card&&card.name?JP_PRINT_BY_NAME.get(nameKey(card.name)):null)||[];
     const sets=[...new Set(rows.map(r=>r.pre))].sort();
@@ -17125,8 +17289,8 @@ function printingsOf(card){
      The second is the worse of the two: a default that is merely absent
      makes you choose, but a default that is wrong gets saved. printingPairs
      is what the menus are built from, so it is what this is built from. */
-  const sets=[...printingPairs(card).keys()].sort();
-  const rars=printRars(card,'');
+  const sets=[...printingPairs(card,R).keys()].sort();
+  const rars=printRars(card,'',R);
   return {sets,rars,oneSet:sets.length===1?sets[0]:'',
           oneRar:rars.length===1?rars[0]:'',oneCode:''};
 }
@@ -17141,10 +17305,13 @@ function printingsOf(card){
    which matters: 877 Asian-English cards have no priced printing at all, and
    restricting those to an empty list would make them impossible to record. */
 let PAIR_CACHE=new Map(),PAIR_REGION='';
-function printingPairs(card){
+function printingPairs(card,reg){
   if(!card||!card.name)return new Map();
+  const R=reg||REGION;
   if(PAIR_REGION!==REGION){PAIR_CACHE=new Map();PAIR_REGION=REGION;}
-  const k=nameKey(card.name);
+  /* keyed by region as well now: the calculator asks about the same card in
+     both, and one answer must not be handed back as the other */
+  const k=R+'|'+nameKey(card.name);
   const hit=PAIR_CACHE.get(k);
   if(hit)return hit;
   const by=new Map();                 /* set -> rarities; empty set means unknown */
@@ -17153,11 +17320,11 @@ function printingPairs(card){
     if(!by.has(s))by.set(s,new Set());
     if(r)by.get(s).add(r);
   };
-  if(ocgOn()){
+  if(R==='ocg'){
     jpCat();jpPriceIndex();
     /* the Japanese catalogue carries the card number, so the set is the whole
        code - which is also what prices it exactly rather than by name */
-    (JP_PRINT_BY_NAME.get(k)||[]).forEach(r=>{
+    (JP_PRINT_BY_NAME.get(nameKey(card.name))||[]).forEach(r=>{
       if(r.rars.length)r.rars.forEach(x=>put(r.code,x));
       else put(r.code,'');
       /* A wiki set list can be thin where the shop is not: if Yuyu-tei has
@@ -17165,24 +17332,25 @@ function printingPairs(card){
       JP_RKEYS.forEach(x=>{if(JP_BY_CODE.has(r.code+'|'+x))put(r.code,x);});
     });
   }else{
-    (PX_NAME[k]||[]).filter(r=>!r.cond).forEach(r=>put(r.pre,r.rar));
+    const nk=nameKey(card.name);
+    (PX_NAME[nk]||[]).filter(r=>!r.cond).forEach(r=>put(r.pre,r.rar));
     aeIndex();
-    AE_BY_SET.forEach((names,pre)=>{if(names.has(k))put(pre,'');});
+    AE_BY_SET.forEach((names,pre)=>{if(names.has(nk))put(pre,'');});
   }
   PAIR_CACHE.set(k,by);
   return by;
 }
 /* The sets this card was printed in, narrowed to one rarity if you name one.
    A set whose rarities are unknown is always offered: we cannot rule it out. */
-function printSets(card,rar){
-  const by=printingPairs(card),out=[];
+function printSets(card,rar,reg){
+  const by=printingPairs(card,reg),out=[];
   by.forEach((rs,s)=>{if(!rar||!rs.size||rs.has(rar))out.push(s);});
   return out.sort();
 }
 /* The rarities this card was printed in, narrowed to one set if you name one. */
-function printRars(card,set){
-  const by=printingPairs(card);
-  const all=()=>RARITIES.map(r=>r.k);
+function printRars(card,set,reg){
+  const by=printingPairs(card,reg);
+  const all=()=>ladderFor(reg||REGION).map(r=>r.k);
   if(set){
     const rs=by.get(set);
     if(!rs)return all();
@@ -18014,6 +18182,56 @@ let JP_BY_SET=null,JP_SET_NAME=null,JP_SET_DATE=null,JP_NAME_BY_CODE=null,JP_ALL
 /* nameKey -> every Japanese printing of that card, so a card can say which
    sets it is in without going anywhere near the Asian-English price feed */
 let JP_PRINT_BY_NAME=null;
+/* ---- the cheapest question the JP data can answer ----
+   "Does this card have an OCG printing at all" is all the trade calculator
+   needs to decide whether a row's JP toggle is live, and it is a fraction of
+   the work of the real catalogue: 17ms and one Set of names against 36ms for
+   the catalogue and another 55ms for prices. So it is its own tier. The two
+   heavier ones are not built until a row is actually put on OCG.
+
+   Once jpCat() has run for real, JP_ALL is the same set - verified, not
+   assumed - so this hands that back rather than keeping a second copy.  */
+let JP_NAMES=null;
+function jpNames(){
+  if(JP_ALL)return JP_ALL;
+  if(JP_NAMES)return JP_NAMES;
+  JP_NAMES=new Set();
+  JP_CAT_RAW.split('\n').forEach(line=>{
+    if(!line)return;
+    const f=line.split('|');
+    (f[3]||'').split(';').forEach(c=>{
+      if(!c)return;
+      const nm=AE_NAMES[+c.split(',')[1]];
+      if(nm)JP_NAMES.add(nameKey(nm));
+    });
+  });
+  return JP_NAMES;
+}
+/* Everything the OCG side builds, given back when nothing is using it. Only
+   ever called while standing in Asian-English: in the JP binder these are
+   the working set, not a loan. */
+function freeJp(){
+  if(ocgOn())return;
+  JP_NAMES=null;
+  JP_BY_SET=null;JP_SET_NAME=null;JP_SET_DATE=null;JP_NAME_BY_CODE=null;
+  JP_ALL=null;JP_SIZE=null;JP_NAME_BY_KEY=null;JP_PRINT_BY_NAME=null;
+  JP_BY_CODE=null;JP_BY_NAME=null;
+  PAIR_CACHE=new Map();
+}
+/* Which printings a card has, per region, without building anything heavier
+   than it has to. AE is free - the catalogue is already indexed for the
+   binder you are in - and JP costs the names tier once. */
+const inAE=card=>{ if(!card||!card.name)return false; aeIndex(); return AE_ALL.has(nameKey(card.name)); };
+const inJP=card=>!!(card&&card.name)&&jpNames().has(nameKey(card.name));
+/* A calculator row opens in Asian-English, unless this device does not carry
+   it, and unless the card has no Asian-English printing to open on. */
+const rowRegion=()=>regionOn('ae')?'ae':'ocg';
+function fitRegion(card,want){
+  const w=want||rowRegion();
+  if(w==='ae'&&!inAE(card)&&inJP(card))return 'ocg';
+  if(w==='ocg'&&!inJP(card)&&inAE(card))return 'ae';
+  return w;
+}
 function jpCat(){
   if(JP_BY_SET)return JP_BY_SET;
   JP_BY_SET=new Map();JP_SET_NAME=new Map();JP_SET_DATE=new Map();

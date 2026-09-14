@@ -489,6 +489,87 @@ printing can sit in Collection and on the selling shelf, and the settlement has
 to take it out of the one that was actually picked. That is why the search
 results read `Rare · ROTA-JP002 · Selling`.
 
+## 12a. The calculator weighs both regions
+
+Asian-English and OCG-JP are two binders that share a card pool, and the
+question "is this trade fair" spans them all the time. The calculator now takes
+a row from either: each one carries its own region, and everything downstream of
+a row is asked with that region rather than with the binder you happen to have
+open.
+
+### Only one region is loaded, still
+
+The Japanese data was always built lazily. It turns out to come in three tiers,
+which is what makes this affordable:
+
+| Tier | Cost | Needed for |
+|---|---|---|
+| `jpNames()` — names only | **17 ms** | whether a row's JP toggle is live |
+| `jpCat()` — the catalogue | 36 ms | which set and rarity a JP printing is |
+| `jpPriceIndex()` — prices | 55 ms | the JP price itself |
+
+So: opening the calculator loads nothing. Adding a row builds the names tier.
+Only tapping **JP** on a row builds the other two — and `freeJp()` gives all
+three back when the panel closes. Someone who never taps JP pays 17 ms, once.
+
+`setRegion()` calls `freeJp()` too, which it never used to: leaving the OCG-JP
+binder left its catalogue and price index standing for the rest of the session,
+about 7 MB, until the tab was closed. It is a no-op while OCG-JP is the open
+binder, and `REGION` has already moved by the time it runs.
+
+### What had to learn about regions
+
+Nothing was fetched and nothing was duplicated — the card pool is already
+shared (`POOL_ALL`, 14,203 against the ~5,000 each region filters out of it).
+What changed is that five things stopped reading the global and started taking
+the region as an argument, defaulting to the open binder so every existing
+caller is unaffected:
+
+- `bestMatch(cp,card,reg)` — the three matchers underneath it never read the
+  region at all, so only the branch in `bestMatch` needed it
+- `printingPairs(card,reg)`, and its cache is keyed by region as well as by
+  name, or one region's answer is handed back as the other's
+- `printSets(card,rar,reg)`, `printRars(card,set,reg)`, `printingsOf(card,reg)`
+- `ladderFor(reg)` / `rarIn(k,reg)` — `RARITIES` flips with the binder, so
+  `rarBy('NR')` in Asian-English answers "Legacy rarity (NR)" for a Normal Rare
+
+### The toggle, and what it greys out
+
+Of the searchable pool, **1,085 cards are Asian-English only** and **5,688 are
+OCG-JP only**; 4,705 are in both. So a dead half is the common case, not the
+edge one: the side a card was never printed on is disabled rather than absent,
+and a row opens on Asian-English unless the card has no AE printing or the
+device does not carry AE.
+
+### No price is not a price of nothing
+
+A printing no shop lists used to count as zero, which made the row read as
+worthless and quietly pulled the difference toward whichever side it sat on.
+That is the one figure this panel exists to produce, and it is far more common
+now that a row can be OCG-JP. `tradeUnit()` answers null, the row shows a dash,
+and the totals say how many could not be priced.
+
+### Trade done is switched off, and kept
+
+The button settles the trade into the binder. With rows able to name either
+region, settling could mean writing to the saved file that is **not** loaded -
+two stores, one of them absent - and a trade half-applied is worse than one not
+applied at all, which is the rule this panel was built on. `tradeShort()`,
+`tradeReserved()` and `applyTrade()` are left standing and the button is
+disabled, the same way Export and Copy-as-code wait in the Prices panel.
+
+### Both rates, when both currencies are in play
+
+A same-region trade prices both sides off one rate, so a stale rate moves both
+and the verdict holds. Across regions one side is yen and the other dollars.
+`refreshRate()` derives peso-per-dollar, per-HKD and per-yen from a **single**
+response, so the two can never drift apart by age - but they are rates against
+different currencies, so the gap between them is still real. And `fxManual`
+leaves the dollar rate hand-set while the yen rate keeps being refreshed, which
+is the one case where the two sides genuinely stop being comparable. The panel
+prints both rates and their age whenever a JP row is present, and says that
+outright when the dollar rate is your own.
+
 ## 13. Storage, and why entries are thin
 
 Binders live in **IndexedDB**, falling back to localStorage where it is not
