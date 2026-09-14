@@ -124,16 +124,36 @@ One authored moment, not scattered effects.
 --slow  220ms
 ```
 
-The world's own motion is a **playhead**: a band travelling down a score while
-the score holds still. So the **beat band** is the only thing that animates —
-it sweeps in from the left across the active row.
+The world’s own motion is a **playhead**: a band travelling down a score while
+the score holds still. The **beat band** sweeps in from the left across the
+active row.
+
+This section used to claim the band was the only thing that animates. An audit
+of the built result found otherwise: the band is a *transition*, and the only
+CSS **animation** running on a resting page is `foil` — a six-second loop on the
+six highest rarities. It is the shimmer on a Secret Rare, so it belongs to
+rarity’s channel rather than to the interface, which is why it survives a world
+that otherwise holds still.
+
+It animates `background-position`, which repaints rather than composites, so it
+is bounded: anything scrolled out of view is marked `.still` by an
+IntersectionObserver and stops. What you are looking at shimmers; nothing else
+costs a frame.
 
 **The rule that outranks the rest:** this is used one-handed in a shop, so
 nothing may delay a tap being answered. Every control inverts on `:active`
 with **no transition at all**. Motion is spent on telling you where you are,
 never on whether the button heard you.
 
-`prefers-reduced-motion` is honoured throughout.
+`prefers-reduced-motion` **takes the movement, not the feedback.** It used to be
+one global rule setting every duration to `.01ms`, which also removed the colour
+settling under a finger and the spinner saying the app is still working. Motion
+sensitivity is about things travelling across the screen.
+
+So page turns, view fades, the sliding pill, the leaf flip and the foil stop
+outright; colour and opacity keep their 120–220ms; and the two indicators that
+must keep saying something — the loading spinner and the indeterminate sync bar
+— get an alternative rather than silence. The bar fills instead of sliding.
 
 ## Components
 
@@ -168,7 +188,10 @@ card shop.
   **removed, not disabled**. A dead control is one you can still mis-tap.
 - The **row count is measured**, not guessed: a card is 1.458× as tall as it is
   wide, so the grid takes the rows that actually fit the window.
-- Every tap target is **44×44** minimum.
+- Every tap target is **44×44** minimum. Where the drawing is smaller than the
+  finger — the AE/JP switch, the info button — a centred `::after` of
+  `max(100%,44px)` carries the hit area without changing what is drawn. The
+  switch and the rail’s action buttons take the height directly.
 
 ## What this file is not
 

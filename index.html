@@ -637,7 +637,7 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 .pbar.nowt>i{background:var(--down)}
 .pbar.indet>i{width:35%;animation:slide 1.1s linear infinite}
 @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
-@media (prefers-reduced-motion:reduce){.pbar.indet>i{animation:none;width:100%;opacity:.4}}
+/* its reduced-motion alternative lives with the others, near the foot of this file */
 .pbar-line{display:flex;justify-content:space-between;gap:var(--sp-3);
   font-size:var(--fs-2xs);color:var(--faint);margin-top:6px}
 .sync-foot{display:flex;gap:6px;margin-top:var(--sp-4)}
@@ -866,6 +866,13 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
   /* two characters wide, so the generic segment padding triples them */
   #core-mult button{padding:0 9px;font-size:var(--fs-sm)}
   .rail-tog{min-width:44px;min-height:44px}
+  /* A switch draws a 21px track, which is the right size for the drawing and
+     half the size of a thumb. The control keeps its look and takes the
+     height a finger needs - measured at 22px tappable before this. */
+  .switch{min-height:44px}
+  /* except inside a setup card, where the whole card is already the target
+     and the switch is pointer-events:none decoration */
+  .wz-opt .switch{min-height:0}
   .cd>summary{min-height:44px}
   .infob{width:36px;height:36px;font-size:var(--fs-sm)}
   .inp{min-height:44px}          /* set, price and condition fields in the card panel */
@@ -984,9 +991,16 @@ body.compact .dash{padding:var(--sp-3) var(--sp-4)}
 .f-super{background:linear-gradient(120deg,#DCE6EF,#FFFFFF,#A8BFD4)}
 .f-ultra{background:linear-gradient(120deg,#E0A82A,#FFF3B0,#B57C05)}
 .f-ultimate{background:linear-gradient(120deg,#C97A2E,#FFD9A0,#9A5312)}
+/* ---- the one loop in the file, and it pays rent ----
+   Six rarities shimmer. It animates background-position, which repaints
+   rather than composites, and it never stops on its own - so on a list of a
+   hundred rows it was repainting chips scrolled far out of sight. The
+   IntersectionObserver in the script adds .still to anything off-screen;
+   what you are looking at still shimmers, and nothing else costs a frame. */
 .f-secret,.f-exsecret,.f-collector,.f-qcsr,.f-prismatic,.f-holo{
   background:linear-gradient(115deg,#FF8FC0,#6FD1F5,#7DF0A4,#FFEE80,#C87DF5,#FF8FC0);
   background-size:340% 340%;animation:foil 6s linear infinite}
+.still{animation-play-state:paused!important}
 .f-exsecret{background:linear-gradient(115deg,#B98CFF,#FFFFFF,#7ED8FF,#E79BFF,#B98CFF);background-size:300% 300%}
 .f-qcsr{background:linear-gradient(115deg,#FFE07A,#FFFFFF,#8FD8FF,#FFA8DC,#FFE07A);background-size:300% 300%}
 .f-collector{background:linear-gradient(115deg,#5FE0C8,#FFFFFF,#FFD86B,#7FB4FF,#5FE0C8);background-size:300% 300%}
@@ -2105,15 +2119,18 @@ html.sp-on{overflow:hidden}
    A drawer holds secondary navigation. What sat here was four identical
    buttons for two different jobs, so nothing said which to reach for.  */
 .acts-grp{display:flex;flex-direction:column;gap:6px;margin-top:var(--sp-3)}
-.acts-grp h3{font-size:var(--fs-3xs);font-weight:500;letter-spacing:.16em;
+/* These were h3 under an h1, with the Key panel's h2 after them - so a screen
+   reader heard the outline jump a level and then go back up. They are
+   siblings of Key, so they are h2 like it; the size stays theirs. */
+.acts-grp h2{font-size:var(--fs-3xs);font-weight:500;letter-spacing:.16em;
   text-transform:uppercase;color:var(--faint);margin:0 0 2px;
   display:flex;align-items:center;gap:8px}
-.acts-grp h3::after{content:'';flex:1;height:1px;background:var(--line-soft)}
+.acts-grp h2::after{content:'';flex:1;height:1px;background:var(--line-soft)}
 /* Both groups get the same room. The difference between them is weight, not
    size - a secondary action is still a real control and must not read as a
    disabled one. */
 .acts-grp .btn{width:100%;justify-content:flex-start;text-align:left;
-  min-height:42px;padding:9px 12px}
+  min-height:44px;padding:9px 12px}
 /* what you press mid-deal */
 .act-primary{border-color:var(--text);color:var(--text);font-weight:500}
 .act-primary:hover{background:var(--text);color:var(--on-accent)}
@@ -2253,8 +2270,30 @@ html.sp-on{overflow:hidden}
 .vfade{animation:vfade var(--slow) var(--ease)}
 @keyframes vfade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 
-@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}
-  .crow::before,.trow::before,.ditem::before{transform:none}}
+/* ---- reduced motion takes the movement, not the feedback ----
+   This was one global rule setting every duration to .01ms, which is the
+   blunt version: it removes the page turn and the sliding pill, and it also
+   removes the colour settling under your finger and the spinner that says
+   the app is still working. Motion sensitivity is about things travelling
+   across the screen, not about a control acknowledging a press.
+
+   So movement stops and everything that merely changes colour or opacity
+   keeps its 120-220ms - and the two places that need to keep saying
+   something, the loading spinner and the sync bar, get an alternative
+   rather than silence. */
+@media (prefers-reduced-motion:reduce){
+  /* things that travel */
+  .vfade,.page.tl,.page.tr,.bm-leaf{animation:none}
+  .tabs::before{transition:opacity .2s ease}      /* the pill appears where it lands */
+  .track::after{transition:background .22s ease}  /* the knob jumps, the colour still settles */
+  .pocket .glare,#rtip,#bm-chrome,.shell,.shell>.rail{transition:none}
+  .crow::before,.trow::before,.ditem::before{transform:none}
+  /* the shimmer is decoration and stops outright - a still foil is still a foil */
+  .f-secret,.f-exsecret,.f-collector,.f-qcsr,.f-prismatic,.f-holo{animation:none}
+  /* and the two that have to keep talking: a bar with no motion and no number
+     says nothing at all, so it fills instead of sliding */
+  .pbar.indet>i{animation:none;width:100%;opacity:.45}
+}
 </style>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="./icon.svg">
@@ -2411,12 +2450,12 @@ provenance
            month. Primary and secondary now look different, which is the
            whole job of a sidebar group. -->
       <div class="acts-grp" id="grp-table" role="group" aria-label="While you are dealing">
-        <h3>At the table</h3>
+        <h2>At the table</h2>
         <button class="btn btn-sm act-primary" id="open-deals">Deals</button>
         <button class="btn btn-sm act-primary" id="open-trade">Trade calculator</button>
       </div>
       <div class="acts-grp" role="group" aria-label="Managing the binder">
-        <h3>Manage</h3>
+        <h2>Manage</h2>
         <button class="btn btn-sm act-quiet" id="open-paste">Paste a list</button>
         <button class="btn btn-sm act-quiet" id="open-settings">Settings</button>
       </div>
@@ -2469,7 +2508,7 @@ provenance
           <span class="count" id="count"></span>
           <span id="load-slot"></span>
         </div>
-        <div class="tabs" id="view-tabs">
+        <div class="tabs" id="view-tabs" role="navigation" aria-label="Binder, Sets and Cores">
           <button data-v="binder" class="on" title="Binder"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.2"/><rect x="4.2" y="2" width="1.5" height="12" fill="#141008"/></svg><span class="tl">Binder</span></button>
           <button data-v="sets" title="Sets"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1.6" width="10" height="10" rx="2" opacity=".45"/><rect x="5" y="4.4" width="10" height="10" rx="2"/></svg><span class="tl">Sets</span></button>
           <button data-v="cores" title="Cores"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.1" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="2.5"/></svg><span class="tl">Cores</span></button>
@@ -4335,6 +4374,7 @@ function renderBinder(dir){
      even if no resize event ever reached us.                                 */
   autoLayout(true);
   placePiles();
+  foilSoon();
   writeUrl();
   const list=visible();
   const pages=Math.max(1,Math.ceil(list.length/PER));
@@ -6279,6 +6319,30 @@ function slideTabs(box){
   box.style.setProperty('--tx',on.offsetLeft+'px');
   box.style.setProperty('--ty',on.offsetTop+'px');
   box.style.setProperty('--to','1');
+}
+/* ---- the shimmer only runs where it can be seen ----
+   Six rarities carry a foil gradient that loops for ever. It animates
+   background-position, which repaints rather than composites, so every chip
+   costs a frame whether or not it is on screen - and a list of a hundred rows
+   holds a hundred of them. DESIGN.md says the beat band is the only thing
+   that animates; the foil is what actually does, so it had better be cheap.
+
+   Anything scrolled out of view gets .still and stops. What you are looking
+   at shimmers exactly as before. Observed after each paint of the grid, and
+   the observer is rebuilt rather than accumulated because the rows it was
+   watching are thrown away on every render.                             */
+let FOIL_IO=null,FOIL_T=null;
+/* renderBinder has five exits; this is scheduled from its top so every one of
+   them is covered, and coalesced so a burst of renders observes once. */
+const foilSoon=()=>{clearTimeout(FOIL_T);FOIL_T=setTimeout(watchFoil,0);};
+const FOIL_SEL='.f-secret,.f-exsecret,.f-collector,.f-qcsr,.f-prismatic,.f-holo';
+function watchFoil(){
+  if(!window.IntersectionObserver)return;          /* it simply keeps shimmering */
+  if(FOIL_IO)FOIL_IO.disconnect();
+  FOIL_IO=new IntersectionObserver(es=>{
+    es.forEach(e=>e.target.classList.toggle('still',!e.isIntersecting));
+  },{rootMargin:'120px'});                          /* start before it arrives */
+  document.querySelectorAll(FOIL_SEL).forEach(el=>FOIL_IO.observe(el));
 }
 const slideAllTabs=()=>document.querySelectorAll('.tabs').forEach(slideTabs);
 /* The sidebar button is the only way in and out of the Deals board, so it has
