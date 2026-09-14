@@ -4607,7 +4607,15 @@ function dealCard(d,closed){
       '<span class="dq">×'+n+'</span>'+
       '<b>'+esc(peso((+it.price||0)*n))+'</b></label>';
   }).join('');
-  const when=new Date(closed?(d.closed||d.created):d.created).toISOString().slice(0,10);
+  /* ---- a deal with no usable date must not take the board down ----
+     addDeal() always stamps created, but deals travel: they ride in the sync
+     payload and they pass through migrate() untouched, so one written by an
+     older build, or half-written, can reach here without one. new Date of
+     undefined throws on toISOString - and it throws inside the row renderer,
+     which loses the whole board rather than the one row that is wrong. */
+  const stamp=closed?(d.closed||d.created):d.created;
+  const dt=new Date(+stamp||NaN);
+  const when=isFinite(dt.getTime())?dt.toISOString().slice(0,10):'no date';
   wrap.innerHTML=
     '<div class="dhead"><span class="dwho">'+esc(d.who)+'</span>'+
     '<span class="dstat '+d.status+'">'+d.status+'</span>'+

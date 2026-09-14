@@ -352,6 +352,18 @@ two rows of one printing listed at two prices stay two listings instead of
 merging into one. A deal closed before this shipped has no `it.from` and falls
 back to the old behaviour, which is the best that can be known about it.
 
+### One bad date must not take the board down
+
+`addDeal()` always stamps `created`, so every deal this app makes has one. But
+deals **travel**: they ride in the sync payload between devices, and `migrate()`
+does not touch them at all, so a deal written by an older build - or half
+written - can reach the board without a usable date.
+
+`new Date(undefined).toISOString()` throws, and it threw **inside the row
+renderer** - which loses the whole deals board, not the one row that is wrong.
+The date is now parsed defensively and a deal that has no usable one says
+`no date` and renders like any other.
+
 ## 11. OCG-JP, the second region
 
 The app holds two collections that share nothing but a card pool. The switch
