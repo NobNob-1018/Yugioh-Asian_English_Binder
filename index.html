@@ -247,20 +247,9 @@ button{cursor:pointer;background:none;border:none}
 .pilebar{display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
   width:100%;order:0;margin-top:2px}
 .pilebar[hidden]{display:none}
-/* ---- which cards on the left, how to look at them on the right ----
-   One row where there is room for one. The tab strip must not shrink below
-   its own labels: .tabs positions its sliding pill by measuring the chosen
-   button, so a squeezed strip does not merely get narrow, it overlaps
-   itself - "Collection" printed through "Wishlist". It holds its width and
-   the row wraps instead, which at 375px is the honest answer. */
-.pilebar #binder-tabs{margin-top:0!important;flex:0 0 auto;min-width:0}
+.pilebar #binder-tabs{margin-top:0!important;flex:1 1 auto;min-width:0}
 .pilebar .switch{flex:0 0 auto;gap:7px}
 .pilebar .switch .lbl{font-size:var(--fs-2xs)}
-/* Two groups on one row, not three peers: the piles and Show owned answer
-   "which cards", the lens answers "how to look at them". A hairline says so
-   - the staff ruling a column, which is how this design separates anything. */
-.pilebar #view-tabs{margin-left:auto;flex:0 0 auto;
-  padding-left:var(--sp-3);border-left:1px solid var(--line-soft)}
 @media (max-width:420px){
   .pilebar{gap:var(--sp-2)}
   .pilebar #binder-tabs button{padding:0 9px}
@@ -6330,11 +6319,11 @@ function applyRail(){
     b.title=hidden?'Show the sidebar':'Hide the sidebar';
     b.setAttribute('aria-label',b.title);
     b.setAttribute('aria-expanded',String(!hidden));
-    /* The row carried the handle and the owned switch. The switch now lives
-       in the bar at every width, so this row is the handle alone - and with
-       the handle gone too it is an empty box holding a gap open. */
+    /* The row exists to carry the handle and the owned switch. On a phone
+       the switch has moved up into the toolbar, so with the handle gone as
+       well the row is an empty box holding a gap open. */
     const row=b.closest('.switch-row');
-    if(row)row.hidden=!side;
+    if(row)row.hidden=!side&&!row.querySelector('.switch');
   }
 }
 /* Measure the chosen option and hand its width and offset to the pill. Called
@@ -21524,6 +21513,7 @@ document.querySelectorAll('#view-tabs button').forEach(b=>{
    control at all - so both move up beside the filters and go back when there
    is room again. Moved rather than duplicated, so there is still one of
    each and nothing can fall out of step.                              */
+let RAIL_HOME=null;
 const RAIL_STACKED=matchMedia('(max-width:920px)');
 /* placePiles moves the switch, applyRail decides whether the handle beside it
    is offered at all - and applyRail reads where the switch ended up, so it
@@ -21545,21 +21535,6 @@ function paintPilebar(){
   if(!slot)return;
   slot.hidden=![...slot.children].some(c=>!c.hidden);
 }
-/* ---- the piles and the lens are one question, so they are one row ----
-   This used to shuttle the pile tabs and Show owned between the rail and the
-   bar depending on width, which meant two homes, a saved RAIL_HOME to get
-   back to, and a control that was in a different place depending on how wide
-   your window happened to be.
-
-   It also drew the piles and the view tabs as two unrelated strips, 200px
-   apart, when the code has always known better: Sets and Cores are scoped to
-   the pile you are standing in. The pile is the spine and the view is a lens
-   on it. Two sibling tab strips said they were peers.
-
-   So there is one home at every width - the bar - and one row: which cards
-   on the left, how to look at them on the right. The rail keeps the things
-   that are actually actions. Only the label still answers to width, because
-   354px has no room for a word that is doing nothing.                    */
 function placePiles(){
   const slot=document.getElementById('pilebar');
   const tabs=document.getElementById('binder-tabs');
@@ -21568,31 +21543,35 @@ function placePiles(){
   const box=document.getElementById('owned-only');
   const owned=box?box.closest('.switch'):null;
   if(!slot||!tabs||!owned)return;
-  if(tabs.parentNode!==slot){
+  if(!RAIL_HOME)RAIL_HOME={tabs:tabs.parentNode,owned:owned.parentNode};
+  /* the same query the stylesheet uses to stack the rail, so the two can
+     never disagree - and unlike innerWidth it is never reported as zero */
+  const narrow=RAIL_STACKED.matches;
+  const moved=tabs.parentNode===slot;
+  if(narrow===moved)return;                 /* already where it should be */
+  const lbl=owned.querySelector('.lbl');
+  if(lbl&&!lbl.dataset.full)lbl.dataset.full=lbl.textContent;
+  if(narrow){
+    /* ---- it scopes what is below it, so it sits with the other thing that does ----
+       This was sent to the bottom of the filter sheet, on the grounds that it
+       is a filter. It is, but it is not the same kind: sort and rarity narrow
+       a list, this one decides whether you are looking at your cards or at
+       every card there is - the same class of question as which pile. Seventh
+       of seven behind a button is where a control goes to be forgotten, and
+       you have to open the sheet to find out which way it is set.
+
+       On the pile row it answers both at a glance. "Show owned" is shortened
+       because the row is 354px wide and the word Show is doing nothing.  */
     slot.appendChild(tabs);
     slot.appendChild(owned);
+    if(lbl)lbl.textContent='Owned';
+    paintPilebar();
+  }else{
+    if(lbl)lbl.textContent=lbl.dataset.full;
+    RAIL_HOME.owned.insertBefore(owned,RAIL_HOME.owned.firstChild);
+    RAIL_HOME.tabs.insertBefore(tabs,document.getElementById('legacy-row'));
+    slot.hidden=true;
   }
-  /* ---- the lens joins the pile row only where both fit ----
-     A .tabs strip does not degrade gracefully: its buttons share the width
-     and its sliding pill is positioned by measuring the chosen one, so a
-     strip narrower than its labels prints "Collection" through "Wishlist"
-     rather than merely looking cramped. At 375px the three groups want
-     about 440px between them. So they share a row from 920px up, where the
-     merge is a real saving, and below that the lens keeps the line it
-     already had - which is what that width was doing anyway. */
-  const lens=document.getElementById('view-tabs');
-  if(lens){
-    const wide=!RAIL_STACKED.matches;
-    if(wide&&lens.parentNode!==slot)slot.appendChild(lens);
-    else if(!wide&&lens.parentNode===slot)slot.parentNode.insertBefore(lens,slot);
-  }
-  const lbl=owned.querySelector('.lbl');
-  if(lbl){
-    if(!lbl.dataset.full)lbl.dataset.full=lbl.textContent;
-    const want=RAIL_STACKED.matches?'Owned':lbl.dataset.full;
-    if(lbl.textContent!==want)lbl.textContent=want;
-  }
-  paintPilebar();
   slideAllTabs();
 }
 /* Re-flow whenever the window changes shape, keeping your place in the binder.
