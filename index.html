@@ -181,12 +181,18 @@ button{cursor:pointer;background:none;border:none}
 .f-millennium{--hi:#d8b24a}
 .f-gold{--hi:#e0bc63}
 .f-par{--hi:#cbd6ea}
-.mark{display:flex;align-items:baseline;gap:9px;margin-right:auto;min-width:0}
+/* ---- the search sits in the middle of the strip ----
+   It used to be pushed right by an auto margin on the wordmark and then
+   pulled back by whatever the action buttons happened to weigh, so it
+   drifted sideways every time a button appeared or left - and two of them
+   just left. The two end zones take equal shares of the slack instead, so
+   the box is centred on the strip and stays centred whatever flanks it. */
+.mark{display:flex;align-items:baseline;gap:9px;flex:1 1 0;min-width:0}
 .mark h1{font-family:var(--display);font-weight:800;letter-spacing:-.01em;font-size:var(--fs-xl);letter-spacing:.02em;margin:0;white-space:nowrap}
 .mark span{font-family:var(--mono);font-size:var(--fs-2xs);color:var(--faint);letter-spacing:.1em;white-space:nowrap}
 .stats{display:flex;gap:14px;font-family:var(--mono);font-size:var(--fs-xs);color:var(--muted)}
 .stats b{color:var(--accent);font-weight:500}
-.acts{display:flex;gap:5px;align-items:center}
+.acts{display:flex;gap:5px;align-items:center;flex:1 1 0;justify-content:flex-end}
 /* Every control on this row is the same height, radius and border weight, so
    the group reads as one set rather than four different widgets. */
 .acts>*{align-self:center}
@@ -255,6 +261,11 @@ button{cursor:pointer;background:none;border:none}
   .pilebar #binder-tabs button{padding:0 9px}
 }
 .toolset{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:28px}
+/* The owned switch lives here on a desktop now. It keeps its 44px of hit
+   area without stretching the row, and must not be squeezed by the menus
+   beside it - a half-width switch track reads as a broken control. */
+.toolset>.switch{flex:0 0 auto;gap:7px;min-height:28px}
+.toolset>.switch .lbl{font-size:var(--fs-2xs);white-space:nowrap}
 .toolset .gone{visibility:hidden;pointer-events:none}
 /* Only the phone sheet stacks these into a list that needs naming; on the
    bar the controls sit in a row where a label above each one would be four
@@ -2076,7 +2087,7 @@ html.sp-on{overflow:hidden}
    It is also not a text field any more: it opens the panel, so it reads as
    a button and cannot take a caret it would only lose a moment later. */
 .hdr-search{position:relative;display:flex;align-items:center;
-  flex:1 1 300px;max-width:460px;min-width:0;margin:0 var(--sp-4);cursor:text}
+  flex:0 1 460px;max-width:460px;min-width:0;margin:0 var(--sp-4);cursor:text}
 .hdr-search .mag{position:absolute;left:2px;width:14px;height:14px;
   color:var(--faint);pointer-events:none;transition:color var(--fast) var(--ease)}
 .hdr-search:hover .mag{color:var(--text)}
@@ -5038,7 +5049,7 @@ function paintDash(){
            of it that is true on day one. -->
       <div class="mv-top">
         ${quiet?'':`<div class="cap">${wo?'Your list':'Since last session'}${MVS.length?` <span class="mv-more">${MVS.length} moved</span>`:''}</div>`}
-        <div class="sync-line" title="Everything that comes over the network">${esc(syncStatus())}</div>
+        <div class="sync-line">${esc(syncStatus())}</div>
       </div>
       ${quiet?'':`<div class="mv-list">${moveRows}</div>`}
       ${footer}
@@ -6143,6 +6154,12 @@ function openSettings(){
        holding a permanent 68px in the header beside Sync, which is weekly.
        Two buttons the same size, a thumb apart, one of them used fifty
        times as often as the other. It sits with the housekeeping now. */
+    /* Where Price options went when it left the Sync sheet. It is the only
+       way to type your own rate or bring a .json in, so it keeps a door. */
+    '<div class="set-row"><div><div class="set-lbl">Prices and the rate</div>'+
+    '<div class="set-hint">Type your own pesos-per-dollar, choose the currency the '+
+    'shop list is in, or bring a price file in.</div></div>'+
+    '<button class="btn btn-sm" id="set-prices">Price options</button></div>'+
     '<div class="set-row"><div><div class="set-lbl">Move to another device</div>'+
     '<div class="set-hint">Sends the whole binder across, or brings one in. '+
     'Nothing leaves the two devices.</div></div>'+
@@ -6283,6 +6300,8 @@ function openSettings(){
      has to re-do. */
   const tr=body.querySelector('#set-transfer');
   if(tr)tr.onclick=()=>{closeModal();openTransfer();};
+  const pp=body.querySelector('#set-prices');
+  if(pp)pp.onclick=()=>{closeModal();pricePanel();};
   const lg2=body.querySelector('#set-legacy');
   if(lg2)lg2.onchange=e=>{
     const src=document.getElementById('legacy-sets');
@@ -18094,8 +18113,13 @@ function openSync(){
       '<div class="pbar"><i></i></div>'+
       '<div class="pbar-line"><span id="sync-phase"></span><span id="sync-pc"></span></div>'+
     '</div>'+
+    /* Price options used to sit beside Sync now, and the panel behind it
+       opened with a second "Sync prices from TCG Corner" button - a sheet
+       about syncing, offering a door to another way of syncing. What is
+       actually behind it is the manual rate, the currency and the .json
+       import, none of which is a thing you do while a sync is running.
+       It opens from Settings instead. */
     '<div class="sync-foot">'+
-      '<button class="btn" id="sync-px">Price options</button>'+
       '<button class="btn btn-a" id="sync-go">Sync now</button>'+
     '</div>'+
     '<p class="hint">Whatever cannot be reached is left exactly as it is. The binder '+
@@ -18109,7 +18133,6 @@ function openSync(){
     go.disabled=!picks().length;
   });
   go.disabled=!picks().length;
-  body.querySelector('#sync-px').onclick=pricePanel;
   go.onclick=()=>runSync(picks(),body);
 }
 /* ---- one bar across the run ----
@@ -21648,9 +21671,24 @@ function placePiles(){
      never disagree - and unlike innerWidth it is never reported as zero */
   const narrow=RAIL_STACKED.matches;
   const moved=tabs.parentNode===slot;
-  if(narrow===moved)return;                 /* already where it should be */
   const lbl=owned.querySelector('.lbl');
   if(lbl&&!lbl.dataset.full)lbl.dataset.full=lbl.textContent;
+  /* ---- it belongs over the cards it is filtering ----
+     On a phone this already sat in the bar; on a desktop it sat at the top
+     of the sidebar, which is the one place you are not looking when you are
+     reading the grid it governs. It is in the bar at both widths now, with
+     the sort and rarity menus - the other two controls that decide what the
+     list below contains.
+
+     It does fit at 1180, which is the width this bar is tightest at. The
+     row does not wrap there by design: the caption and the menus give
+     ground and ellipse instead, which leaves the switch its 88px with the
+     pager still clear of the edge. The long label does not fit, so it
+     stays "Owned" at every width rather than changing with the window. */
+  const ts=document.getElementById('toolset');
+  if(lbl)lbl.textContent='Owned';
+  if(!narrow&&ts&&owned.parentNode!==ts)ts.insertBefore(owned,ts.firstChild);
+  if(narrow===moved)return;                 /* the tabs are already home */
   if(narrow){
     /* ---- it scopes what is below it, so it sits with the other thing that does ----
        This was sent to the bottom of the filter sheet, on the grounds that it
@@ -21664,11 +21702,8 @@ function placePiles(){
        because the row is 354px wide and the word Show is doing nothing.  */
     slot.appendChild(tabs);
     slot.appendChild(owned);
-    if(lbl)lbl.textContent='Owned';
     paintPilebar();
   }else{
-    if(lbl)lbl.textContent=lbl.dataset.full;
-    RAIL_HOME.owned.insertBefore(owned,RAIL_HOME.owned.firstChild);
     RAIL_HOME.tabs.insertBefore(tabs,document.getElementById('legacy-row'));
     slot.hidden=true;
   }
