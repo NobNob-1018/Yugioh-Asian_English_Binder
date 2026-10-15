@@ -1259,7 +1259,6 @@ body.bm #bm-exit{display:inline-flex;align-items:center;gap:6px;margin-left:var(
      three icon buttons — which then fit beside the title on one line.      */
   .acts{flex-wrap:nowrap;gap:6px;width:auto;margin-left:auto}
   .acts .hdr-sep{display:none}
-  #hdr-fx{display:none}
   .mark h1{font-size:var(--fs-lg)}
   .mark span{display:none}
   .mark .regsw{display:inline-flex}
@@ -2352,11 +2351,9 @@ provenance
       <kbd class="hdr-kbd" aria-hidden="true">/</kbd>
     </div>
     <div class="acts">
-      <span class="fxbox" id="hdr-fx"></span>
       <span id="hdr-px"></span>
       <span class="hdr-sep"></span>
       <button class="btn ico" id="do-sale" hidden title="Send your selling shelf as a link, or save it as a page"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="1.5" width="9" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="5.4" y="4.6" width="4.2" height="1.5" rx=".7"/><rect x="5.4" y="7.4" width="4.2" height="1.5" rx=".7"/></svg><span class="tl">Selling list</span></button>
-      <button class="btn ico" id="do-transfer" title="Move this binder to another device"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5.5h9M9 3l2.6 2.5L9 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 10.5h-9M7 8l-2.6 2.5L7 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="tl">Transfer</span></button>
       <input type="file" id="file-in" accept="application/json" hidden>
     </div>
   </div>
@@ -4560,7 +4557,7 @@ function renderList(grid,list,dk,bn){
   $('#jump').value=page+1;$('#of').textContent='/ '+pages.toLocaleString();
   $('#prev').disabled=page===0;$('#next').disabled=page>=pages-1;
   $('#page-tag').textContent=dk?dk.name:(bn?bn.name:'List');
-  $('#count').textContent=list.length.toLocaleString()+' cards \u00b7 '+peso(list.reduce((s,c)=>s+valueOf(c.id),0));
+  $('#count').textContent=list.length.toLocaleString()+' cards'+countValue(list.reduce((s,c)=>s+valueOf(c.id),0));
   paintBinders();
 }
 /* One line per set or core, for when the tiles are too much. Same data, same
@@ -4769,7 +4766,7 @@ function renderCores(grid){
     grid.appendChild(card);
   });
   $('#page-tag').textContent='Cores · '+pileName();
-  $('#count').textContent=groups.length+' core'+(groups.length===1?'':'s')+' \u00b7 '+peso(groups.reduce((s,g)=>s+g.value,0));
+  $('#count').textContent=groups.length+' core'+(groups.length===1?'':'s')+countValue(groups.reduce((s,g)=>s+g.value,0));
   $('#of').textContent='/ 1';$('#jump').value=1;
   $('#prev').disabled=true;$('#next').disabled=true;
   paintBinders();
@@ -4820,7 +4817,7 @@ function renderSets(grid,dk,bn){
   /* the region already reads in the header, so this names the pile instead -
      and it stops saying "Asian-English sets" while you are in OCG-JP */
   $('#page-tag').textContent='Sets · '+pileName();
-  $('#count').textContent=groups.length+' sets \u00b7 '+peso(groups.reduce((s,g)=>s+g.value,0));
+  $('#count').textContent=groups.length+' set'+(groups.length===1?'':'s')+countValue(groups.reduce((s,g)=>s+g.value,0));
   $('#of').textContent='/ 1';$('#jump').value=1;
   $('#prev').disabled=true;$('#next').disabled=true;
   paintBinders();
@@ -4843,15 +4840,13 @@ function editSet(code,name,target){
 /* Rate and the price-sync pill live in the header strip beside Export, rather
    than eating two tiles of the dashboard.                                   */
 function paintTopTools(){
-  const fxb=$('#hdr-fx'),pxb=$('#hdr-px');
-  /* The refresh arrow beside the rate fetched exactly what the Exchange rate
-     row in the Sync sheet fetches, a thumb away from the button that opens
-     it. The box keeps the figure and keeps letting you type your own; going
-     back to the live one is Sync's job, and that is now the one place that
-     says when it last landed. */
-  if(fxb)fxb.innerHTML='\u20B1 per $ <input id="fx" value="'+fx()+'" inputmode="decimal" title="'+
-    esc(DB.fxManual?'Your own rate \u2014 Sync replaces it with the live one'
-                   :'Live rate'+(DB.fxAt?' \u00b7 '+fxAgo():''))+'">';
+  const pxb=$('#hdr-px');
+  /* The rate box that used to sit here is gone. It was the third place the
+     same number could be set - the price panel has the field, Sync has the
+     fetch - and the widest thing on the strip at 100px, for a figure you
+     glance at rather than operate. The figure moved into syncStatus, which
+     the dashboard already prints; typing your own is the price panel's job,
+     reached from Sync. */
   /* ---- one button ----
      There were two: a pill that synced all three at once with no way to say
      otherwise, and a caret beside it that opened a panel holding a second,
@@ -4860,8 +4855,6 @@ function paintTopTools(){
      one opens a sheet that asks what to fetch and then shows it arriving. */
   if(pxb)pxb.innerHTML='<button class="btn btn-sm pxpill '+(pxFresh()?'fresh':'stale')+
     '" id="px-sync" title="'+esc(syncStatus())+'"><i class="dot"></i>Sync</button>';
-  const fxi=$('#fx');
-  if(fxi)fxi.onchange=()=>{DB.fx=Math.max(1,+fxi.value||58);DB.fxManual=true;save();paintTopTools();renderBinder();};
   const ps=$('#px-sync');
   if(ps)ps.onclick=openSync;
 }
@@ -4915,6 +4908,16 @@ function paintDash(){
   const keep=binderValue('b-main'), sell=binderValue('b-sell');
   const selling=F.binder==='b-sell';
   const val=wo?wt.now:(selling?sell:keep);
+  /* ---- the headline already said it ----
+     The bar under the dashboard printed the same total a second time, about
+     90px below the first one: "COLLECTION VALUE P4,935" and then "45 cards
+     - P4,935". Two readings of one number, and the eye checks both before
+     it believes either. The second is worth having only when a filter has
+     narrowed the list to something smaller than the headline counts, which
+     is exactly when the two numbers differ - so that is when it prints.
+     Kept as the last value the dashboard drew rather than recomputed,
+     because paintDash always runs before the bar it is being compared
+     with. */
   const h=DB.history||[];
   const prev=h.length>1?h[h.length-2].v:null;
   const diff=prev==null?null:totalValue()-prev;
@@ -5046,6 +5049,7 @@ function paintDash(){
   });
   const big=d.querySelector('.big');
   if(big)rollTo(big,'headline:'+(wo?'want':F.binder),val,peso);
+  DASH_VAL=val;
   paintTopTools();
   /* The re-fit that used to live here, on a frame callback, is gone: it did
      the same job as the settle at the end of renderBinder and did it less
@@ -5053,6 +5057,15 @@ function paintDash(){
      dashboard, and at 1600x778 it simply never ran. One mechanism, in the
      place that cannot be raced. */
 }
+/* The number the dashboard headline is currently showing, so the bar below
+   can tell whether it would be repeating it. */
+let DASH_VAL=null;
+/* Prints the list's own total only when it is not the one already up in the
+   headline. Rounded before comparing: both are drawn through peso(), which
+   rounds, so two values a fraction of a centavo apart print identically and
+   would otherwise both be shown. */
+const countValue=sum=>
+  (DASH_VAL!=null&&Math.round(sum)===Math.round(DASH_VAL))?'':' · '+peso(sum);
 let FITTING=false,SETTLE=0;
 /* The sidebar folds away so the cards get the full width. Remembered in the
    collection file, so it stays how you left it next time.                  */
@@ -6125,7 +6138,15 @@ function openSettings(){
     '<input class="inp set-in" id="set-contact" placeholder="e.g. m.me/yourname"></div>'+
     '<div class="set-foot">'+
     '<button class="btn btn-sm" id="set-binder">View as a binder</button>'+
-    '<span class="set-hint" id="set-binder-note"></span></div>';
+    '<span class="set-hint" id="set-binder-note"></span></div>'+
+    /* Moving a binder to another device is a once-a-year job, and it was
+       holding a permanent 68px in the header beside Sync, which is weekly.
+       Two buttons the same size, a thumb apart, one of them used fifty
+       times as often as the other. It sits with the housekeeping now. */
+    '<div class="set-row"><div><div class="set-lbl">Move to another device</div>'+
+    '<div class="set-hint">Sends the whole binder across, or brings one in. '+
+    'Nothing leaves the two devices.</div></div>'+
+    '<button class="btn btn-sm" id="set-transfer">Transfer</button></div>';
   /* Where the binder actually lives, and whether the browser has agreed to
      keep it. Worth showing: it is the difference between a collection that
      survives a low-disk moment and one that does not.                   */
@@ -6260,6 +6281,8 @@ function openSettings(){
   /* Drives the rail's hidden checkbox rather than DB.legacy directly, so
      there is still exactly one handler that knows what switching this on
      has to re-do. */
+  const tr=body.querySelector('#set-transfer');
+  if(tr)tr.onclick=()=>{closeModal();openTransfer();};
   const lg2=body.querySelector('#set-legacy');
   if(lg2)lg2.onchange=e=>{
     const src=document.getElementById('legacy-sets');
@@ -18017,7 +18040,12 @@ function syncStatus(){
   return [
     'Cards '+ago(POOL_AT),
     'Prices '+(!PX_ROWS.length?'none':!isFinite(a)?'no date':a===0?'today':a===1?'yesterday':a+'d ago'),
-    'Rate '+(DB.fxManual?'yours':ago(DB.fxAt))
+    /* The figure itself, not just its age. It used to live in a box in the
+       header - a third way to see a number that the price panel already
+       edits and Sync already fetches - and that box was the widest thing
+       on the strip, at 100px, for something you read rather than press.
+       It reads here instead, beside the other money and the other ages. */
+    'Rate '+fx()+' '+(DB.fxManual?'(yours)':ago(DB.fxAt))
   ].join(' · ');
 }
 /* ---- what to fetch, and how far along it is ----
@@ -21719,7 +21747,6 @@ $('#bb-keep').onclick=()=>bulkMove('b-main');
 $('#bb-want').onclick=bulkWant;
 $('#bb-none').onclick=()=>setSelMode(false);
 $('#do-sale').onclick=doSaleList;
-$('#do-transfer').onclick=openTransfer;
 $('#file-in').onchange=e=>{if(e.target.files[0]){doImport(e.target.files[0]);closeModal();}e.target.value='';};
 
 /* ---- working without a signal ----
