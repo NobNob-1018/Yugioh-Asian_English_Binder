@@ -1880,6 +1880,13 @@ html.sp-on{overflow:hidden}
 .sp-ref .inp{flex:0 1 138px;min-width:0;height:32px;font-size:var(--fs-xs);
   background:transparent;border:1px solid var(--line-soft);color:var(--muted)}
 .sp-ref .inp:hover,.sp-ref .inp:focus{border-color:var(--text);color:var(--text)}
+/* The collapsed legend and the info button share one line: both are things
+   you open when you want them, neither earns a row of its own. */
+.ref-row{display:flex;align-items:flex-start;gap:8px}
+.ref-row>.sub-filters{flex:1 1 auto;min-width:0}
+.ref-row>.infob{flex:0 0 auto}
+.sp-cap{font-size:var(--fs-3xs);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--faint);flex:0 0 auto;margin-right:2px}
 .sp-chk{display:inline-flex;align-items:center;gap:7px;font-size:var(--fs-xs);
   color:var(--muted);min-height:32px;cursor:pointer}
 .sp-chk:hover{color:var(--text)}
@@ -2376,9 +2383,20 @@ provenance
     </button>
     <button type="button" class="btn btn-sm sp-x" id="sp-close" aria-label="Close search"><span aria-hidden="true">&times;</span> Close <kbd>Esc</kbd></button>
   </div>
+  <!-- ---- these three belong to the search, not to the binder ----
+       The binder has its own rarity menu and its own Show owned switch, and
+       these read as the same two controls because the words are the same.
+       They are not: the binder's narrow what you are looking at, these
+       narrow one search over the whole pool, and they are forgotten the
+       moment the panel closes. Two of them already behaved that way and
+       said nothing about it, which is how "Show owned" could be on while
+       "Only cards I own" was off, both on screen, both apparently about
+       the same thing. The caption is the cheapest way to say which is
+       which, and it says it once for all three. -->
   <div class="sp-ref" id="sp-ref">
-    <select class="inp" id="sp-cat" aria-label="Category"><option value="">Any type</option><option>Monster</option><option>Spell</option><option>Trap</option></select>
-    <select class="inp" id="sp-rar" aria-label="Rarity"></select>
+    <span class="sp-cap">Narrow this search</span>
+    <select class="inp" id="sp-cat" aria-label="Narrow this search by category"><option value="">Any type</option><option>Monster</option><option>Spell</option><option>Trap</option></select>
+    <select class="inp" id="sp-rar" aria-label="Narrow this search by rarity"></select>
     <label class="sp-chk"><input type="checkbox" id="sp-owned"> Only cards I own</label>
     <button type="button" class="btn btn-sm act-quiet" id="sp-reset">Reset</button>
   </div>
@@ -2439,7 +2457,19 @@ provenance
         <button data-b="b-sell">Selling</button>
         <button data-b="b-want">Wishlist</button>
       </div>
-      <label class="switch" id="legacy-row" style="margin-top:9px">
+      <!-- ---- a once-a-year switch does not earn a permanent 44px ----
+           This decides whether the Sets board shows pre-2018 Asian-English
+           sets. It is a thing you settle once and then never touch, and it
+           was sitting above Deals, in the column you reach into while a
+           buyer waits. It lives in Settings now, with the other decisions
+           of its kind.
+
+           The element stays here, permanently hidden, because placePiles
+           uses it as the anchor it puts the pile tabs back in front of, and
+           because applyPiles and the paste importer address it by id. The
+           Settings control drives the same checkbox, so there is still only
+           one of it. -->
+      <label class="switch" id="legacy-row" hidden>
         <input type="checkbox" id="legacy-sets">
         <span class="track"></span>
         <span class="lbl">Include pre-2018 sets</span>
@@ -2459,14 +2489,21 @@ provenance
         <button class="btn btn-sm act-quiet" id="open-paste">Paste a list</button>
         <button class="btn btn-sm act-quiet" id="open-settings">Settings</button>
       </div>
-      <p class="hint hint-row">
-        <span>Two binders, kept separate.</span>
-        <button class="infob" id="i-binders" aria-label="What these switches do" title="What these switches do">i</button>
-      </p>
     </section>
 
     <section class="grp">
-      <h2>Key</h2>
+      <!-- ---- the reference matter, together and out of the way ----
+           This was an h2 reading "Key" above a collapsed "How to read this",
+           and above that a sentence saying "Two binders, kept separate."
+           beside an i button. Three stacked lines of explanation, pinned
+           open in a column you reach into mid-deal, for an app with one
+           user who wrote the notation himself.
+
+           The heading went - the summary underneath it already says what
+           the thing is - and the i joined it on the same line. The sentence
+           went entirely; the panel behind the i still explains the piles,
+           which is where that belonged. -->
+      <div class="ref-row">
       <!-- ---- retired ----
            Category, sub-type, attribute, type, level and scale were a second
            filtering system living behind the results they filtered, and with
@@ -2493,6 +2530,8 @@ provenance
           <div class="lg-h">Rarities</div>
           <div id="rkey-list"></div>
         </details>
+      </div>
+        <button class="infob" id="i-binders" aria-label="What these switches do" title="What these switches do">i</button>
       </div>
     </section>
 
@@ -3849,9 +3888,15 @@ async function setRegion(r){
 /* The pre-2018 switch exists because Asian-English runs back to 2004 and the
    shops stock almost none of it. OCG-JP was cut at 2013 on purpose, so there
    is nothing behind the switch there and it only invites a pointless click. */
+/* The rail copy is hidden for good now - the control lives in Settings - but
+   the node stays as placePiles' anchor, so this keeps the Settings row in
+   step with the region instead: pre-2018 is an Asian-English question and
+   OCG-JP has nothing to say about it. */
 function paintLegacySwitch(){
   const row=document.getElementById('legacy-row');
-  if(row)row.hidden=ocgOn();
+  if(row)row.hidden=true;
+  const s=document.getElementById('set-legacy-row');
+  if(s)s.hidden=ocgOn();
 }
 /* The switch is the whole surface: hide it and the region it is not on stops
    existing as far as this device is concerned. */
@@ -6051,6 +6096,16 @@ function openSettings(){
       '<span class="lbl">'+esc(p.name)+
       '<span class="pile-n" data-n="'+esc(p.id)+'"></span></span></label>').join('')+
     '</div></div>'+
+    /* Moved out of the sidebar, where a switch you set once a year was
+       holding 44px above the buttons you reach for mid-deal. */
+    '<div class="set-row" id="set-legacy-row"'+(ocgOn()?' hidden':'')+'>'+
+    '<div><div class="set-lbl">Include pre-2018 sets</div>'+
+    '<div class="set-hint">The Sets board lists Asian-English sets from 2018 on. '+
+    'Switch this on to see the older ones too.</div></div>'+
+    '<div class="pile-switches">'+
+    '<label class="switch"><input type="checkbox" id="set-legacy"'+(DB.legacy?' checked':'')+'>'+
+    '<span class="track"></span><span class="lbl">Show them</span></label>'+
+    '</div></div>'+
     /* The same question the setup asks, in the same shape as the piles above
        it, because it does the same kind of thing: it takes a whole half of
        the app away. */
@@ -6202,6 +6257,16 @@ function openSettings(){
   pick('set-theme',v=>{DB.theme=v;applyTheme();savePrefs();});
   pick('set-density',v=>{setDensity(v);autoLayout(true);renderBinder();savePrefs();});
   if($('#set-spread'))pick('set-spread',v=>{DB.spread=(v==='on');autoLayout(true);renderBinder();savePrefs();});
+  /* Drives the rail's hidden checkbox rather than DB.legacy directly, so
+     there is still exactly one handler that knows what switching this on
+     has to re-do. */
+  const lg2=body.querySelector('#set-legacy');
+  if(lg2)lg2.onchange=e=>{
+    const src=document.getElementById('legacy-sets');
+    if(!src)return;
+    src.checked=e.target.checked;
+    src.dispatchEvent(new Event('change'));
+  };
   const nm=body.querySelector('#set-name'),ct=body.querySelector('#set-contact');
   DB.seller=DB.seller||{};
   nm.value=DB.seller.name||'';ct.value=DB.seller.contact||'';
@@ -21290,7 +21355,14 @@ function spOpen(on){
       r.dataset.done=REGION;
       r.innerHTML=opts(RARITIES.map(x=>x.n),'Any rarity');
     }
-    r.value=F.rar||'';
+    /* Type and owned reset on every open; rarity used to be seeded from the
+       binder's menu instead, and then never written back. So it was the one
+       control here that pretended to be the binder's: you narrowed a search
+       to Secret, closed the panel, and the bar still said Any rarity - and
+       reopening threw your choice away. Half-wired in both directions. It
+       resets like the other two now, and all three mean the same thing:
+       this search only. */
+    r.value='';
     spRender();
     setTimeout(()=>{q.focus();q.select();},20);
   }
