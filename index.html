@@ -5017,7 +5017,13 @@ function paintDash(){
   const more=MVS.length-M2.length;
   /* The margin earns the line only when there is a margin to report; failing
      that the wishlist takes it, if the list above has not already used it. */
-  const mgPc=pileOn('b-sell')&&M.n&&M.srp>0?(M.ask-M.srp)/M.srp*100:null;
+  /* ---- the margin line belongs to the selling shelf ----
+     It asked whether the Selling pile exists, not whether you are looking
+     at it, so "Asking P3,837 against P2,674 TCG Corner - +43%" sat under
+     the Collection headline it has nothing to do with. It is a fact about
+     what you are asking for the cards you are selling; it shows when that
+     is what is on screen. */
+  const mgPc=selling&&M.n&&M.srp>0?(M.ask-M.srp)/M.srp*100:null;
   const footer=(mgPc!=null&&Math.abs(mgPc)>=0.5)
     ? `<div class="mv-foot">Asking ${esc(peso(M.ask))} against ${esc(peso(M.srp))} ${esc(shopName())} \u2014 <b class="${mgPc<0?'up':'down'}">${mgPc>0?'+':''}${Math.round(mgPc)}%</b></div>`
     : (M2.length&&wantLine?`<div class="mv-foot">${wantLine}</div>`:'');
@@ -18054,18 +18060,32 @@ const ago=t=>{
   const d=Math.floor(h/24); return d===1?'yesterday':d+'d ago';
 };
 /* What is fresh and what is not, in one line. */
+/* ---- say nothing when there is nothing to say ----
+   This printed three ages every time - "Cards just now - Prices today -
+   Rate 62.92 35m ago" - which is three readings to make before you learn
+   the thing you wanted, which is that nothing needs fetching. Almost
+   always, nothing does.
+
+   So a day is the bar: anything refreshed inside one is simply up to date,
+   and the line says so once. Only what has fallen behind is named, and
+   then it is named with its age, because that is the moment the age
+   actually matters. A rate you typed yourself never counts as stale - it
+   is not waiting on anything.
+
+   The rate figure stays either way. It is not an age, it is the number
+   every peso on the page is derived from, and it is worth a glance before
+   you quote someone. */
 function syncStatus(){
+  const DAY=864e5, now=Date.now();
+  const fresh=t=>!!t&&(now-(+t))<DAY;
   const a=pxAgeDays();
-  return [
-    'Cards '+ago(POOL_AT),
-    'Prices '+(!PX_ROWS.length?'none':!isFinite(a)?'no date':a===0?'today':a===1?'yesterday':a+'d ago'),
-    /* The figure itself, not just its age. It used to live in a box in the
-       header - a third way to see a number that the price panel already
-       edits and Sync already fetches - and that box was the widest thing
-       on the strip, at 100px, for something you read rather than press.
-       It reads here instead, beside the other money and the other ages. */
-    'Rate '+fx()+' '+(DB.fxManual?'(yours)':ago(DB.fxAt))
-  ].join(' · ');
+  const behind=[];
+  if(!fresh(POOL_AT))behind.push('Cards '+ago(POOL_AT));
+  if(!(PX_ROWS.length&&isFinite(a)&&a<=1))
+    behind.push('Prices '+(!PX_ROWS.length?'none':!isFinite(a)?'no date':a+'d ago'));
+  if(!(DB.fxManual||fresh(DB.fxAt)))behind.push('Rate '+ago(DB.fxAt));
+  const rate='₱'+fx()+' per $'+(DB.fxManual?' (yours)':'');
+  return (behind.length?behind.join(' · '):'✓ Up to date')+' · '+rate;
 }
 /* ---- what to fetch, and how far along it is ----
    Three different things came down one button: the card list, the prices and
