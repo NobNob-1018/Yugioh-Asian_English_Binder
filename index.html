@@ -175,17 +175,6 @@ button{cursor:pointer;background:none;border:none}
 .regsw button:hover{color:var(--ink)}
 .regsw button.on{background:var(--accent);color:var(--on-accent)}
 .regsw button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-/* ---- the job switch outranks the region switch, and must look it ----
-   They are the same component because they are the same kind of control -
-   a short closed set, one of which is true - and making the big one a
-   different widget would have taught two patterns for one idea. The
-   hierarchy is carried the way this design carries everything else:
-   by size and by position, not by colour. Words rather than initials,
-   a step up in type, and first in a left-to-right run of decreasing
-   scope - what app, what job, which catalogue. */
-.jobsw{margin-right:2px}
-.jobsw button{font-family:var(--sans);font-size:var(--fs-2xs);letter-spacing:.02em;
-  padding:4px 12px;font-weight:500}
 /* rarities that only OCG-JP prints */
 .f-normalrare{--hi:#cfd6e4}
 .f-parallel{--hi:#b9c7dd}
@@ -267,16 +256,11 @@ button{cursor:pointer;background:none;border:none}
 .pilebar #binder-tabs{margin-top:0!important;flex:0 0 auto;min-width:0}
 .pilebar .switch{flex:0 0 auto;gap:7px}
 .pilebar .switch .lbl{font-size:var(--fs-2xs)}
-.pilebar #view-tabs{margin-left:auto;flex:0 0 auto}
-/* One job's bar at a time. The job is on the root element, so which row is
-   showing is one selector rather than a branch in the script. */
-#job-tabs{width:100%;order:0;margin-top:2px}
-:root[data-job="binder"] #job-tabs{display:none}
-:root[data-job="tool"] #pilebar{display:none}
-/* Deals and the trade calculator are two of Tool's four tabs, so the rail
-   offering them as well is the same door twice. They stay in the rail for
-   Binder, which has no tab for them. */
-:root[data-job="tool"] #grp-table{display:none}
+/* Two groups on one row, not three peers: the piles and Show owned answer
+   "which cards", the lens answers "how to look at them". A hairline says so
+   - the staff ruling a column, which is how this design separates anything. */
+.pilebar #view-tabs{margin-left:auto;flex:0 0 auto;
+  padding-left:var(--sp-3);border-left:1px solid var(--line-soft)}
 @media (max-width:420px){
   .pilebar{gap:var(--sp-2)}
   .pilebar #binder-tabs button{padding:0 9px}
@@ -2357,7 +2341,7 @@ provenance
          change - "Asian-English Binder" then "OCG-JP Binder" - and those are
          different widths, so the AE/JP switch shuffled sideways every time
          you used it. The switch is the one control that must never move. -->
-    <div class="mark"><h1 id="mark-title">OCG · AE Binder</h1><div class="regsw jobsw" id="jobsw" role="group" aria-label="What you are doing"><button type="button" data-j="binder" aria-pressed="true" title="The collection, at your own pace">Binder</button><button type="button" data-j="tool" aria-pressed="false" title="Standing up in a shop: prices, selling, deals, trades">Tool</button></div><div class="regsw" id="regsw" role="group" aria-label="Which collection"><button type="button" data-r="ae" aria-pressed="true" title="Asian-English printings, priced by TCG Corner and Players Club">AE</button><button type="button" data-r="ocg" aria-pressed="false" title="Japanese OCG printings from 2020 on, priced by Yuyu-tei">JP</button></div></div>
+    <div class="mark"><h1 id="mark-title">OCG · AE Binder</h1><div class="regsw" id="regsw" role="group" aria-label="Which collection"><button type="button" data-r="ae" aria-pressed="true" title="Asian-English printings, priced by TCG Corner and Players Club">AE</button><button type="button" data-r="ocg" aria-pressed="false" title="Japanese OCG printings from 2020 on, priced by Yuyu-tei">JP</button></div></div>
     <!-- ---- search lives here now ----
          It used to sit in the rail, and below 920px the rail drops beneath
          the card grid - so on a phone the single most-used control in the
@@ -2543,24 +2527,6 @@ provenance
         <!-- Below 920px the rail drops underneath the card grid, which strands
              the two controls reached for most. They move in here instead. -->
         <div class="pilebar" id="pilebar" hidden></div>
-        <!-- ---- Tool's four tabs are its four jobs ----
-             PRODUCT.md names what this half is for in one sentence: what a
-             card is worth, what is on the selling shelf, what a buyer has
-             reserved, whether a trade is fair. That is four things, so this
-             is four tabs and not a fifth. The wishlist is folded into Price
-             because a wishlist in a shop is a list of prices you are
-             watching, which is the question Price already answers.
-
-             None of this is new machinery. Each tab is a preset over the
-             binder that already exists - a pile, a filter and a view the app
-             has had all along - because the two jobs were always in here,
-             argued over the same screen. -->
-        <div class="tabs" id="job-tabs" role="navigation" aria-label="Price, Sell, Deals and Trade" hidden>
-          <button data-t="price" class="on">Price</button>
-          <button data-t="sell">Sell</button>
-          <button data-t="deals">Deals</button>
-          <button data-t="trade">Trade</button>
-        </div>
         <div class="toolset" id="toolset">
           <select class="mini" id="t-sort" aria-label="Order by"></select>
           <select class="mini" id="t-rar" aria-label="Rarity"></select>
@@ -2647,13 +2613,7 @@ const KEY_PREFS='ygo-binder-prefs-v1';
    the two board sort orders. So AE->JP un-folded your sidebar, reset cards
    per page and reset the Sets and Cores ordering - and AE again put them all
    back, which is what made it look random rather than broken.            */
-/* 'job' is which of the two the app is being right now, and 'densities' is
-   the card size each of them opens at. Both are facts about this device, not
-   about the collection, so they ride with the prefs and survive a region
-   swap - the same reasoning as 'piles' and 'regions' beside them.
-   NB 'mode' is already taken: it is the grid/list toggle, and has been since
-   before there were two jobs to confuse it with. */
-const PREF_FIELDS=['theme','density','densities','job','spread','mode','piles','regions',
+const PREF_FIELDS=['theme','density','spread','mode','piles','regions',
                    'railHidden','per','setSort','coreSort',
                    'fx','fxHkd','fxJpy','fxManual','fxAuto','fxAt'];
 let PREFS=(()=>{try{return JSON.parse(localStorage.getItem(KEY_PREFS)||'{}')||{};}
@@ -2850,40 +2810,6 @@ const REGIONS=[
 const regionOn=id=>{const r=DB.regions;return !Array.isArray(r)||!r.length||r.includes(id);};
 const regionsOn=()=>REGIONS.filter(r=>regionOn(r.id));
 const bothRegions=()=>regionsOn().length>1;
-/* ---- two jobs, and they are not the same app ----
-   The same person and the same collection, in two situations that have
-   almost nothing in common. At home, unhurried: looking through the cards,
-   seeing what a set is missing, showing someone. In a shop, one-handed, in a
-   hurry, often with no signal: what is this worth, what is on my selling
-   shelf, what has a buyer reserved, is this trade fair.
-
-   One medium-density interface served both, which is to say neither. The
-   binder half was too busy to enjoy and the tool half too slow to use
-   standing up. Three selectors - region, pile, view - sat in three different
-   corners as equals, and the user had to hold a map of all three.
-
-   So the job is the spine. It decides which question the bar below it is
-   even asking, which is why adding this control removes a row rather than
-   adding one: in Binder you choose a pile and a lens, in Tool you choose one
-   of the four things you came to do, and you are never offered both.      */
-const JOBS=[
-  {id:'binder',name:'Binder',
-   hint:'The collection, at your own pace. Art, sets and what is missing.'},
-  {id:'tool',  name:'Tool',
-   hint:'Standing up, in a shop. Prices, your selling shelf, deals and trades.'}
-];
-const JOB_DEF='binder';
-const theJob=()=>{const j=DB.job;return JOBS.some(x=>x.id===j)?j:JOB_DEF;};
-const toolOn=()=>theJob()==='tool';
-/* Binder is the unhurried one and Tool is read at arm's length over a
-   counter, so they do not want the same card size. Settings keeps a choice
-   per job rather than one choice that is wrong half the time. */
-const DENSITY_DEF={binder:'cosy',tool:'compact'};
-const densityFor=j=>{
-  const job=j||theJob();
-  const d=(DB.densities||{})[job];
-  return (d==='cosy'||d==='compact')?d:DENSITY_DEF[job];
-};
 /* ---- the rarity ladder of a named region ----
    RARITIES is a global that flips with the binder you are in, which is right
    everywhere except a panel that holds rows from both at once. rarBy() reads
@@ -3971,83 +3897,6 @@ function paintRegion(){
     b.setAttribute('aria-pressed',on?'true':'false');
   });
   document.documentElement.setAttribute('data-region',REGION);
-}
-/* ---- switching job is a repaint, not a reload ----
-   Unlike the region switch, nothing is read from disk and nothing is swapped
-   out: both jobs are lenses on the same loaded binder. So this stays
-   synchronous and instant, which is the whole point of a control you press
-   while someone is waiting for you to quote them a price.
-
-   The job is written to the root element rather than being read by each
-   component, so the stylesheet can answer "which job" without a class on
-   every node - and a rule that only applies to one of them is one selector,
-   not a branch in the script.                                            */
-function paintJob(){
-  const j=theJob();
-  document.documentElement.setAttribute('data-job',j);
-  document.querySelectorAll('#jobsw button').forEach(b=>{
-    const on=(b.dataset.j||JOB_DEF)===j;
-    b.classList.toggle('on',on);
-    b.setAttribute('aria-pressed',on?'true':'false');
-  });
-  /* each job opens at its own card size, so the grid has to be re-measured
-     rather than merely re-coloured */
-  applyDensity();
-  paintJobTabs();
-}
-function setJob(j){
-  if(!JOBS.some(x=>x.id===j)||j===theJob())return;
-  DB.job=j; savePrefs(); save();
-  /* A job remembers nothing about where you were in the other one: Tool's
-     four jobs and Binder's three piles are different questions, and landing
-     on "the equivalent tab" would be guessing at one. Each opens where it
-     opens. */
-  page=0;
-  paintJob();
-  if(toolOn()){
-    setToolTab('price');
-  }else{
-    VIEW='binder';
-    paintTools(); paintBinders(); renderBinder();
-  }
-  autoLayout(false);
-  /* The one thing Tool exists for is answering "what is this worth" while
-     standing up, so it opens with the search ready and the keyboard up. The
-     cost is a keyboard to dismiss when you came for the selling shelf; the
-     benefit is the common case costing no taps at all. */
-  if(toolOn())spOpen(true);
-}
-/* Which of Tool's four you are standing in is not stored: it is read back
-   off the view and the pile, the way the pile tabs read theirs. One source
-   of truth means the tab cannot disagree with the screen under it - which
-   is what happens when a view is reached from somewhere other than the tab
-   that nominally owns it. */
-const curToolTab=()=>VIEW==='deals'?'deals':(F.binder==='b-sell'?'sell':'price');
-function paintJobTabs(){
-  const tabs=document.getElementById('job-tabs');
-  if(!tabs)return;
-  tabs.hidden=!toolOn();
-  const cur=curToolTab();
-  tabs.querySelectorAll('button').forEach(b=>{
-    const on=b.dataset.t===cur;
-    b.classList.toggle('on',on);
-    b.setAttribute('aria-pressed',on?'true':'false');
-  });
-  slideAllTabs();
-}
-function setToolTab(t){
-  /* Trade is a panel you open over what you were doing, not a place you go,
-     so its tab does not latch: you come back to the tab you were on. */
-  if(t==='trade'){openTrade();paintJobTabs();return;}
-  VIEW=t==='deals'?'deals':'binder';
-  if(t==='price'){F.binder=defaultPile();F.ownedOnly=false;}
-  if(t==='sell'){F.binder='b-sell';F.ownedOnly=true;}
-  /* the switch is the source of this one everywhere else, so it has to be
-     told when something other than a finger moves it */
-  const ob=document.getElementById('owned-only');
-  if(ob)ob.checked=F.ownedOnly;
-  page=0;
-  paintJobTabs();paintBinders();paintTools();renderBinder();
 }
 function toast(m){
   document.querySelectorAll('.toast').forEach(t=>t.remove());
@@ -5218,18 +5067,13 @@ function paintTools(showingCards){
   const clr=$('#t-clear');
   if(clr)clr.classList.toggle('gone',!(F.rar||F.sort!=='price'||(DB.setSort&&DB.setSort!=='old')||(DB.coreSort&&DB.coreSort!=='name')));
 }
-/* Card size belongs to the job, not to the device: Binder is looked at and
-   Tool is read at arm's length over a counter. DB.density stays as the
-   *effective* value so every reader downstream - the column count, the
-   settings radio, the wizard - goes on asking one question and gets the
-   right answer for whichever job you are standing in. */
 function applyDensity(){
-  DB.density=densityFor();
   document.body.classList.toggle('compact',DB.density==='compact');
 }
+/* One writer, so the settings radio and the setup wizard cannot set it two
+   different ways. */
 function setDensity(v){
-  DB.densities=Object.assign({},DB.densities||{});
-  DB.densities[theJob()]=v;
+  DB.density=v;
   applyDensity();
 }
 /* ---- binder mode ----
@@ -21808,12 +21652,6 @@ document.querySelectorAll('#binder-tabs button').forEach(b=>{
 document.querySelectorAll('#regsw button').forEach(b=>{
   b.onclick=()=>setRegion(b.dataset.r);
 });
-document.querySelectorAll('#jobsw button').forEach(b=>{
-  b.onclick=()=>setJob(b.dataset.j);
-});
-document.querySelectorAll('#job-tabs button').forEach(b=>{
-  b.onclick=()=>setToolTab(b.dataset.t);
-});
 $('#filt-fab').onclick=()=>openSheet();
 $('#filt-btn').onclick=()=>openFilters();
 $('#sheet-veil').onclick=()=>{openSheet(false);openFilters(false);};
@@ -21919,11 +21757,6 @@ paintRarityKey();
   RARITIES = ocgOn()?RARITIES_JP:RARITIES_AE;
   $('#t-rar').innerHTML=opts(RARITIES.map(r=>r.n),'Any rarity');
   paintRegion();
-  /* before placePiles and the first layout: the job decides which bar is
-     being arranged and at what card size, so arranging it first would be
-     arranging the wrong one */
-  paintJob();
-  if(toolOn()){F.binder=defaultPile();F.ownedOnly=false;}
   placePiles();
   applyPiles();
   paintOnline();
