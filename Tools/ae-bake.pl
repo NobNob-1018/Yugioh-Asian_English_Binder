@@ -22,15 +22,28 @@ binmode(STDOUT, ':encoding(UTF-8)');
 my $HTML = 'index.html';
 
 # ---- read what the harvests produced ----
+# ---- one shop at a time is a legitimate run ----
+# This used to die unless both harvests had written a file, which sounds safe
+# and is not: when one shop is reachable and the other is being rate-limited,
+# refusing to bake either means the fresh data is thrown away to protect the
+# stale data. The block belonging to a missing harvest is simply left exactly
+# as it is, stamp and all, and the run says which shop it skipped.
 sub slurp_json {
-  my $f = shift;
-  open my $H, '<:raw', $f or die "$f: $! - run the harvester first\n";
+  my ($f, $optional) = @_;
+  open my $H, '<:raw', $f or do {
+    return undef if $optional;
+    die "$f: $! - run the harvester first\n";
+  };
   local $/; my $s = <$H>; close $H;
   return JSON::PP->new->utf8->decode($s);
 }
 
-my $tc = slurp_json('tcgc-prices.json');
-my $pc = slurp_json('pc-prices.json');
+my $tc = slurp_json('tcgc-prices.json', 1);
+my $pc = slurp_json('pc-prices.json',   1);
+die "neither tcgc-prices.json nor pc-prices.json is here - run a harvester first\n"
+  unless $tc || $pc;
+print "no tcgc-prices.json - leaving the TCG Corner block untouched\n"   unless $tc;
+print "no pc-prices.json - leaving the Players Club block untouched\n"   unless $pc;
 
 # ---- the shared name table ----
 # AE_NAMES already exists in the file. Names are stored as an index into it
@@ -62,7 +75,7 @@ my $packname = sub {
 # used prices live in Tools/played-stock.json instead.
 my (%by_code, @order, $played, $unrar, $kept);
 $played = 0; $unrar = 0; $kept = 0;
-for my $r (@{ $tc->{rows} }) {
+for my $r (@{ $tc ? $tc->{rows} : [] }) {
   my ($code, $price, $name, $rar, $cond, $av) = @$r;
   if ($cond) { $played++; next }
   $unrar++ unless defined $rar && length $rar;
@@ -91,7 +104,7 @@ printf "TCG Corner: %d codes, %d printings (%d played dropped, %d without a rari
 # through rather than collapsed here - collapsing in two places is how the
 # two shops would drift apart.
 my @pcrows;
-for my $r (@{ $pc->{rows} }) {
+for my $r (@{ $pc ? $pc->{rows} : [] }) {
   my ($code, $rar, $price, $name, $av) = @$r;
   push @pcrows, [ $code, $rar // '', $price + 0, $packname->($name), $av ? 1 : 0 ];
 }
@@ -104,30 +117,38 @@ sub rows_text {                      # one row per line, as the file already has
   return join ",\n", map { $J->encode($_) } @$rows;
 }
 
-my $tc_date = $tc->{t} // '';
-my $tc_cur  = $tc->{cur} // 'PHP';
-my $pc_date = $pc->{t} // '';
-my $pc_cur  = $pc->{cur} // 'HKD';
-
-my $baked_block = "/* BAKED_PRICES_START */\n"
-  . "const BAKED_STAMP='$tc_date';\n"
-  . "const BAKED_CUR='$tc_cur';\n"
-  . "const BAKED_PRICES=[\n" . rows_text( \@baked ) . "\n];\n"
-  . "/* BAKED_PRICES_END */";
-
-my ($pc_head) = $html =~ /(\/\* PC_PRICES_START \*\/.*?const PC_LINK=[^\n]*\n)/s
-  or die "could not find the Players Club header block\n";
-# the stamp and currency live in that header, so refresh them in place
-$pc_head =~ s/const PC_STAMP='[^']*';/const PC_STAMP='$pc_date';/;
-$pc_head =~ s/const PC_CUR='[^']*';/const PC_CUR='$pc_cur';/;
-my $pc_block = $pc_head
-  . "const PC_ROWS_RAW=[\n" . rows_text( \@pcrows ) . "\n];\n"
-  . "/* PC_PRICES_END */";
-
+my $want = 0;     # how many blocks this run is supposed to rewrite
 my $hits = 0;
-$hits += ( $html =~ s/\/\* BAKED_PRICES_START \*\/.*?\/\* BAKED_PRICES_END \*\//$baked_block/s );
-$hits += ( $html =~ s/\/\* PC_PRICES_START \*\/.*?\/\* PC_PRICES_END \*\//$pc_block/s );
-die "expected to replace 2 blocks, replaced $hits - markers moved?\n" unless $hits == 2;
+
+if ($tc) {
+  $want++;
+  my $tc_date = $tc->{t}   // '';
+  my $tc_cur  = $tc->{cur} // 'PHP';
+  my $baked_block = "/* BAKED_PRICES_START */\n"
+    . "const BAKED_STAMP='$tc_date';\n"
+    . "const BAKED_CUR='$tc_cur';\n"
+    . "const BAKED_PRICES=[\n" . rows_text( \@baked ) . "\n];\n"
+    . "/* BAKED_PRICES_END */";
+  $hits += ( $html =~ s/\/\* BAKED_PRICES_START \*\/.*?\/\* BAKED_PRICES_END \*\//$baked_block/s );
+}
+
+if ($pc) {
+  $want++;
+  my $pc_date = $pc->{t}   // '';
+  my $pc_cur  = $pc->{cur} // 'HKD';
+  my ($pc_head) = $html =~ /(\/\* PC_PRICES_START \*\/.*?const PC_LINK=[^\n]*\n)/s
+    or die "could not find the Players Club header block\n";
+  # the stamp and currency live in that header, so refresh them in place
+  $pc_head =~ s/const PC_STAMP='[^']*';/const PC_STAMP='$pc_date';/;
+  $pc_head =~ s/const PC_CUR='[^']*';/const PC_CUR='$pc_cur';/;
+  my $pc_block = $pc_head
+    . "const PC_ROWS_RAW=[\n" . rows_text( \@pcrows ) . "\n];\n"
+    . "/* PC_PRICES_END */";
+  $hits += ( $html =~ s/\/\* PC_PRICES_START \*\/.*?\/\* PC_PRICES_END \*\//$pc_block/s );
+}
+
+die "expected to replace $want block(s), replaced $hits - markers moved?\n"
+  unless $hits == $want;
 
 # Card names carry non-ASCII - accented letters, the full-width middle dot -
 # so the text is encoded to UTF-8 bytes before it is written. Writing wide

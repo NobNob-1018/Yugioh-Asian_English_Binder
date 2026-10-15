@@ -20,6 +20,34 @@ This replaced `fetch-tcgc-prices.js`, which needed Node and so could never run
 on this machine while the OCG-JP scripts beside it could. It writes the same
 file, plus `Tools/played-stock.json` for the graded copies.
 
+**It reads every collection the shop publishes, not one shelf.** Both
+harvesters used to read a single collection each, and both were wrong about
+it — see section 9. The short version: a newly released set gets a collection
+of its own and is filed into the general singles shelf weeks later, or never.
+CR13 (Creation Pack 13) was sitting in a collection called `cr13` while the
+shelf the harvester read still held 374 CR12 listings and no CR13 at all.
+
+The whole-shop feed, `/products.json`, is **not** a substitute. It answers
+past the end of the catalogue: Players Club served 25,000 products that way
+against a sitemap holding nearer 11,000, with whole sets — ALIN, BN01, CR03
+through CR10, DUAD, SUDA — never appearing in it once. Deep page-based
+pagination repeats some products and skips others, and two runs agree with
+each other, so it does not even look broken. Collections are small, so their
+paging stays shallow and honest. The whole-shop feed is still swept at the
+end for anything filed in no collection; at TCG Corner that sweep found
+exactly one row the 181 collections had missed.
+
+Overlap is heavy and harmless — 45,039 repeat listings at TCG Corner. A
+product seen twice is dropped **by product id**, not by content, because a
+shop really does list one printing twice at two prices and those are two
+listings rather than a duplicate. `indexPrices()` and `pcIndex()` already
+pick between them: in stock beats cheaper, then cheaper wins.
+
+Sealed product is dropped too. Card numbers start at 001, so a listing
+numbered `000` — `CR13-AE000 Creation Pack 13 Booster Box` — is a box, not a
+printing. Fifteen of those were already baked into the file, counting towards
+set completion and priced at the cost of a whole box.
+
 **Or from the app itself:** Prices → Sync, then Export .json. *(Export is
 currently disabled — see the warning under "Load it back".)*
 
@@ -48,6 +76,12 @@ condition column: `[code, rarity, price, name, available]`. Section 9 has
 described this endpoint since the shop was added, but the harvester itself was
 never written and its rows were produced by hand — which is why the
 Asian-English side could not be refreshed without a person.
+
+This one is the slow half: Players Club publishes about 1,700 collections with
+stock against TCG Corner's 181, so a run is roughly 1,700 polite sequential
+requests and takes around half an hour. That is why
+`.github/workflows/prices.yml` allows 90 minutes rather than 30. It is the
+price of not guessing which shelf to read, once a week.
 
 Neither harvester maps a rarity. Both pass the shop's own tag through
 untouched, because `ourRar()` in the app already owns every spelling both
@@ -106,22 +140,36 @@ paste its `rows` over the `BAKED_PRICES` array between the markers.
 ```bash
 perl Tools/verify-harvest.pl            # the JSON the harvests wrote
 perl Tools/verify-harvest.pl --baked    # what is already in index.html
+perl Tools/verify-harvest.pl --partial  # one shop answered, the other did not
 ```
 
-Exits non-zero on failure, so nothing downstream runs. It checks four things:
+Exits non-zero on failure, so nothing downstream runs. It checks five things:
 
 - **Floors** — 6,000 TCG Corner rows, 3,000 Players Club, 18,000 Yuyu-tei.
-  Set below the known-good counts (7,022 / 3,699 / 22,164) with room for a
-  real week of stock movement. Raise them when the catalogues genuinely grow;
-  a floor that never moves stops meaning anything.
+  Set below the known-good counts with room for a real week of stock movement.
+  Raise them when the catalogues genuinely grow; a floor that never moves
+  stops meaning anything.
 - **A drop of more than 15%** against what is currently baked.
+- **A set that has vanished.** Any set the baked file carries with 20 rows or
+  more must still be present by name. This is the one that was missing, and
+  it is the one that mattered: a throttled Players Club run lost eight whole
+  sets — ALIN, ES01, RC04, SDID, SDRB, SDSS, SLF1, TFTV — and that was a 1.7%
+  drop, so the 15% rule waved it straight through. Row counts cannot see a
+  hole; they can only see a smaller number.
 - **Rarity spread** — if every row carries the same tag, the parser stopped
   reading titles and is returning a default.
 - **A stamp from the future**, which means a clock or a cache problem.
 
-The half-failure is the case worth guarding: a shop changes a page, the parser
-matches less, and a smaller but perfectly well-formed file lands in the binder.
-Nothing looks wrong until a number is quoted at a table.
+`--partial` allows one shop's file to be missing, for the real case where one
+shop is rate-limiting and the other is not. The shop that *did* answer is
+still checked in full. It exists because the alternative — refusing to bake
+anything — throws away good data to protect stale data, and `ae-bake.pl`
+leaves the absent shop's block exactly as it is.
+
+The half-failure is the case worth guarding: a shop changes a page or starts
+refusing requests, the parser matches less, and a smaller but perfectly
+well-formed file lands in the binder. Nothing looks wrong until a number is
+quoted at a table — or until a set you own is simply not there.
 
 ### Running it on a schedule
 
@@ -186,6 +234,45 @@ each page's wikitext in batches of 40 with
 Two notes. Yugipedia refuses cross-origin requests, so this cannot be fetched
 from the app itself; it has to be baked. And send a normal browser User-Agent —
 the default one is blocked.
+
+### This one has no harvester, and it shows
+
+Everything above is a procedure, not a script. `Tools/` has
+`jp-catalogue-yugipedia.pl` for the OCG-JP side and **nothing for this one**,
+so `AE_CAT` is a snapshot someone took by hand: `AE_STAMP_SRC` still reads
+`yugipedia 2026-08-19`. The weekly workflow refreshes prices and never touches
+it.
+
+So a set that releases after that date is known to the app **only through the
+price feed**. That is enough to be useful and it is not nothing:
+
+- it appears on the Sets board, because `setGroups()` builds that from
+  `aeSets()`, which reads the price index, not the catalogue;
+- its cards are listed and priced, and `setMembers()` falls back to
+  `namesInSet()` — the distinct names the feed prints under that prefix;
+- it escapes the pre-2018 "legacy" hide, because `aeEra()` only classifies
+  sets the catalogue knows, and the `aeSets()` branch of `setGroups()` is not
+  filtered.
+
+What it does not get, until the catalogue is rebuilt:
+
+- **a name.** `setInfo()` has no entry, so the tile says "Tap to name this set"
+  until you name it yourself.
+- **a real size.** The completion bar counts against the highest card number
+  the shops happen to stock, not the set's true count.
+- **a release date.** `AE_DATES` stops at CR12 (`2026-07-11`), so `setDates()`
+  guesses from the newest card in the set — which for a reprint set like a
+  Creation Pack is an old date, and sorts it as though it were old.
+- **`inAE()`.** That reads `AE_ALL`, which is built from `AE_CAT` alone. A card
+  whose only Asian-English printing is in the new set reads as having none, so
+  the trade calculator greys out the AE side it should be offering.
+
+Writing `ae-catalogue-yugipedia.pl` is the fix, and it is not a copy of the JP
+one: `JP_NAMES_EXTRA` is appended to `AE_NAMES` at load, so every index baked
+into the JP catalogue depends on `AE_NAMES` keeping its current length and
+order. Regenerating `AE_NAMES` in place silently repoints the whole OCG-JP
+catalogue at the wrong cards. New names have to be appended after
+`JP_NAMES_EXTRA`, or both catalogues rebuilt together.
 
 ## 5. Moving a binder between devices
 
@@ -284,22 +371,56 @@ P1,538 with nothing on screen to say a second shop had it for half. It reads
 exactly like the comparison picking wrong - and the comparison is fine. It was
 never handed the row.
 
-So the shop's own collection list decides what to read: every collection whose
-title names an AE set - their convention, `1303 BPRO-AE BURST PROTOCOL` - plus
-`ygoae1`. A set that gets its own collection next month is picked up without
-anyone having to notice.
+### The title rule was still a guess, and it missed CR13
+
+That fix read `ygoae1` plus every collection whose **title** contained `-AE`.
+It caught 23 collections and it missed the entire Creation Pack line, because
+those are titled `CR13 Creation Pack 13` — no `-AE` anywhere in the string.
+CR11, CR12 and CR13 therefore arrived with 0, 1 and 1 rows against CR01's 199.
+The one row each was the sealed booster box.
+
+The pattern underneath both bugs: **the newest set gets a collection of its
+own and is filed into `ygoae1` weeks later, or never.** So the newest set is
+always the one missing, which is the worst possible set to be missing.
+
+Reading all 1,709 stocked collections is the obvious way to stop guessing.
+**This shop will not have it.** It starts answering `429` with an HTML error
+page at around the thousandth request and stays cross for a long time
+afterwards. Worse, the first attempt treated an undecodable body exactly like
+an empty one — end of collection, zero rows, carry on — so the run *finished
+successfully* having lost ALIN, ES01, RC04, SDID, SDRB, SDSS, SLF1 and TFTV,
+because `ygoae1` came 1,530th and by then nothing was being answered at all.
+That is 606 rows: a **1.7%** drop, which sailed through the 15% floor.
+
+So two things changed. The gate now compares sets by name, not just row counts
+(see "Refusing a bad harvest"). And the selection is narrowed by **data rather
+than by a hunch about naming**:
+
+- every collection whose title or handle mentions a set code that
+  `tcgc-prices.json` or the baked `AE_CAT` already knows about;
+- plus anything matching `-AE`, plus `ygoae1`.
+
+That is ~130 collections instead of 1,709. CR13 is found because TCG Corner
+was already selling it when the other harvester ran minutes earlier — not
+because anything here was taught the words "Creation Pack". The two shops
+cover each other, which is the property the old rules lacked.
 
 ```
 https://playersclubhk.com/en/collections.json?limit=250&page=N     -> the list
 https://playersclubhk.com/en/collections/<handle>/products.json?limit=250&page=N
 ```
 
-Overlap is expected and harmless: a card in both `ygoae1` and its own set
-collection is emitted twice, and `pcIndex()` already resolves a duplicate
-code+rarity the right way round - in stock beats cheaper, then cheaper wins.
+A failed fetch is retried with a widening pause (5s, 15s, 30s, 60s, 90s) and,
+if it still will not answer, the script **exits non-zero without writing**.
+A short file is the dangerous outcome precisely because it looks fine.
 
-16 collections, 4,837 rows, 1,993 of them carrying a rarity (was 4,127 and
-1,608). Three things to know:
+Overlap is expected and harmless: a card in both `ygoae1` and its own set
+collection arrives twice and is dropped **by product id**, not by content —
+the shop really does list one printing twice at two prices, and those are two
+listings. `pcIndex()` already resolves a repeated code+rarity the right way
+round: in stock beats cheaper, then cheaper wins.
+
+Three things to know:
 
 1. **Rarity is in the title, not a field.** `25AT-AE304 (SR)Lose 1 Turn`, or
    sometimes glued on: `DUNE-AE107(UR)`. Their abbreviations differ from ours -
@@ -1165,7 +1286,11 @@ These were verified on the TCG Corner site by eye, and are the reference the
 price matching is judged against. They lived inside `test-prices.js`, which
 needed Node and so could never run here; the file is gone, the knowledge is not.
 
-Checked 2026-08-18, in pesos:
+Checked 2026-08-18, in pesos. The three Droll & Lock Bird figures were
+re-captured on **2026-10-15**: TCG Corner had dropped that printing from $28
+to $20, $10 to $6 and $18 to $12 since August, so the check was failing on a
+correct build. The rows were byte-identical before and after the harvester
+change, which is how we knew it was the shop moving and not the code.
 
 | Card | Set | Rarity | Price |
 |---|---|---|---|
@@ -1176,9 +1301,9 @@ Checked 2026-08-18, in pesos:
 | Ash Blossom & Joyous Spring | RC04 | CR | 1,134.73 |
 | Ash Blossom & Joyous Spring | RC04 | ExSR | 1,576.01 |
 | Ash Blossom & Joyous Spring | RC04 | HGR | 8,825.67 |
-| Droll & Lock Bird | ES02 | UtR | 1,765.13 |
-| Droll & Lock Bird | ES02 | UR | 630.40 |
-| Droll & Lock Bird | ES02 | ScR | 1,134.73 |
+| Droll & Lock Bird | ES02 | UtR | 1,260.80 |
+| Droll & Lock Bird | ES02 | UR | 378.24 |
+| Droll & Lock Bird | ES02 | ScR | 756.48 |
 
 **These figures are in pesos, and the peso figure is not a constant.** The
 baked list is in USD (`PX_CUR==='USD'`), so `bestMatch` returns
@@ -1204,9 +1329,9 @@ with the peso figure as a tolerance.
     ['Ash Blossom & Joyous Spring','RC04','CR'  , 1134.73,'RC04-AE009'],
     ['Ash Blossom & Joyous Spring','RC04','ExSR', 1576.01,'RC04-AE009'],
     ['Ash Blossom & Joyous Spring','RC04','HGR' , 8825.67,'RC04-AE009'],
-    ['Droll & Lock Bird'          ,'ES02','UtR' , 1765.13,'ES02-AE005'],
-    ['Droll & Lock Bird'          ,'ES02','UR'  ,  630.40,'ES02-AE005'],
-    ['Droll & Lock Bird'          ,'ES02','ScR' , 1134.73,'ES02-AE005'],
+    ['Droll & Lock Bird'          ,'ES02','UtR' , 1260.80,'ES02-AE005'],
+    ['Droll & Lock Bird'          ,'ES02','UR'  ,  378.24,'ES02-AE005'],
+    ['Droll & Lock Bird'          ,'ES02','ScR' ,  756.48,'ES02-AE005'],
   ];
   const live = DB.fx; DB.fx = FX_WHEN_CHECKED;   // pin, so this tests matching
   let bad = 0;

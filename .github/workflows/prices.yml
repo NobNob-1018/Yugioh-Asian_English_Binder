@@ -34,7 +34,13 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Was 30, which fitted when the Asian-English harvest read one collection
+    # per shop. It now reads every collection either shop publishes - about
+    # 180 at TCG Corner and 1,200 at Players Club - because a set filed only
+    # in its own collection was invisible otherwise, and CR13 was. That is
+    # roughly 25 minutes of polite sequential requests, so the old ceiling
+    # would have killed the job just before it wrote anything.
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -49,17 +55,27 @@ jobs:
       - name: Record what is baked now
         run: perl Tools/verify-harvest.pl --baked
 
+      # Either shop may rate-limit us - Players Club answers 429 once it has
+      # had enough, and a harvester that hits that writes no file at all
+      # rather than a short one. That must not throw away the shop that did
+      # answer, so a failure here is a warning and the bake takes what it got.
       - name: Harvest Asian-English
         if: ${{ github.event.inputs.region != 'jp' }}
         run: |
-          perl Tools/ae-prices-tcgcorner.pl
-          perl Tools/pc-prices-playersclub.pl
+          perl Tools/ae-prices-tcgcorner.pl \
+            || echo "::warning::TCG Corner harvest failed - its baked block will be left as it is"
+          perl Tools/pc-prices-playersclub.pl \
+            || echo "::warning::Players Club harvest failed - its baked block will be left as it is"
+          test -f tcgc-prices.json -o -f pc-prices.json \
+            || { echo "::error::both harvests failed"; exit 1; }
 
       # The gate. Runs before anything is written to index.html, so a bad
-      # harvest stops here rather than being discovered in the diff.
+      # harvest stops here rather than being discovered in the diff. --partial
+      # allows the one-shop case above; the shop that did answer is still
+      # checked in full, including that no set of its has vanished.
       - name: Verify the harvest
         if: ${{ github.event.inputs.region != 'jp' }}
-        run: perl Tools/verify-harvest.pl
+        run: perl Tools/verify-harvest.pl --partial
 
       - name: Bake Asian-English
         if: ${{ github.event.inputs.region != 'jp' }}
